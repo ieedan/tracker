@@ -1,0 +1,51 @@
+{
+	"$schema": "https://getbizi.dev/schemas/task.config.json",
+	"tasks": {
+		"dev": {
+			"title": "tracker",
+			"tasks": {
+				"infra": {
+					"title": "postgres + minio",
+					"color": "blue",
+					"command": "docker compose up -d --wait"
+				},
+				"migrate": {
+					"title": "migrations",
+					"color": "yellow",
+					"command": "pnpm db:migrate",
+					"dependsOn": ["dev:infra"]
+				},
+				"app": {
+					"title": "vite",
+					"color": "green",
+					"command": "pnpm dev",
+					"dependsOn": ["dev:migrate"]
+				}
+			}
+		},
+		"seed": {
+			"title": "seed demo data",
+			"color": "magenta",
+			"command": "pnpm db:seed",
+			"optional": true
+		},
+		"studio": {
+			"title": "drizzle studio",
+			"color": "cyan",
+			"command": "pnpm db:studio",
+			"optional": true
+		},
+		"check": {
+			"title": "typecheck",
+			"color": "white",
+			"command": "pnpm check",
+			"optional": true
+		},
+		"down": {
+			"title": "stop infra",
+			"color": "red",
+			"command": "docker compose down",
+			"optional": true
+		}
+	}
+}

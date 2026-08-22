@@ -4,6 +4,7 @@
 		"target": "ES2022",
 		"lib": [
 			"ES2022",
+			"ES2023",
 			"DOM",
 			"DOM.Iterable"
 		],
@@ -20,7 +21,26 @@
 		"types": [
 			"node",
 			"vite/client"
-		]
+		],
+		// `@implementjs/*` are linked from a sibling checkout that carries its own
+		// copy of vite. Without pinning these, tsc sees two structurally identical
+		// but nominally different `Plugin` types and rejects the plugin array.
+		// The `@/lib` entries are inherited from `.implement/tsconfig.json` and
+		// have to be repeated, since `paths` replaces rather than merges.
+		"paths": {
+			"@/lib": [
+				"./src/lib"
+			],
+			"@/lib/*": [
+				"./src/lib/*"
+			],
+			"vite": [
+				"./node_modules/vite"
+			],
+			"rollup": [
+				"./node_modules/rollup"
+			]
+		}
 	},
 	"include": [
 		"src/**/*.ts",
