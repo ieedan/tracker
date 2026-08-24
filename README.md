@@ -57,8 +57,13 @@ at a workspace that does not exist.
   click-to-edit on the issue.
 - **Inbox** — assignment, reassignment, status changes and comments land in the
   assignee's and reporter's inbox. You are never notified of your own actions.
+- **Filters** — `F` (or the Filter button) opens a two-step menu: pick a
+  dimension — status, priority, assignee, label, team, creator — then pick
+  values. Each active filter becomes a chip you can edit in place: click the
+  operator to flip `is` ⇄ `is not`, click the values to change them, `×` to drop
+  it. Filters live in the URL, so a filtered view is a shareable link.
 - **Keyboard** — `⌘K` command palette, `c` to compose an issue, `/` to search,
-  `⌘↵` to submit a composer or a comment, `Esc` to dismiss.
+  `F` to filter, `⌘↵` to submit a composer or a comment, `Esc` to dismiss.
 - **REST API** — everything the UI does, under `/api/v1`, authenticated with a
   session cookie _or_ an API key.
 
@@ -88,6 +93,27 @@ API keys are deliberately **not** sessions. They authenticate `/api/v1` only:
 they cannot reach better-auth's account endpoints, and they cannot mint more
 keys — that needs a signed-in session. See `src/lib/server/api-key.server.ts`
 for why.
+
+## Filters
+
+Filters are query params, and they are meant to be readable:
+
+```
+?status=todo,in_progress        status is Todo or In Progress
+?status=!done,canceled          status is not Done or Canceled
+?assignee=none                  unassigned
+?label=<id>&team=ENG            combined — every filter must match
+```
+
+Because the URL is the state, a filtered list survives a reload, works with the
+back button, and **server-renders already filtered** rather than painting the
+full list and then narrowing it.
+
+Matching runs over the issues the page loaded, in `filters.ts` — one pure
+function shared by the server render and the browser. That is the right trade
+while a workspace's issues fit in one response; the API already takes
+`?team=`/`?status=` server-side, and pushing the rest down to SQL is what to do
+when the list grows enough to need pagination.
 
 ## Webhooks
 

@@ -13,6 +13,7 @@ import {
 	type Readable,
 } from "@implementjs/core";
 import { Plus, Search } from "@implementjs/lucide";
+import { navigateTo } from "@implementjs/core";
 import { StatusIcon } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -24,6 +25,8 @@ import {
 import type { Issue, Label, Member, Team, TeamRef, Workspace } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 import { issueCreated, openCreateIssue } from "./create-issue-dialog";
+import { AddFilterButton, FilterBar, type FilterContext } from "./filter-bar";
+import { matchesFilters, parseFilters, serializeFilters, type Filter } from "./filters";
 import { AssigneePicker, LabelChips, PriorityPicker, StatusPicker, TeamBadge } from "./pickers";
 import { patchIssue } from "./issue-store";
 
@@ -40,9 +43,11 @@ interface PageData {
 export function IssueListPage({
 	data,
 	params,
+	url,
 }: {
 	data: Readable<PageData>;
 	params: { slug: Readable<string> };
+	url: Readable<{ path: string; search: string }>;
 }) {
 	const issues = signal(data.get().issues);
 	// A client navigation between workspaces reseeds the load rather than
@@ -51,10 +56,35 @@ export function IssueListPage({
 
 	const query = signal("");
 
-	const visible = derived([issues, query], (list, term) => {
+	// The URL is the filter state. Deriving from it rather than mirroring it into
+	// a signal means a shared link, a reload and the back button all land on the
+	// same view — and the server render is already filtered, so nothing flashes
+	// unfiltered and then narrows.
+	const filters = derived([url], (location) => parseFilters(location.search));
+
+	const applyFilters = (next: Filter[]) => {
+		const location = url.get();
+		const search = serializeFilters(next, location.search);
+		// `replace` so a filter fiddle does not bury the previous page under a
+		// dozen history entries; `noScroll` so a long list stays where it is.
+		navigateTo(`${location.path}${search}`, { replace: true, noScroll: true });
+	};
+
+	const filterContext = derived([data], (value): FilterContext => ({
+		teams: value.teams,
+		members: value.members,
+		labels: value.labels,
+		hideTeam: value.team !== null,
+	}));
+
+	const addFilterOpen = signal(false);
+
+	const visible = derived([issues, query, filters], (list, term, active) => {
 		const needle = term.trim().toLowerCase();
-		if (needle === "") return list;
-		return list.filter(
+		const matched =
+			active.length === 0 ? list : list.filter((issue) => matchesFilters(issue, active));
+		if (needle === "") return matched;
+		return matched.filter(
 			(issue) =>
 				issue.title.toLowerCase().includes(needle) ||
 				issue.identifier.toLowerCase().includes(needle),
@@ -95,16 +125,31 @@ export function IssueListPage({
 					event.preventDefault();
 					searchRef.get()?.focus();
 				}
+				if (event.key === "f" && !event.metaKey && !event.ctrlKey) {
+					event.preventDefault();
+					addFilterOpen.set(true);
+				}
 			},
 		}),
 
-		Header(data, query, searchRef, params),
+		Header(
+			data,
+			query,
+			searchRef,
+			params,
+			visible,
+			filters,
+			filterContext,
+			applyFilters,
+			addFilterOpen,
+		),
+		FilterBar({ filters, context: filterContext, onChange: applyFilters }),
 
 		Div(
 			{ class: "min-h-0 flex-1 overflow-y-auto" },
 			If(
 				visible.bind((list) => list.length === 0),
-				EmptyState(query, params, data),
+				EmptyState(query, params, data, filters, applyFilters),
 			),
 			...ISSUE_STATUSES.map((status) => StatusGroup(status, visible, issues, data, params)),
 		),
@@ -116,6 +161,11 @@ function Header(
 	query: ReturnType<typeof signal<string>>,
 	searchRef: ReturnType<typeof signal<HTMLInputElement | null>>,
 	params: { slug: Readable<string> },
+	visible: Readable<Issue[]>,
+	filters: Readable<Filter[]>,
+	filterContext: Readable<FilterContext>,
+	applyFilters: (next: Filter[]) => void,
+	addFilterOpen: ReturnType<typeof signal<boolean>>,
 ) {
 	return Div(
 		{
@@ -136,8 +186,12 @@ function Header(
 		),
 		Span(
 			{ class: "rounded bg-secondary px-1.5 text-[11px] text-muted-foreground" },
-			data.bind((value) => `${value.issues.length}`),
+			// The count follows what is actually listed, so a filter that hides
+			// everything reads as 0 rather than the unfiltered total.
+			visible.bind((list) => `${list.length}`),
 		),
+
+		AddFilterButton(filters, filterContext, applyFilters, addFilterOpen),
 
 		Div(
 			{ class: "relative ml-auto" },
@@ -169,15 +223,31 @@ function EmptyState(
 	query: Readable<string>,
 	params: { slug: Readable<string> },
 	data: Readable<PageData>,
+	filters: Readable<Filter[]>,
+	applyFilters: (next: Filter[]) => void,
 ) {
 	return Div(
 		{ class: "flex flex-col items-center justify-center gap-3 py-24 text-center" },
+
+		// "Nothing here" means three different things; say which one.
 		Div(
 			{ class: "text-[13px] text-muted-foreground" },
-			query.bind((term) => (term.trim() === "" ? "No issues yet." : `Nothing matches “${term}”.`)),
+			derived([query, filters], (term, active) => {
+				if (term.trim() !== "") return `Nothing matches \u201C${term}\u201D.`;
+				return active.length > 0 ? "No issues match these filters." : "No issues yet.";
+			}),
 		),
+
 		If(
-			query.bind((term) => term.trim() === ""),
+			filters.bind((active) => active.length > 0),
+			Button(
+				{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
+				"Clear filters",
+			),
+		),
+
+		If(
+			derived([query, filters], (term, active) => term.trim() === "" && active.length === 0),
 			Button(
 				{
 					size: "sm",
