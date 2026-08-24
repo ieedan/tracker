@@ -18,7 +18,7 @@ export const tabsListVariants = tv({
 	base: "inline-flex items-center justify-center text-muted-foreground data-[orientation=vertical]:h-fit data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch",
 	variants: {
 		variant: {
-			default: "h-9 w-fit rounded-lg bg-muted p-[3px]",
+			default: "h-8 w-fit rounded-lg bg-muted p-[3px]",
 			underline:
 				"h-auto w-full justify-start gap-4 rounded-none border-b border-border bg-transparent p-0 data-[orientation=vertical]:w-fit data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-r",
 		},

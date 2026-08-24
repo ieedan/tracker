@@ -9,23 +9,23 @@ importers:
   .:
     dependencies:
       '@implementjs/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ~0.0.8
+        version: 0.0.8
       '@implementjs/formish':
-        specifier: ^0.0.6
-        version: 0.0.6(valibot@1.4.2(typescript@7.0.2))
+        specifier: ~0.0.8
+        version: 0.0.8(valibot@1.4.2(typescript@7.0.2))
       '@implementjs/lucide':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ~0.0.6
+        version: 0.0.8
       '@implementjs/mode-watcher':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ~0.0.8
+        version: 0.0.8
       '@implementjs/primitives':
-        specifier: ^0.0.7
-        version: 0.0.7
+        specifier: ~0.0.9
+        version: 0.0.9
       '@implementjs/router':
-        specifier: ^0.0.7
-        version: 0.0.7
+        specifier: ~0.0.9
+        version: 0.0.9
       '@libsql/client':
         specifier: ^0.17.4
         version: 0.17.4
@@ -46,11 +46,11 @@ importers:
         specifier: ^2.21.0
         version: 2.21.0
       '@implementjs/eslint':
-        specifier: ^0.0.1
+        specifier: ~0.0.1
         version: 0.0.1
       '@implementjs/kit':
-        specifier: 0.0.7
-        version: 0.0.7(neverthrow@8.2.0)(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+        specifier: ~0.0.10
+        version: 0.0.10(neverthrow@8.2.0)(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
@@ -421,19 +421,19 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@implementjs/core@0.0.6':
-    resolution: {integrity: sha512-dnJVYe0N9sEb+5XdDMP8lk+OTRuOgI4A+DLtZDbm1/2mN3cCaaM998Ppry60ostP+fkpa09wPw4g0A1t0GBoeg==}
+  '@implementjs/core@0.0.8':
+    resolution: {integrity: sha512-Z4rBQbDpT1u5w0/WRQToweMbstKkDESDjXYGp9SOc4IpdzpNtP20vSDmdJ3ckK7O8y7QhY37+7wsd/UDHkD4vQ==}
 
   '@implementjs/eslint@0.0.1':
     resolution: {integrity: sha512-tDelj7wrEqCh3TWxtdfpyNcIUCfgKgqDoJK/t193AnhsYwxKzqEB9DZH8EvzmLdQ9nSxrJm1cVnVGzfydH1l3g==}
 
-  '@implementjs/formish@0.0.6':
-    resolution: {integrity: sha512-iVIdX4Ol1xHq1aRxVab13c/CIQge6Qxv8BrTGHT7PsKiFGbjwPx/oUlUj7tg89i+Uidzu0JJ36FGOT+XTIPEgA==}
+  '@implementjs/formish@0.0.8':
+    resolution: {integrity: sha512-8wbUUmJEIezxoByayGxMHRaGL5KA3ky8tzfBFvfdzzfDtGgtYwctf90B+CFJkYh7B8JuehrXtqmrs8rsyBrZ6A==}
     peerDependencies:
       valibot: '>=1.4.1 <2'
 
-  '@implementjs/kit@0.0.7':
-    resolution: {integrity: sha512-VOgQJIj+baVqUhcMvBEcd3Gl8V5PadtCseGu6CVw2L/SZmrSwwe5uBte5WPIJbk7aISKINJ/7xjIgHbbt8wzXA==}
+  '@implementjs/kit@0.0.10':
+    resolution: {integrity: sha512-GD1nBGEUNQ678PgPg2YVGavec1p8fM1v8YO2SwZcXeK0qnUjNOxbpsZyZZZybsiWQdfUfVURIieO+MVWSYMGlg==}
     hasBin: true
     peerDependencies:
       neverthrow: ^8.0.0
@@ -442,17 +442,17 @@ packages:
       neverthrow:
         optional: true
 
-  '@implementjs/lucide@0.0.6':
-    resolution: {integrity: sha512-pcbdyDt+EGoyCEvsyONnmyELqVHg3y6+9cnMP37VA54xqgBVJO8WOxiywgo2yEIi9yzuvvsEbbCUTm+qBm725A==}
+  '@implementjs/lucide@0.0.8':
+    resolution: {integrity: sha512-73t0KcOiKaONOrA9zMeh37a8Z0+8+GBBcDBtZgdAcn+TqW7m3egBx3Ni8TxxEUV/8lud+fEpMpFWZGkKDCR4/g==}
 
-  '@implementjs/mode-watcher@0.0.6':
-    resolution: {integrity: sha512-X6TMgYIE5WKyK7lzyMdAzoQcprxSTiqTJ/I3UE70Yf03+IzDK/F+i0+97j0Xd1YAlDQrk6+lIVsxE1Rb4Wo9pA==}
+  '@implementjs/mode-watcher@0.0.8':
+    resolution: {integrity: sha512-IeHHGPkLLuaSf3E+oEw5gUJsIqmHWnPp4M3+yliCJFOL3IeIbR7+IOBUGqhVkUIYxX8ny9uWPJE6rzzB8iS4Bg==}
 
-  '@implementjs/primitives@0.0.7':
-    resolution: {integrity: sha512-Fl6Qxn7jik9DJ7W3RTSQaQehe0eMEYcL4BB6WbY1YmoFT53ldE4411y5h6Z+HSPsWy9hV3z0J73FaAg8Iw+uxg==}
+  '@implementjs/primitives@0.0.9':
+    resolution: {integrity: sha512-COKYYiRFP8E6boLSo5727CM92jxlErnhOTmUuf+gSIy2ynmheTGFnzTRWqKtFUn3amImKh27ts2K8aNf3n3jrw==}
 
-  '@implementjs/router@0.0.7':
-    resolution: {integrity: sha512-/R/MrNC1cR5tF0ons+xEQKMZn4u1wlCQ9S31z2Oz4Tp9g826f6LBKoBkbscigTxyEaeC7BOTbIMUBWMxjo1Oxw==}
+  '@implementjs/router@0.0.9':
+    resolution: {integrity: sha512-IJZZ3LFrBY/leaqe0oeJe97H9gq/cOrE8qG8ANi+c9Oyr0OI3XvzV3nPvkXUeqEHERd4E+kJLpjnElvYi0Btyg==}
 
   '@implementjs/vite@0.0.1':
     resolution: {integrity: sha512-nzjv5BESnpIBSA6EqJpa7dNQnwclz+RfQAwKlk14JfCXr0EESTrm2vsM/yhcW4hyBegDob7u9Qs7Sekp6bZCLQ==}
@@ -2144,7 +2144,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@implementjs/core@0.0.6':
+  '@implementjs/core@0.0.8':
     dependencies:
       fast-deep-equal: 3.1.3
 
@@ -2152,15 +2152,15 @@ snapshots:
     dependencies:
       aria-query: 5.3.2
 
-  '@implementjs/formish@0.0.6(valibot@1.4.2(typescript@7.0.2))':
+  '@implementjs/formish@0.0.8(valibot@1.4.2(typescript@7.0.2))':
     dependencies:
-      '@implementjs/core': 0.0.6
+      '@implementjs/core': 0.0.8
       valibot: 1.4.2(typescript@7.0.2)
 
-  '@implementjs/kit@0.0.7(neverthrow@8.2.0)(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
+  '@implementjs/kit@0.0.10(neverthrow@8.2.0)(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
     dependencies:
-      '@implementjs/core': 0.0.6
-      '@implementjs/router': 0.0.7
+      '@implementjs/core': 0.0.8
+      '@implementjs/router': 0.0.9
       '@implementjs/vite': 0.0.1(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@resvg/resvg-js': 2.6.2
       '@standard-schema/spec': 1.1.0
@@ -2171,21 +2171,21 @@ snapshots:
     optionalDependencies:
       neverthrow: 8.2.0
 
-  '@implementjs/lucide@0.0.6':
+  '@implementjs/lucide@0.0.8':
     dependencies:
-      '@implementjs/core': 0.0.6
+      '@implementjs/core': 0.0.8
 
-  '@implementjs/mode-watcher@0.0.6':
+  '@implementjs/mode-watcher@0.0.8':
     dependencies:
-      '@implementjs/core': 0.0.6
+      '@implementjs/core': 0.0.8
 
-  '@implementjs/primitives@0.0.7':
+  '@implementjs/primitives@0.0.9':
     dependencies:
-      '@implementjs/core': 0.0.6
+      '@implementjs/core': 0.0.8
 
-  '@implementjs/router@0.0.7':
+  '@implementjs/router@0.0.9':
     dependencies:
-      '@implementjs/core': 0.0.6
+      '@implementjs/core': 0.0.8
 
   '@implementjs/vite@0.0.1(vite@7.3.6(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
     dependencies:

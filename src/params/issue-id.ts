@@ -1,4 +1,4 @@
-import { matcher, mismatch } from "@implementjs/kit";
+import { matcher, mismatch } from "@implementjs/kit/params";
 
 export default matcher((v) => {
 	const match = /^([A-Z]+)-(\d+)$/.exec(v);

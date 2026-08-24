@@ -1,4 +1,4 @@
-import { Div, ForEach, Span, type Signal } from "@implementjs/core";
+import { Div, ForEach, Fragment, Span, type Child, type Signal } from "@implementjs/core";
 import { IssueManagerContext } from "@/lib/features/issues/issue-manager";
 import type { Issue } from "@/lib/db/types";
 import { Button } from "@/lib/components/ui/button";
@@ -9,6 +9,8 @@ import { LabelBadge } from "@/lib/features/issues/label-picker";
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { router } from "$implement/router";
 import { formatIssueId } from "@/lib/features/issues/utils";
+import { PageContent, PageHeader } from "@/lib/components/page/page";
+import { BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/lib/components/ui/breadcrumb";
 
 export default function Page() {
 	return Div(
@@ -19,24 +21,30 @@ export default function Page() {
 
 function IssueList() {
 	return IssueManagerContext.Use((manager) => {
-		return Div(
-			{ class: "flex flex-col" },
+		return Fragment({},
 			IssueListHeader(),
-			Div({ class: 'flex flex-col' },
-				ForEach(
-					manager.issues,
-					(item) => item.id,
-					(item) => Issue(item),
+			PageContent(
+				Div({ class: 'flex flex-col' },
+					ForEach(
+						manager.issues,
+						(item) => item.id,
+						(item) => Issue(item),
+					),
 				),
 			),
-		);
+		)
 	});
 }
 
 function IssueListHeader() {
 	return IssueManagerContext.Use((manager) => {
-		return Div({ class: 'flex items-center justify-end' },
-			Button({ variant: "outline", size: 'icon', onClick: () => manager.openCreateIssueDialog() }, SquarePenIcon({}),),
+		return PageHeader(
+			Div({ class: 'flex items-center justify-between w-full' },
+				BreadcrumbList({},
+					BreadcrumbItem(BreadcrumbPage("Issues")),
+				),
+				Button({ variant: "ghost", size: 'icon', onClick: () => manager.openCreateIssueDialog() }, SquarePenIcon({}),),
+			)
 		)
 	})
 }
@@ -49,18 +57,18 @@ function Issue(issue: Signal<Issue>) {
 			class: 'border-b py-1 px-3 flex items-center justify-between',
 		},
 		Div({ class: 'flex items-center gap-2' },
-			Checkbox({}),
-			PriorityPicker({
+			RowControl(Checkbox({})),
+			RowControl(PriorityPicker({
 				value: issue.bind('priority'),
 				showLabel: false,
 				class: 'border-none p-0 flex items-center justify-center size-8'
-			}),
+			})),
 			Span({ class: 'text-muted-foreground font-mono text-sm w-15' }, issue.bind((issue) => formatIssueId(issue))),
-			StatusPicker({
+			RowControl(StatusPicker({
 				value: issue.bind("status"),
 				showLabel: false,
 				class: 'border-none p-0 flex items-center justify-center size-8'
-			}),
+			})),
 			Span(issue.bind("title"))
 		),
 		Div({ class: 'flex items-center gap-2' },
@@ -70,3 +78,20 @@ function Issue(issue: Signal<Issue>) {
 	);
 }
 
+/**
+ * A control that lives inside the row's link. `preventDefault` is what `router.Link` checks before
+ * it navigates, and it also cancels the browser's own anchor activation — the control's click
+ * handler has already run by the time the event reaches this wrapper.
+ */
+function RowControl(...children: Child[]) {
+	return Div(
+		{
+			class: 'flex items-center',
+			onClick: (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+			},
+		},
+		...children,
+	);
+}

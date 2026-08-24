@@ -22,7 +22,6 @@ import { LabelPicker } from "./label-picker";
 import { createForm, Form, Field as FormishField, reset, submit } from "@implementjs/formish";
 import type { Label, Team } from "@/lib/db/types";
 import { TeamPicker } from "./team-picker";
-import { cn } from "@/lib/utils";
 
 export const NewIssueSchema = v.object({
 	teamId: v.pipe(v.number(), v.integer()),
@@ -67,7 +66,7 @@ export function CreateIssueDialog({ open }: { open: Signal<boolean> }) {
 		return Dialog(
 			{ open },
 			DialogContent(
-				{  },
+				{},
 				ImplementEffect(
 					[open],
 					(isOpen) => {
@@ -77,9 +76,7 @@ export function CreateIssueDialog({ open }: { open: Signal<boolean> }) {
 				),
 				Form(
 					{ of: form, onSubmit, class: "flex flex-col gap-2" },
-                    Div({ class: 'flex items-center' },
-                        TeamField(form, manager.teams)
-                    ),
+					Div({ class: "flex items-center" }, TeamField(form, manager.teams)),
 					FieldGroup(
 						{ class: "gap-1" },
 						TitleField(form),
@@ -104,9 +101,6 @@ export function CreateIssueDialog({ open }: { open: Signal<boolean> }) {
 	});
 }
 
-const BORDERLESS_FIELD_CLASS =
-	"border-none bg-transparent shadow-none px-0 dark:bg-transparent focus-visible:border-none focus-visible:ring-0";
-
 export function TitleField(form: NewIssueForm) {
 	return FormishField({ of: form, path: ["title"] }, (field) => {
 		return Field(
@@ -118,7 +112,8 @@ export function TitleField(form: NewIssueForm) {
 				placeholder: "Issue title",
 				"aria-label": "Issue title",
 				value: field.input,
-				class: cn(BORDERLESS_FIELD_CLASS, "h-auto py-1 text-lg md:text-lg font-semibold"),
+				variant: "borderless",
+				class: "h-auto py-1 text-lg md:text-lg font-semibold",
 			}),
 			If(field.error).Then(FieldError(field.error)),
 		);
@@ -135,7 +130,8 @@ export function BodyField(form: NewIssueForm) {
 				placeholder: "Add description...",
 				"aria-label": "Description",
 				value: field.input,
-				class: cn(BORDERLESS_FIELD_CLASS, "min-h-20 py-1 resize-none md:text-base"),
+				variant: "borderless",
+				class: "min-h-20 py-1 resize-none md:text-base",
 				onKeydown: (event) => {
 					if (event.key === "Enter" && event.metaKey) {
 						submit(form);
@@ -161,7 +157,7 @@ export function StatusField(form: NewIssueForm) {
 
 export function LabelsField(form: NewIssueForm, labels: Readable<Label[]>) {
 	return FormishField({ of: form, path: ["labels"] }, (field) =>
-		bindPicker(field, [] as number[], (value) => LabelPicker({ value, labels })),
+		bindPicker(field, [], (value) => LabelPicker({ value, labels })),
 	);
 }
 
@@ -173,11 +169,11 @@ export function TeamField(form: NewIssueForm, teams: Readable<Team[]>) {
 
 /**
  * Primitives like Select need a writable signal. Formish fields expose a
- * readable plus `setInput` — this keeps the two in step without a native input.
+ * readable plus `onInput` — this keeps the two in step without a native input.
  */
 function bindPicker<T extends string | number | number[]>(
-	field: { input: Readable<T | undefined>; setInput: (value: T) => void },
-	fallback: T,
+	field: { input: Readable<T | undefined>; onInput: (input: T) => void },
+	fallback: NoInfer<T>,
 	render: (value: Signal<T>) => Child,
 ) {
 	const value = signal(field.input.get() ?? fallback) as Signal<T>;
@@ -186,7 +182,7 @@ function bindPicker<T extends string | number | number[]>(
 		ImplementEffect(
 			[value],
 			(next) => {
-				if (!sameValue(field.input.get(), next)) field.setInput(next);
+				if (!sameValue(field.input.get(), next)) field.onInput(next);
 			},
 			{ immediate: false },
 		),
