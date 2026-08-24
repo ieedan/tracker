@@ -1,6 +1,6 @@
 import { defineEnv } from "@implementjs/kit";
-import { z } from "zod";
+import * as v from "valibot";
 
 export const env = defineEnv({
-	DB_FILE_NAME: z.string().default("file:local.db"),
+	DB_FILE_NAME: v.optional(v.string(), "file:local.db"),
 });

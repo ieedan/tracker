@@ -16,27 +16,27 @@ export function LabelPicker({ value, labels }: LabelPickerProps) {
                 TagPlusIcon({ class: "size-4" }),
                 "Labels",
             )
-            .ElseIf(value.bind((v) => v.length === 1)).Then(
-                Span({
-                    style: { backgroundColor: selectedLabels.bind((v) => v[0]!.color) },
-                    class: "size-4 rounded-full shrink-0",
-                }),
-                selectedLabels.bind((v) => v[0]!.name),
-            )
-            .Else(
-                Span(
-                    { class: "inline-flex items-center gap-1" },
-                    Div({ class: "flex flex-wrap -space-x-1" },
-                        ForEach(selectedLabels, (item) => item.id, (label) =>
-                            Span({
-                                style: { backgroundColor: label.bind("color") },
-                                class: "size-3 ring ring-background rounded-full shrink-0",
-                            }),
+                .ElseIf(value.bind((v) => v.length === 1)).Then(
+                    Span({
+                        style: { backgroundColor: selectedLabels.bind((v) => v[0]!.color) },
+                        class: "size-4 rounded-full shrink-0",
+                    }),
+                    selectedLabels.bind((v) => v[0]!.name),
+                )
+                .Else(
+                    Span(
+                        { class: "inline-flex items-center gap-1" },
+                        Div({ class: "flex flex-wrap -space-x-1" },
+                            ForEach(selectedLabels, (item) => item.id, (label) =>
+                                Span({
+                                    style: { backgroundColor: label.bind("color") },
+                                    class: "size-3 ring ring-background rounded-full shrink-0",
+                                }),
+                            ),
                         ),
+                        selectedLabels.bind((v) => `${v.length} labels`),
                     ),
-                    selectedLabels.bind((v) => `${v.length} labels`),
                 ),
-            ),
         ),
         DropdownMenuContent({},
             DropdownMenuCheckboxGroup({ value: value.bind(v => v.map(v => v.toString()), (_, next) => next.map(Number)) },
@@ -48,5 +48,12 @@ export function LabelPicker({ value, labels }: LabelPickerProps) {
                 }),
             )
         )
+    );
+}
+
+export function LabelBadge(label: Signal<Label>) {
+    return Div({ class: 'flex items-center gap-1 border border-border rounded-full px-2 py-1 bg-accent/50' },
+        Span({ style: { backgroundColor: label.bind('color') }, class: 'size-3 rounded-full shrink-0' }),
+        Span({ class: 'text-nowrap whitespace-nowrap text-sm' }, label.bind('name'))
     );
 }

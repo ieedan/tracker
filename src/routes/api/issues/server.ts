@@ -3,11 +3,11 @@ import { issueLabels, issues } from "@/lib/db/schema";
 import type { Issue } from "@/lib/db/types";
 import { NewIssueSchema } from "@/lib/features/issues/create-issue-dialog";
 import { handler } from "@implementjs/kit/server";
-import z from "zod";
+import * as v from "valibot";
 
 export const POST = handler({
 	body: NewIssueSchema,
-	response: z.custom<Issue>(),
+	response: v.custom<Issue>(() => true),
 	handle: async ({ body }) => {
 		const issue = await db.transaction(async (tx) => {
 			const newIssue = await tx

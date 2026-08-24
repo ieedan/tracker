@@ -1,6 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { db } from "../db.server";
-import { labels } from "./schema";
+import { labels, teams } from "./schema";
+
+export const DEFAULT_TEAMS = [
+	{
+		shortHand: "PRD",
+		name: "Product Team",
+	},
+	{
+		shortHand: "ENG",
+		name: "Engineers",
+	},
+] as const;
 
 export const DEFAULT_LABELS = [
 	{
@@ -42,15 +53,25 @@ export const DEFAULT_LABELS = [
 
 let seeded = false;
 
+/** Inserts the built-in teams when they are missing. Safe to call more than once. */
+export async function seedDefaultTeams() {
+	await db.insert(teams).values(DEFAULT_TEAMS).onConflictDoNothing({ target: teams.shortHand });
+}
+
 /** Inserts the built-in labels when they are missing. Safe to call more than once. */
 export async function seedDefaultLabels() {
+	await db.insert(labels).values(DEFAULT_LABELS).onConflictDoNothing({ target: labels.name });
+}
+
+export async function seed() {
 	if (seeded) return;
 
-	await db.insert(labels).values(DEFAULT_LABELS).onConflictDoNothing({ target: labels.name });
+	await seedDefaultTeams();
+	await seedDefaultLabels();
 
 	seeded = true;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-	await seedDefaultLabels();
+	await seed();
 }

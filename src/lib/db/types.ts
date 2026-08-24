@@ -7,3 +7,4 @@ export type Issue = InferSelectModel<typeof issues> & {
 };
 
 export type Label = InferSelectModel<typeof labels>;
+export type Team = InferSelectModel<typeof teams>;

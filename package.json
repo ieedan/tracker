@@ -20,22 +20,22 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"dependencies": {
-		"@implementjs/core": "^0.0.4",
-		"@implementjs/formish": "^0.0.4",
-		"@implementjs/lucide": "^0.0.4",
-		"@implementjs/mode-watcher": "^0.0.4",
-		"@implementjs/primitives": "^0.0.5",
-		"@implementjs/router": "^0.0.5",
+		"@implementjs/core": "^0.0.6",
+		"@implementjs/formish": "^0.0.6",
+		"@implementjs/lucide": "^0.0.6",
+		"@implementjs/mode-watcher": "^0.0.6",
+		"@implementjs/primitives": "^0.0.7",
+		"@implementjs/router": "^0.0.7",
 		"@libsql/client": "^0.17.4",
 		"neverthrow": "^8.2.0",
 		"tailwind-merge": "^3.6.0",
 		"tailwind-variants": "^3.3.1",
-		"valibot": "^1.4.1"
+		"valibot": "1.4.2"
 	},
 	"devDependencies": {
 		"@dotenvx/dotenvx": "^2.21.0",
 		"@implementjs/eslint": "^0.0.1",
-		"@implementjs/kit": "0.0.5",
+		"@implementjs/kit": "0.0.7",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.2.0",
 		"drizzle-kit": "1.0.0-rc.4",
@@ -46,7 +46,6 @@
 		"tailwindcss": "^4.3.3",
 		"tsx": "^4.23.12",
 		"typescript": "^7.0.2",
-		"vite": "^7.3.0",
-		"zod": "^4.4.3"
+		"vite": "^7.3.0"
 	}
 }

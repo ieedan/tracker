@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 export const GET = handler({
 	handle: async ({ params }) => {
 		const issue = await db.query.issues.findFirst({
-			where: { id: parseInt(params.id) },
+			where: { id: params.id },
 			with: { labels: true, team: true },
 		});
 
@@ -16,6 +16,6 @@ export const GET = handler({
 
 export const DELETE = handler({
 	handle: async ({ params }) => {
-		await db.delete(issues).where(eq(issues.id, parseInt(params.id)));
+		await db.delete(issues).where(eq(issues.id, params.id));
 	},
 });

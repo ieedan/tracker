@@ -1,16 +1,20 @@
-import { Dynamic, Span, type Signal } from "@implementjs/core";
+import { Dynamic, If, Span, type Signal } from "@implementjs/core";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/lib/components/ui/select";
 import { ISSUE_PRIORITIES, type Priority } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 export type PriorityPickerProps = {
     value: Signal<Priority>;
+    showLabel?: boolean;
+    class?: string;
+    onChange?: (value: Priority) => void;
 };
 
-export function PriorityPicker({ value }: PriorityPickerProps) {
+export function PriorityPicker({ value, showLabel = true, class: className, onChange }: PriorityPickerProps) {
     return Select({ type: "single", value },
-        SelectTrigger({ noIcon: true, class: 'h-8 px-3' },
+        SelectTrigger({ noIcon: true, class: cn('h-8 px-3', className) },
             Dynamic([value], (value) => ISSUE_PRIORITIES[value].icon()),
-            value
+            If(showLabel).Then(Span({ class: 'text-nowrap whitespace-nowrap' }, value)),
         ),
         SelectContent({},
             ...Object.entries(ISSUE_PRIORITIES).map(([key, value]) =>
