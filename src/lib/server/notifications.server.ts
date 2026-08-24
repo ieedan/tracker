@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import type { NotificationType } from "@/lib/domain/issues";
 import type { Notification } from "@/lib/domain/schemas";
 import { db } from "./db.server";
-import { issue, notification, user, workspace } from "./schema.server";
+import { issue, notification, team, user, workspace } from "./schema.server";
 import { identifierFor, toUser } from "./serialize.server";
 
 interface NotifyInput {
@@ -45,12 +45,15 @@ export async function listNotifications(
 	const conditions = [eq(notification.userId, userId)];
 	if (options.unreadOnly === true) conditions.push(isNull(notification.readAt));
 
+	// The identifier lives on the issue's team, so a notification that points at
+	// an issue joins through to it.
 	const rows = await db
-		.select({ notification, actor: user, workspace, issue })
+		.select({ notification, actor: user, workspace, issue, team })
 		.from(notification)
 		.innerJoin(user, eq(user.id, notification.actorId))
 		.innerJoin(workspace, eq(workspace.id, notification.workspaceId))
 		.leftJoin(issue, eq(issue.id, notification.issueId))
+		.leftJoin(team, eq(team.id, issue.teamId))
 		.where(and(...conditions))
 		.orderBy(desc(notification.createdAt))
 		.limit(options.limit ?? 50);
@@ -63,10 +66,10 @@ export async function listNotifications(
 		actor: toUser(row.actor),
 		workspaceSlug: row.workspace.slug,
 		issue:
-			row.issue === null
+			row.issue === null || row.team === null
 				? null
 				: {
-						identifier: identifierFor(row.workspace.key, row.issue.number),
+						identifier: identifierFor(row.team.key, row.issue.number),
 						title: row.issue.title,
 						number: row.issue.number,
 					},

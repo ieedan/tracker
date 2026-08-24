@@ -3,6 +3,7 @@ import { requireMembership } from "@/lib/server/guards.server";
 import { db } from "@/lib/server/db.server";
 import { label, user, workspaceMember } from "@/lib/server/schema.server";
 import { toLabel, toMember, toWorkspace } from "@/lib/server/serialize.server";
+import { listTeams } from "@/lib/server/teams.server";
 import type { LoadEvent } from "./$types";
 
 /**
@@ -28,6 +29,7 @@ export default async function load({ locals, params }: LoadEvent) {
 
 	return {
 		workspace: toWorkspace(membership.workspace, membership.role),
+		teams: await listTeams(membership.workspace.id),
 		members: memberRows.map((row) => toMember(row.member, row.user)),
 		labels: labelRows.map(toLabel),
 	};

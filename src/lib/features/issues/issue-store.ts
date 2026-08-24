@@ -10,6 +10,8 @@ import { toastError } from "@/lib/client/toast";
 import type { Issue } from "@/lib/domain/schemas";
 
 export interface IssuePatch {
+	/** Moving teams reallocates the number, so the identifier changes. */
+	teamKey?: string;
 	title?: string;
 	description?: string;
 	status?: Issue["status"];
@@ -28,15 +30,17 @@ export interface IssuePatch {
 export async function patchIssue(
 	issues: Signal<Issue[]>,
 	slug: string,
-	number: number,
+	/** The issue's id — stable across a team move, unlike its identifier. */
+	id: string,
+	identifier: string,
 	patch: IssuePatch,
 	apply: (issue: Issue) => Issue,
 ): Promise<Issue | undefined> {
 	const before = issues.get();
-	issues.set(before.map((issue) => (issue.number === number ? apply(issue) : issue)));
+	issues.set(before.map((issue) => (issue.id === id ? apply(issue) : issue)));
 
-	const { data, error } = await api.PATCH("/api/v1/workspaces/[slug]/issues/[number]", {
-		params: { slug, number: String(number) },
+	const { data, error } = await api.PATCH("/api/v1/workspaces/[slug]/issues/[identifier]", {
+		params: { slug, identifier },
 		body: patch,
 	});
 
@@ -46,6 +50,7 @@ export async function patchIssue(
 		return undefined;
 	}
 
-	issues.set(issues.get().map((issue) => (issue.number === number ? data : issue)));
+	// Matched by id: a team move changes the identifier, so that is not a key.
+	issues.set(issues.get().map((issue) => (issue.id === id ? data : issue)));
 	return data;
 }

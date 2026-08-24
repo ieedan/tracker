@@ -140,8 +140,8 @@ function NotificationRow(
 
 	return router.Link(
 		{
-			to: "/app/:slug/issue/:number",
-			params: { slug: params.slug, number: String(current.issue.number) },
+			to: "/app/:slug/issue/:identifier",
+			params: { slug: params.slug, identifier: current.issue.identifier },
 			class: "block",
 		},
 		body,

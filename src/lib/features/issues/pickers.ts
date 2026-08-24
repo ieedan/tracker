@@ -2,7 +2,7 @@
 // and labels. The list rows and the detail page share them, which is what keeps
 // "click the status glyph and pick a new one" identical in both places.
 import { Div, ForEach, If, Span, type Child, type Readable } from "@implementjs/core";
-import { Check, Tag } from "@implementjs/lucide";
+import { Check, Tag, Users } from "@implementjs/lucide";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -20,7 +20,7 @@ import {
 	type IssuePriority,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Label, Member, UserSummary } from "@/lib/domain/schemas";
+import type { Label, Member, Team, TeamRef, UserSummary } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
 
 const triggerClass =
@@ -222,5 +222,62 @@ export function LabelChips(labels: Readable<Label[]>) {
 				}),
 				label.bind("name"),
 			),
+	);
+}
+
+/** Which team owns the issue — and therefore what its identifier reads. */
+export function TeamPicker(
+	current: Readable<TeamRef | null>,
+	teams: Readable<Team[]>,
+	onPick: (key: string) => void,
+	options: { showLabel?: boolean; class?: string } = {},
+) {
+	return DropdownMenu(
+		DropdownMenuTrigger(
+			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Team" },
+			Users({ class: "size-3.5" }),
+			Span(
+				{ class: options.showLabel === true ? "" : "font-mono" },
+				current.bind((team) => team?.key ?? "Team"),
+			),
+			options.showLabel === true
+				? Span(
+						{ class: "text-muted-foreground" },
+						current.bind((team) => team?.name ?? ""),
+					)
+				: null,
+		),
+		DropdownMenuContent(
+			{ class: "w-56", align: "start" },
+			DropdownMenuGroup(
+				DropdownMenuGroupHeading("Team"),
+				ForEach(
+					teams,
+					(team) => team.id,
+					(team) =>
+						DropdownMenuItem(
+							{ onSelect: () => onPick(team.get().key) },
+							Span(
+								{ class: "w-10 shrink-0 font-mono text-[11px] text-muted-foreground" },
+								team.bind("key"),
+							),
+							Span({ class: "flex-1 truncate" }, team.bind("name")),
+							Tick(current.bind((value) => value?.id === team.get().id)),
+						),
+				),
+			),
+		),
+	);
+}
+
+/** The small monospace team tag shown on a workspace-wide issue row. */
+export function TeamBadge(team: Readable<TeamRef>) {
+	return Span(
+		{
+			class:
+				"shrink-0 rounded border border-border px-1 font-mono text-[10px] text-muted-foreground",
+			title: team.get().name,
+		},
+		team.bind("key"),
 	);
 }

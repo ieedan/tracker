@@ -21,7 +21,7 @@ export function NewWorkspacePage() {
 		creating.set(true);
 
 		const { data, error } = await api.POST("/api/v1/workspaces", {
-			body: { name: name.get().trim(), key: key.get().trim() || undefined },
+			body: { name: name.get().trim() },
 		});
 		creating.set(false);
 

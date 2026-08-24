@@ -17,15 +17,23 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
-import type { Comment, Issue, Label, Member, Workspace } from "@/lib/domain/schemas";
+import type { Comment, Issue, Label, Member, Team, Workspace } from "@/lib/domain/schemas";
 import { fullTime, relativeTime } from "@/lib/format";
-import { AssigneePicker, LabelChips, LabelPicker, PriorityPicker, StatusPicker } from "./pickers";
+import {
+	AssigneePicker,
+	LabelChips,
+	LabelPicker,
+	PriorityPicker,
+	StatusPicker,
+	TeamPicker,
+} from "./pickers";
 import { patchIssue } from "./issue-store";
 
 interface PageData {
 	issue: Issue;
 	comments: Comment[];
 	workspace: Workspace;
+	teams: Team[];
 	members: Member[];
 	labels: Label[];
 }
@@ -35,7 +43,7 @@ export function IssueDetailPage({
 	params,
 }: {
 	data: Readable<PageData>;
-	params: { slug: Readable<string>; number: Readable<string> };
+	params: { slug: Readable<string>; identifier: Readable<string> };
 }) {
 	// `patchIssue` works over a list, so the detail page keeps a list of one.
 	const issues = signal<Issue[]>([data.get().issue]);
@@ -45,8 +53,37 @@ export function IssueDetailPage({
 	const comments = signal(data.get().comments);
 	data.onChange((next) => comments.set(next.comments));
 
-	const update = (patch: Parameters<typeof patchIssue>[3], apply: (value: Issue) => Issue) =>
-		void patchIssue(issues, params.slug.get(), data.get().issue.number, patch, apply);
+	const update = (patch: Parameters<typeof patchIssue>[4], apply: (value: Issue) => Issue) =>
+		void patchIssue(
+			issues,
+			params.slug.get(),
+			data.get().issue.id,
+			data.get().issue.identifier,
+			patch,
+			apply,
+		);
+
+	// Moving teams renumbers the issue, so the URL it lives at changes with it.
+	const moveTeam = (key: string) => {
+		const destination = data.get().teams.find((team) => team.key === key);
+		if (destination === undefined || destination.id === issue.get().team.id) return;
+
+		void patchIssue(
+			issues,
+			params.slug.get(),
+			data.get().issue.id,
+			data.get().issue.identifier,
+			{ teamKey: key },
+			(value) => ({ ...value, team: destination }),
+		).then((moved) => {
+			if (moved !== undefined) {
+				router.navigate("/app/:slug/issue/:identifier", {
+					slug: params.slug.get(),
+					identifier: moved.identifier,
+				});
+			}
+		});
+	};
 
 	return Div(
 		{ class: "flex min-h-0 flex-1" },
@@ -83,6 +120,15 @@ export function IssueDetailPage({
 		// Linear puts the properties in a right rail rather than above the body.
 		Div(
 			{ class: "hidden w-64 shrink-0 flex-col gap-4 border-l border-border p-4 lg:flex" },
+			PropertyRow(
+				"Team",
+				TeamPicker(
+					issue.bind("team"),
+					data.bind((value) => value.teams),
+					moveTeam,
+					{ showLabel: true },
+				),
+			),
 			PropertyRow(
 				"Status",
 				StatusPicker(
@@ -263,7 +309,7 @@ function EditableDescription(
 
 function CommentThread(
 	comments: ReturnType<typeof signal<Comment[]>>,
-	params: { slug: Readable<string>; number: Readable<string> },
+	params: { slug: Readable<string>; identifier: Readable<string> },
 ) {
 	const draft = signal("");
 	const posting = signal(false);
@@ -273,10 +319,13 @@ function CommentThread(
 		if (body === "") return;
 
 		posting.set(true);
-		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/issues/[number]/comments", {
-			params: { slug: params.slug.get(), number: params.number.get() },
-			body: { body },
-		});
+		const { data, error } = await api.POST(
+			"/api/v1/workspaces/[slug]/issues/[identifier]/comments",
+			{
+				params: { slug: params.slug.get(), identifier: params.identifier.get() },
+				body: { body },
+			},
+		);
 		posting.set(false);
 
 		if (error !== undefined) {

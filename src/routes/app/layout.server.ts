@@ -21,6 +21,11 @@ export default async function load({ locals }: LoadEvent) {
 		.where(eq(workspaceMember.userId, locals.user.id))
 		.orderBy(workspace.createdAt);
 
+	// Nothing under /app can render without a workspace — the sidebar would link
+	// into routes that 404, which is exactly what used to happen. Send anyone
+	// without one to create one instead.
+	if (rows.length === 0) redirect(303, "/workspaces/new");
+
 	return {
 		user: locals.user,
 		workspaces: rows.map((row) => toWorkspace(row.workspace, row.role)),

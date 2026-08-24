@@ -21,15 +21,18 @@ import {
 	PRIORITY_ORDER,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Issue, Label, Member, Workspace } from "@/lib/domain/schemas";
+import type { Issue, Label, Member, Team, TeamRef, Workspace } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 import { issueCreated, openCreateIssue } from "./create-issue-dialog";
-import { AssigneePicker, LabelChips, PriorityPicker, StatusPicker } from "./pickers";
+import { AssigneePicker, LabelChips, PriorityPicker, StatusPicker, TeamBadge } from "./pickers";
 import { patchIssue } from "./issue-store";
 
 interface PageData {
 	issues: Issue[];
+	/** Set on a team route, `null` on the workspace-wide list. */
+	team: TeamRef | null;
 	workspace: Workspace;
+	teams: Team[];
 	members: Member[];
 	labels: Label[];
 }
@@ -70,7 +73,10 @@ export function IssueListPage({
 			onMount: () =>
 				issueCreated.onChange((created) => {
 					if (created === null) return;
-					if (created.identifier.split("-")[0] !== data.get().workspace.key) return;
+					// A team-scoped list only takes issues filed to that team.
+					const scope = data.get().team;
+					if (scope !== null && created.team.id !== scope.id) return;
+					if (!data.get().teams.some((team) => team.id === created.team.id)) return;
 					issues.update((list) =>
 						list.some((issue) => issue.id === created.id) ? list : [created, ...list],
 					);
@@ -83,7 +89,7 @@ export function IssueListPage({
 				if (isTyping(event.target)) return;
 				if (event.key === "c" && !event.metaKey && !event.ctrlKey) {
 					event.preventDefault();
-					openCreateIssue(params.slug.get());
+					openCreateIssue(params.slug.get(), data.get().team?.key);
 				}
 				if (event.key === "/") {
 					event.preventDefault();
@@ -98,7 +104,7 @@ export function IssueListPage({
 			{ class: "min-h-0 flex-1 overflow-y-auto" },
 			If(
 				visible.bind((list) => list.length === 0),
-				EmptyState(query, params),
+				EmptyState(query, params, data),
 			),
 			...ISSUE_STATUSES.map((status) => StatusGroup(status, visible, issues, data, params)),
 		),
@@ -115,7 +121,19 @@ function Header(
 		{
 			class: "flex h-12 shrink-0 items-center gap-3 border-b border-border px-4",
 		},
-		H1({ class: "text-[15px] font-semibold tracking-tight" }, "Issues"),
+		H1(
+			{ class: "text-[15px] font-semibold tracking-tight" },
+			data.bind((value) => value.team?.name ?? "All issues"),
+		),
+		If(
+			data.bind((value) => value.team !== null),
+			Span(
+				{
+					class: "rounded border border-border px-1.5 font-mono text-[11px] text-muted-foreground",
+				},
+				data.bind((value) => value.team?.key ?? ""),
+			),
+		),
 		Span(
 			{ class: "rounded bg-secondary px-1.5 text-[11px] text-muted-foreground" },
 			data.bind((value) => `${value.issues.length}`),
@@ -136,14 +154,22 @@ function Header(
 			}),
 		),
 		Button(
-			{ size: "sm", class: "gap-1.5", onClick: () => openCreateIssue(params.slug.get()) },
+			{
+				size: "sm",
+				class: "gap-1.5",
+				onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
+			},
 			Plus({ class: "size-3.5" }),
 			"New issue",
 		),
 	);
 }
 
-function EmptyState(query: Readable<string>, params: { slug: Readable<string> }) {
+function EmptyState(
+	query: Readable<string>,
+	params: { slug: Readable<string> },
+	data: Readable<PageData>,
+) {
 	return Div(
 		{ class: "flex flex-col items-center justify-center gap-3 py-24 text-center" },
 		Div(
@@ -153,7 +179,11 @@ function EmptyState(query: Readable<string>, params: { slug: Readable<string> })
 		If(
 			query.bind((term) => term.trim() === ""),
 			Button(
-				{ size: "sm", variant: "secondary", onClick: () => openCreateIssue(params.slug.get()) },
+				{
+					size: "sm",
+					variant: "secondary",
+					onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
+				},
 				"Create the first issue",
 			),
 		),
@@ -211,10 +241,10 @@ function IssueRow(
 	params: { slug: Readable<string> },
 ) {
 	const slug = params.slug;
-	const number = issue.get().number;
+	const id = issue.get().id;
 
-	const update = (patch: Parameters<typeof patchIssue>[3], apply: (value: Issue) => Issue) =>
-		void patchIssue(issues, slug.get(), number, patch, apply);
+	const update = (patch: Parameters<typeof patchIssue>[4], apply: (value: Issue) => Issue) =>
+		void patchIssue(issues, slug.get(), id, issue.get().identifier, patch, apply);
 
 	return Div(
 		{
@@ -237,14 +267,22 @@ function IssueRow(
 
 		router.Link(
 			{
-				to: "/app/:slug/issue/:number",
-				params: { slug, number: issue.bind((value) => String(value.number)) },
+				to: "/app/:slug/issue/:identifier",
+				params: { slug, identifier: issue.bind("identifier") },
 				class: "min-w-0 flex-1 truncate hover:underline",
 			},
 			issue.bind("title"),
 		),
 
-		Div({ class: "flex shrink-0 items-center gap-1" }, LabelChips(issue.bind("labels"))),
+		Div(
+			{ class: "flex shrink-0 items-center gap-1" },
+			// On a team route every row is the same team, so the badge is noise.
+			If(
+				data.bind((value) => value.team === null),
+				TeamBadge(issue.bind("team")),
+			),
+			LabelChips(issue.bind("labels")),
+		),
 
 		Span(
 			{ class: "w-10 shrink-0 text-right text-[12px] text-muted-foreground" },

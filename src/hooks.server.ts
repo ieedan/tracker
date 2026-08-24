@@ -44,9 +44,12 @@ const authenticate: Handle = async ({ event, resolve }) => {
 	return await resolve(event);
 };
 
-/** Everything under /app is the signed-in product. */
+/** Everything under /app and /workspaces is the signed-in product. */
+const PRIVATE_PREFIXES = ["/app", "/workspaces"];
+
 const guardApp: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname.startsWith("/app") && event.locals.user === null) {
+	const isPrivate = PRIVATE_PREFIXES.some((prefix) => event.url.pathname.startsWith(prefix));
+	if (isPrivate && event.locals.user === null) {
 		const next = encodeURIComponent(event.url.pathname + event.url.search);
 		redirect(303, `/login?next=${next}`);
 	}

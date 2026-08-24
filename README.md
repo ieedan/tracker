@@ -15,13 +15,20 @@ OpenAPI 3.1 document.
 
 ```sh
 pnpm install
-cp .env.example .env      # the defaults work for local development
-pnpm db:migrate           # create local.db
-pnpm db:seed              # demo workspace, three people, nine issues
+pnpm dev:setup            # walks through .env, then offers to migrate and seed
 pnpm dev
 ```
 
+`dev:setup` prompts for each value, validates answers against the same schemas
+the app enforces at build time, generates an auth secret, and can run the
+migrations and seed for you. Add `--yes` to take every default without prompts.
+Prefer doing it by hand? `cp .env.example .env`, then `pnpm db:migrate && pnpm db:seed`.
+
 Then sign in at http://localhost:5173 as **demo@tracker.dev** / **password123**.
+
+Everything under `/app` needs a workspace; anyone without one is sent to
+`/workspaces/new`, which renders on its own so there is never a sidebar linking
+at a workspace that does not exist.
 
 | Script            | What it does                                                         |
 | ----------------- | -------------------------------------------------------------------- |
@@ -38,9 +45,14 @@ Then sign in at http://localhost:5173 as **demo@tracker.dev** / **password123**.
 
 - **Auth** — email + password sessions. Everything under `/app` is behind a
   session, enforced once in `src/hooks.server.ts`.
-- **Workspaces** — create them, add members by email or with a shareable invite
-  link, manage labels. Issues are numbered per workspace (`ENG-42`).
+- **Workspaces and teams** — a workspace is the container: people, labels and
+  teams. **Teams own issues**, and a team's key is the issue prefix, so the same
+  workspace has `ENG-42` and `PRD-7` numbering independently. Every new
+  workspace starts with Engineering (`ENG`) and Product (`PRD`); add more in
+  Settings. Members join by email or through a shareable invite link.
 - **Issues** — status, priority, assignee, labels, description, comments.
+  Moving an issue between teams reallocates its number, so `ENG-42` becomes
+  `PRD-8` and the URL follows.
   Status and priority are edited inline from the list; title and description are
   click-to-edit on the issue.
 - **Inbox** — assignment, reassignment, status changes and comments land in the
@@ -55,8 +67,17 @@ Then sign in at http://localhost:5173 as **demo@tracker.dev** / **password123**.
 Create a key in the app under **Settings → API keys**, then:
 
 ```sh
+# every issue in the workspace, across teams
 curl -H "Authorization: Bearer trk_…" \
-  https://localhost:5173/api/v1/workspaces/engineering/issues
+  http://localhost:5173/api/v1/workspaces/acme/issues
+
+# one team's issues
+curl -H "Authorization: Bearer trk_…" \
+  "http://localhost:5173/api/v1/workspaces/acme/issues?team=ENG"
+
+# one issue, by the identifier you would say out loud
+curl -H "Authorization: Bearer trk_…" \
+  http://localhost:5173/api/v1/workspaces/acme/issues/ENG-1
 ```
 
 `x-api-key: trk_…` works too. The full description is at
@@ -83,6 +104,9 @@ src/
    ├ api/auth/[...all]/  better-auth's own surface
    ├ api/v1/             the documented REST API
    ├ app/[slug]/         the product, behind a session
+   │  ├ team/[key]/      one team's issues
+   │  └ issue/[identifier]/   ENG-42
+   ├ workspaces/new      onboarding — no workspace, no shell
    ├ login, signup, invite/[token]
    └ layout.ts, page.ts, error.ts
 ```

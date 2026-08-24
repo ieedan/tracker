@@ -27,8 +27,6 @@ export const workspace = sqliteTable("workspace", {
 	id: text("id").primaryKey(),
 	name: text("name").notNull(),
 	slug: text("slug").notNull().unique(),
-	/** Issue identifier prefix — the `ENG` in `ENG-42`. */
-	key: text("key").notNull(),
 	createdAt: now(),
 	updatedAt: timestamp("updatedAt")
 		.notNull()
@@ -73,6 +71,29 @@ export const workspaceInvite = sqliteTable(
 	(table) => [index("workspace_invite_workspace").on(table.workspaceId)],
 );
 
+/**
+ * Teams own issues, and a team's `key` is the issue prefix — the `ENG` in
+ * `ENG-42`. A workspace is the container; every issue belongs to exactly one
+ * team inside it.
+ */
+export const team = sqliteTable(
+	"team",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		/** Uppercase, unique within the workspace. */
+		key: text("key").notNull(),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("team_key_unique").on(table.workspaceId, table.key),
+		index("team_workspace").on(table.workspaceId),
+	],
+);
+
 export const label = sqliteTable(
 	"label",
 	{
@@ -91,10 +112,10 @@ export const issue = sqliteTable(
 	"issue",
 	{
 		id: text("id").primaryKey(),
-		workspaceId: text("workspaceId")
+		teamId: text("teamId")
 			.notNull()
-			.references(() => workspace.id, { onDelete: "cascade" }),
-		/** Per-workspace counter — the `42` in `ENG-42`. */
+			.references(() => team.id, { onDelete: "cascade" }),
+		/** Per-team counter — the `42` in `ENG-42`. */
 		number: integer("number").notNull(),
 		title: text("title").notNull(),
 		description: text("description").notNull().default(""),
@@ -110,8 +131,8 @@ export const issue = sqliteTable(
 			.default(sql`(unixepoch() * 1000)`),
 	},
 	(table) => [
-		uniqueIndex("issue_number_unique").on(table.workspaceId, table.number),
-		index("issue_workspace").on(table.workspaceId),
+		uniqueIndex("issue_number_unique").on(table.teamId, table.number),
+		index("issue_team").on(table.teamId),
 		index("issue_assignee").on(table.assigneeId),
 	],
 );
@@ -174,8 +195,13 @@ export const notification = sqliteTable(
 
 export const workspaceRelations = relations(workspace, ({ many }) => ({
 	members: many(workspaceMember),
-	issues: many(issue),
+	teams: many(team),
 	labels: many(label),
+}));
+
+export const teamRelations = relations(team, ({ one, many }) => ({
+	workspace: one(workspace, { fields: [team.workspaceId], references: [workspace.id] }),
+	issues: many(issue),
 }));
 
 export const workspaceMemberRelations = relations(workspaceMember, ({ one }) => ({
@@ -187,7 +213,7 @@ export const workspaceMemberRelations = relations(workspaceMember, ({ one }) => 
 }));
 
 export const issueRelations = relations(issue, ({ one, many }) => ({
-	workspace: one(workspace, { fields: [issue.workspaceId], references: [workspace.id] }),
+	team: one(team, { fields: [issue.teamId], references: [team.id] }),
 	assignee: one(user, { fields: [issue.assigneeId], references: [user.id] }),
 	creator: one(user, { fields: [issue.creatorId], references: [user.id] }),
 	labels: many(issueLabel),

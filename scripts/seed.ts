@@ -16,10 +16,12 @@ import {
 	issueLabel,
 	label,
 	notification,
+	team,
 	user,
 	workspace,
 	workspaceMember,
 } from "../src/lib/server/schema.server";
+import { DEFAULT_TEAMS } from "../src/lib/domain/issues";
 import type { IssuePriority, IssueStatus } from "../src/lib/domain/issues";
 
 const PASSWORD = "password123";
@@ -38,6 +40,8 @@ const LABELS = [
 ];
 
 interface SeedIssue {
+	/** Which default team files it — decides the identifier prefix. */
+	team: "ENG" | "PRD";
 	title: string;
 	description: string;
 	status: IssueStatus;
@@ -48,6 +52,7 @@ interface SeedIssue {
 
 const ISSUES: SeedIssue[] = [
 	{
+		team: "ENG",
 		title: "Command palette should remember recent issues",
 		description:
 			"Opening ⌘K and typing the same identifier every time is friction. Keep the last ten opened issues at the top of the list until a query is typed.",
@@ -57,6 +62,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Improvement"],
 	},
 	{
+		team: "ENG",
 		title: "Assigning an issue does not notify the previous assignee",
 		description:
 			"Reassigning tells the new owner but leaves the old one thinking it is still theirs. Both sides of a reassignment should land in the inbox.",
@@ -66,6 +72,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Bug"],
 	},
 	{
+		team: "PRD",
 		title: "Inline editing for issue titles in the list view",
 		description: "Press Enter on a focused row to rename without opening the issue.",
 		status: "backlog",
@@ -74,6 +81,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Feature"],
 	},
 	{
+		team: "PRD",
 		title: "Dark mode contrast on label chips is too low",
 		description: "The chip border disappears against the row hover state at 60% opacity.",
 		status: "todo",
@@ -82,6 +90,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Design", "Bug"],
 	},
 	{
+		team: "ENG",
 		title: "Paginate the issues endpoint",
 		description:
 			"GET /api/v1/workspaces/{slug}/issues returns every issue in the workspace. Add limit and cursor before anyone has ten thousand of them.",
@@ -91,6 +100,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Improvement"],
 	},
 	{
+		team: "PRD",
 		title: "Webhooks for issue events",
 		description: "Let a workspace register a URL that receives issue.created and issue.updated.",
 		status: "backlog",
@@ -99,6 +109,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Feature"],
 	},
 	{
+		team: "ENG",
 		title: "Ship the public API docs",
 		description: "The OpenAPI document is generated at /openapi.json; give it a rendered page.",
 		status: "done",
@@ -107,6 +118,7 @@ const ISSUES: SeedIssue[] = [
 		labels: ["Feature"],
 	},
 	{
+		team: "ENG",
 		title: "Drop the legacy invite-by-token endpoint",
 		description: "Superseded by /api/v1/invites/{token}/accept.",
 		status: "canceled",
@@ -134,7 +146,7 @@ async function main(): Promise<void> {
 	}
 	const [ada, grace, alan] = userIds as [string, string, string];
 
-	const slug = "engineering";
+	const slug = "acme";
 	const existing = await db.select().from(workspace).where(eq(workspace.slug, slug)).limit(1);
 	if (existing[0] !== undefined) {
 		console.log(`Workspace "${slug}" already exists — nothing to do.`);
@@ -145,12 +157,25 @@ async function main(): Promise<void> {
 	const workspaceId = nanoid();
 	await db.insert(workspace).values({
 		id: workspaceId,
-		name: "Engineering",
+		name: "Acme",
 		slug,
-		key: "ENG",
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	});
+
+	// Teams own issues, and a team's key is the issue prefix.
+	const teamIds = new Map<string, string>();
+	for (const entry of DEFAULT_TEAMS) {
+		const id = nanoid();
+		teamIds.set(entry.key, id);
+		await db.insert(team).values({
+			id,
+			workspaceId,
+			name: entry.name,
+			key: entry.key,
+			createdAt: new Date(),
+		});
+	}
 
 	for (const [index, userId] of userIds.entries()) {
 		await db.insert(workspaceMember).values({
@@ -177,16 +202,22 @@ async function main(): Promise<void> {
 	}
 
 	const issueIds: string[] = [];
+	// Numbers run per team, so ENG and PRD each start at 1.
+	const nextNumber = new Map<string, number>();
+
 	for (const [index, entry] of ISSUES.entries()) {
 		const id = nanoid();
 		issueIds.push(id);
 		// Stagger the timestamps so the list has a believable recency order.
 		const when = new Date(Date.now() - (ISSUES.length - index) * 3600_000 * 7);
 
+		const number = (nextNumber.get(entry.team) ?? 0) + 1;
+		nextNumber.set(entry.team, number);
+
 		await db.insert(issue).values({
 			id,
-			workspaceId,
-			number: index + 1,
+			teamId: teamIds.get(entry.team)!,
+			number,
 			title: entry.title,
 			description: entry.description,
 			status: entry.status,
@@ -250,7 +281,7 @@ async function main(): Promise<void> {
 		},
 	]);
 
-	console.log("Seeded the Engineering workspace.");
+	console.log("Seeded the Acme workspace (teams ENG and PRD).");
 	console.log(`Sign in as ${PEOPLE[0]!.email} / ${PASSWORD}`);
 }
 

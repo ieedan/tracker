@@ -51,6 +51,29 @@ export const NOTIFICATION_TYPES = [
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+/**
+ * Every new workspace starts with these. A team's key is the issue prefix, so
+ * the first issue filed to Engineering is ENG-1 and to Product is PRD-1.
+ */
+export const DEFAULT_TEAMS = [
+	{ key: "ENG", name: "Engineering" },
+	{ key: "PRD", name: "Product" },
+] as const;
+
+/** Uppercase letters and digits, starting with a letter. 1–6 characters. */
+export const TEAM_KEY_PATTERN = /^[A-Z][A-Z0-9]{0,5}$/;
+
+/** `ENG-42` → `{ key: "ENG", number: 42 }`; anything else → null. */
+export function parseIdentifier(value: string): { key: string; number: number } | null {
+	const match = /^([A-Za-z][A-Za-z0-9]{0,5})-(\d+)$/.exec(value.trim());
+	if (match === null) return null;
+
+	const number = Number(match[2]);
+	if (!Number.isSafeInteger(number) || number < 1) return null;
+
+	return { key: match[1]!.toUpperCase(), number };
+}
+
 export const WORKSPACE_ROLES = ["admin", "member"] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 

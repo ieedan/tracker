@@ -1,63 +1,72 @@
 import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import * as v from "valibot";
-import { STATUS_LABELS } from "@/lib/domain/issues";
+import { parseIdentifier, STATUS_LABELS } from "@/lib/domain/issues";
 import { IssueSchema, UpdateIssueBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
 import {
 	assertMember,
-	getIssueByNumber,
+	getIssueById,
+	getIssueByIdentifier,
+	insertWithNumber,
 	setIssueLabels,
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { notify } from "@/lib/server/notifications.server";
-import { issue } from "@/lib/server/schema.server";
+import { issue, team } from "@/lib/server/schema.server";
+import { identifierFor } from "@/lib/server/serialize.server";
+import { requireTeam } from "@/lib/server/teams.server";
 import { handler } from "./$types";
 
+/**
+ * Issues are addressed by the identifier people actually say out loud —
+ * `ENG-42` — rather than by an opaque id or a number that only means something
+ * once you know the team.
+ */
+const IdentifierParams = v.object({
+	slug: v.string(),
+	identifier: v.string(),
+});
+
+/** Splits `ENG-42`, or 404s on anything that is not one. */
+function split(identifier: string): { key: string; number: number } {
+	const parsed = parseIdentifier(identifier);
+	if (parsed === null) error(404, `"${identifier}" is not an issue identifier`);
+	return parsed;
+}
+
 export const GET = handler({
-	// implement:bug:#1: a `[number=integer]` matcher directory leaks its matcher
-	// name into the generated OpenAPI path (`{number=integer}`) while the
-	// parameter object is still named `number`, so the document is invalid for
-	// this route. Parsing in the handler instead keeps the path template clean.
-	// A `params` schema replaces every param, not just the one it names, so
-	// `slug` has to be redeclared here even though only `number` is parsed.
-	params: v.object({
-		slug: v.string(),
-		number: v.pipe(v.string(), v.transform(Number), v.number(), v.integer(), v.minValue(1)),
-	}),
+	params: IdentifierParams,
 	response: IssueSchema,
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
-		const found = await getIssueByNumber(workspace.id, workspace.key, params.number);
-		if (found === undefined) error(404, `no issue ${workspace.key}-${params.number}`);
+		const { key, number } = split(params.identifier);
+
+		const found = await getIssueByIdentifier(workspace.id, key, number);
+		if (found === undefined) error(404, `no issue ${key}-${number}`);
 		return found;
 	},
 });
 
 export const PATCH = handler({
-	// implement:bug:#1: a `[number=integer]` matcher directory leaks its matcher
-	// name into the generated OpenAPI path (`{number=integer}`) while the
-	// parameter object is still named `number`, so the document is invalid for
-	// this route. Parsing in the handler instead keeps the path template clean.
-	// A `params` schema replaces every param, not just the one it names, so
-	// `slug` has to be redeclared here even though only `number` is parsed.
-	params: v.object({
-		slug: v.string(),
-		number: v.pipe(v.string(), v.transform(Number), v.number(), v.integer(), v.minValue(1)),
-	}),
+	params: IdentifierParams,
 	body: UpdateIssueBody,
 	response: IssueSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		const { key, number } = split(params.identifier);
 
 		const rows = await db
-			.select()
+			.select({ issue, team })
 			.from(issue)
-			.where(and(eq(issue.workspaceId, workspace.id), eq(issue.number, params.number)))
+			.innerJoin(team, eq(team.id, issue.teamId))
+			.where(and(eq(team.workspaceId, workspace.id), eq(team.key, key), eq(issue.number, number)))
 			.limit(1);
-		const before = rows[0];
-		if (before === undefined) error(404, `no issue ${workspace.key}-${params.number}`);
+
+		const row = rows[0];
+		if (row === undefined) error(404, `no issue ${key}-${number}`);
+		const before = row.issue;
 
 		if (body.assigneeId != null && body.assigneeId !== "") {
 			await assertMember(workspace.id, body.assigneeId);
@@ -70,13 +79,26 @@ export const PATCH = handler({
 		if (body.priority !== undefined) changes.priority = body.priority;
 		if (body.assigneeId !== undefined) changes.assigneeId = body.assigneeId;
 
-		await db.update(issue).set(changes).where(eq(issue.id, before.id));
+		// Moving teams changes the identifier: numbers are unique per team, so the
+		// issue takes the next free number in its new home rather than keeping one
+		// that may already be taken there.
+		let identifier = identifierFor(row.team.key, before.number);
+		if (body.teamKey !== undefined && body.teamKey !== row.team.key) {
+			const destination = await requireTeam(workspace.id, body.teamKey);
+			const moved = await insertWithNumber(destination.id, async (candidate) => {
+				await db
+					.update(issue)
+					.set({ ...changes, teamId: destination.id, number: candidate })
+					.where(eq(issue.id, before.id));
+			});
+			identifier = identifierFor(destination.key, moved);
+		} else {
+			await db.update(issue).set(changes).where(eq(issue.id, before.id));
+		}
 
 		if (body.labelIds !== undefined) {
 			await setIssueLabels(before.id, await validLabelIds(workspace.id, body.labelIds));
 		}
-
-		const identifier = `${workspace.key}-${before.number}`;
 
 		// Reassignment tells the new owner, and tells the previous one they are off it.
 		if (body.assigneeId !== undefined && body.assigneeId !== before.assigneeId) {
@@ -118,30 +140,25 @@ export const PATCH = handler({
 			}
 		}
 
-		const updated = await getIssueByNumber(workspace.id, workspace.key, params.number);
+		const updated = await getIssueById(before.id);
 		if (updated === undefined) error(500, "issue vanished after update");
 		return updated;
 	},
 });
 
 export const DELETE = handler({
-	// implement:bug:#1: a `[number=integer]` matcher directory leaks its matcher
-	// name into the generated OpenAPI path (`{number=integer}`) while the
-	// parameter object is still named `number`, so the document is invalid for
-	// this route. Parsing in the handler instead keeps the path template clean.
-	// A `params` schema replaces every param, not just the one it names, so
-	// `slug` has to be redeclared here even though only `number` is parsed.
-	params: v.object({
-		slug: v.string(),
-		number: v.pipe(v.string(), v.transform(Number), v.number(), v.integer(), v.minValue(1)),
-	}),
+	params: IdentifierParams,
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		const { key, number } = split(params.identifier);
+
+		const owningTeam = await requireTeam(workspace.id, key);
 		const deleted = await db
 			.delete(issue)
-			.where(and(eq(issue.workspaceId, workspace.id), eq(issue.number, params.number)))
+			.where(and(eq(issue.teamId, owningTeam.id), eq(issue.number, number)))
 			.returning({ id: issue.id });
-		if (deleted.length === 0) error(404, `no issue ${workspace.key}-${params.number}`);
+
+		if (deleted.length === 0) error(404, `no issue ${key}-${number}`);
 		// 204 — kit turns an undefined return into an empty response.
 	},
 });

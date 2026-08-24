@@ -251,9 +251,6 @@
 										"slug": {
 											"type": "string"
 										},
-										"key": {
-											"type": "string"
-										},
 										"role": {
 											"enum": ["admin", "member"],
 											"type": "string"
@@ -262,7 +259,7 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "key", "role", "createdAt"],
+									"required": ["id", "name", "slug", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -534,9 +531,6 @@
 											"slug": {
 												"type": "string"
 											},
-											"key": {
-												"type": "string"
-											},
 											"role": {
 												"enum": ["admin", "member"],
 												"type": "string"
@@ -545,7 +539,7 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "slug", "key", "role", "createdAt"]
+										"required": ["id", "name", "slug", "role", "createdAt"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -568,10 +562,6 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 60
-									},
-									"key": {
-										"type": "string",
-										"maxLength": 6
 									}
 								},
 								"required": ["name"],
@@ -597,9 +587,6 @@
 										"slug": {
 											"type": "string"
 										},
-										"key": {
-											"type": "string"
-										},
 										"role": {
 											"enum": ["admin", "member"],
 											"type": "string"
@@ -608,7 +595,7 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "key", "role", "createdAt"],
+									"required": ["id", "name", "slug", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -650,9 +637,6 @@
 										"slug": {
 											"type": "string"
 										},
-										"key": {
-											"type": "string"
-										},
 										"role": {
 											"enum": ["admin", "member"],
 											"type": "string"
@@ -661,7 +645,7 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "key", "role", "createdAt"],
+									"required": ["id", "name", "slug", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -717,9 +701,6 @@
 										"slug": {
 											"type": "string"
 										},
-										"key": {
-											"type": "string"
-										},
 										"role": {
 											"enum": ["admin", "member"],
 											"type": "string"
@@ -728,7 +709,7 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "key", "role", "createdAt"],
+									"required": ["id", "name", "slug", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -901,6 +882,14 @@
 						}
 					},
 					{
+						"name": "team",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
 						"name": "status",
 						"in": "query",
 						"required": false,
@@ -975,6 +964,21 @@
 											},
 											"identifier": {
 												"type": "string"
+											},
+											"team": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"key": {
+														"type": "string"
+													}
+												},
+												"required": ["id", "name", "key"]
 											},
 											"title": {
 												"type": "string"
@@ -1079,6 +1083,7 @@
 											"id",
 											"number",
 											"identifier",
+											"team",
 											"title",
 											"description",
 											"status",
@@ -1120,6 +1125,10 @@
 							"schema": {
 								"type": "object",
 								"properties": {
+									"teamKey": {
+										"type": "string",
+										"maxLength": 6
+									},
 									"title": {
 										"type": "string",
 										"minLength": 1,
@@ -1157,7 +1166,7 @@
 										}
 									}
 								},
-								"required": ["title"],
+								"required": ["teamKey", "title"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1180,6 +1189,21 @@
 										"identifier": {
 											"type": "string"
 										},
+										"team": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"key": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "name", "key"]
+										},
 										"title": {
 											"type": "string"
 										},
@@ -1283,6 +1307,7 @@
 										"id",
 										"number",
 										"identifier",
+										"team",
 										"title",
 										"description",
 										"status",
@@ -1305,9 +1330,9 @@
 				}
 			}
 		},
-		"/api/v1/workspaces/{slug}/issues/{number}": {
+		"/api/v1/workspaces/{slug}/issues/{identifier}": {
 			"get": {
-				"operationId": "getApiV1WorkspacesBySlugIssuesByNumber",
+				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifier",
 				"parameters": [
 					{
 						"name": "slug",
@@ -1318,12 +1343,11 @@
 						}
 					},
 					{
-						"name": "number",
+						"name": "identifier",
 						"in": "path",
 						"required": true,
 						"schema": {
-							"type": "integer",
-							"minimum": 1
+							"type": "string"
 						}
 					}
 				],
@@ -1343,6 +1367,21 @@
 										},
 										"identifier": {
 											"type": "string"
+										},
+										"team": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"key": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -1447,6 +1486,7 @@
 										"id",
 										"number",
 										"identifier",
+										"team",
 										"title",
 										"description",
 										"status",
@@ -1469,7 +1509,7 @@
 				}
 			},
 			"patch": {
-				"operationId": "patchApiV1WorkspacesBySlugIssuesByNumber",
+				"operationId": "patchApiV1WorkspacesBySlugIssuesByIdentifier",
 				"parameters": [
 					{
 						"name": "slug",
@@ -1480,12 +1520,11 @@
 						}
 					},
 					{
-						"name": "number",
+						"name": "identifier",
 						"in": "path",
 						"required": true,
 						"schema": {
-							"type": "integer",
-							"minimum": 1
+							"type": "string"
 						}
 					}
 				],
@@ -1496,6 +1535,10 @@
 							"schema": {
 								"type": "object",
 								"properties": {
+									"teamKey": {
+										"type": "string",
+										"maxLength": 6
+									},
 									"title": {
 										"type": "string",
 										"minLength": 1,
@@ -1553,6 +1596,21 @@
 										"identifier": {
 											"type": "string"
 										},
+										"team": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"key": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "name", "key"]
+										},
 										"title": {
 											"type": "string"
 										},
@@ -1656,6 +1714,7 @@
 										"id",
 										"number",
 										"identifier",
+										"team",
 										"title",
 										"description",
 										"status",
@@ -1678,7 +1737,7 @@
 				}
 			},
 			"delete": {
-				"operationId": "deleteApiV1WorkspacesBySlugIssuesByNumber",
+				"operationId": "deleteApiV1WorkspacesBySlugIssuesByIdentifier",
 				"parameters": [
 					{
 						"name": "slug",
@@ -1689,12 +1748,11 @@
 						}
 					},
 					{
-						"name": "number",
+						"name": "identifier",
 						"in": "path",
 						"required": true,
 						"schema": {
-							"type": "integer",
-							"minimum": 1
+							"type": "string"
 						}
 					}
 				],
@@ -1713,9 +1771,9 @@
 				}
 			}
 		},
-		"/api/v1/workspaces/{slug}/issues/{number}/comments": {
+		"/api/v1/workspaces/{slug}/issues/{identifier}/comments": {
 			"get": {
-				"operationId": "getApiV1WorkspacesBySlugIssuesByNumberComments",
+				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifierComments",
 				"parameters": [
 					{
 						"name": "slug",
@@ -1726,12 +1784,11 @@
 						}
 					},
 					{
-						"name": "number",
+						"name": "identifier",
 						"in": "path",
 						"required": true,
 						"schema": {
-							"type": "integer",
-							"minimum": 1
+							"type": "string"
 						}
 					}
 				],
@@ -1796,7 +1853,7 @@
 				}
 			},
 			"post": {
-				"operationId": "postApiV1WorkspacesBySlugIssuesByNumberComments",
+				"operationId": "postApiV1WorkspacesBySlugIssuesByIdentifierComments",
 				"parameters": [
 					{
 						"name": "slug",
@@ -1807,12 +1864,11 @@
 						}
 					},
 					{
-						"name": "number",
+						"name": "identifier",
 						"in": "path",
 						"required": true,
 						"schema": {
-							"type": "integer",
-							"minimum": 1
+							"type": "string"
 						}
 					}
 				],
@@ -2188,6 +2244,125 @@
 								"schema": {}
 							}
 						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/teams": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugTeams",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"key": {
+												"type": "string"
+											},
+											"issueCount": {
+												"type": "number"
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": ["id", "name", "key", "issueCount", "createdAt"]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugTeams",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 60
+									},
+									"key": {
+										"type": "string",
+										"maxLength": 6
+									}
+								},
+								"required": ["name"],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"key": {
+											"type": "string"
+										},
+										"issueCount": {
+											"type": "number"
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": ["id", "name", "key", "issueCount", "createdAt"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
 					}
 				}
 			}

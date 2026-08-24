@@ -34,7 +34,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { UserAvatar } from "@/lib/components/glyphs";
-import type { Workspace } from "@/lib/domain/schemas";
+import type { Team, Workspace } from "@/lib/domain/schemas";
 import { mode } from "@/lib/mode";
 import { cn } from "@/lib/utils";
 import { CommandPalette, openCommandPalette } from "./command-palette";
@@ -44,6 +44,8 @@ export interface ShellData {
 	user: App.SessionUser;
 	workspaces: Workspace[];
 	unread: number;
+	workspace: Workspace;
+	teams: Team[];
 }
 
 /** How often the inbox badge re-checks. Cheap query, and 15s reads as live. */
@@ -51,6 +53,7 @@ const POLL_MS = 15_000;
 
 export function AppShell(
 	data: Readable<ShellData>,
+	activeSlug: Readable<string>,
 	url: Readable<{ path: string }>,
 	children: Child,
 ) {
@@ -62,11 +65,6 @@ export function AppShell(
 		const { data: result, error } = await api.GET("/api/v1/notifications/unread");
 		if (error === undefined) unread.set(result.count);
 	};
-
-	const activeSlug = derived([url, data], (location, shell) => {
-		const match = /^\/app\/([^/]+)/.exec(location.path);
-		return match?.[1] ?? shell.workspaces[0]?.slug ?? "";
-	});
 
 	return Div(
 		{ class: "flex min-h-dvh" },
@@ -121,8 +119,10 @@ function Sidebar(
 		),
 
 		NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
-		NavItem(url, activeSlug, "/app/:slug", LayoutList, "Issues"),
+		NavItem(url, activeSlug, "/app/:slug", LayoutList, "All issues"),
 		NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
+
+		TeamNav(data, activeSlug, url),
 
 		Div({ class: "flex-1" }),
 
@@ -178,13 +178,12 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 								onSelect: () => router.navigate("/app/:slug", { slug: workspace.get().slug }),
 							},
 							Span({ class: "truncate" }, workspace.bind("name")),
-							Span({ class: "ml-auto text-[11px] text-muted-foreground" }, workspace.bind("key")),
 						),
 				),
 			),
 			DropdownMenuSeparator(),
 			DropdownMenuItem(
-				{ onSelect: () => window.location.assign("/app/new") },
+				{ onSelect: () => window.location.assign("/workspaces/new") },
 				Plus({ class: "size-3.5" }),
 				"Create workspace",
 			),
@@ -270,6 +269,56 @@ function UserMenu(data: Readable<ShellData>) {
 				LogOut({ class: "size-3.5" }),
 				"Sign out",
 			),
+		),
+	);
+}
+
+/**
+ * Teams, each linking to its own issue list. A team's key is the prefix its
+ * issues carry, so it is shown beside the name rather than hidden.
+ */
+function TeamNav(
+	data: Readable<ShellData>,
+	activeSlug: Readable<string>,
+	url: Readable<{ path: string }>,
+) {
+	return Div(
+		{ class: "mt-4 flex flex-col gap-0.5" },
+		Div(
+			{ class: "px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground/70" },
+			"Teams",
+		),
+		ForEach(
+			data.bind((shell) => shell.teams),
+			(team) => team.id,
+			(team) => {
+				const active = derived([url, activeSlug], (location, slug) =>
+					location.path.startsWith(`/app/${slug}/team/${team.get().key}`),
+				);
+				return router.Link(
+					{
+						to: "/app/:slug/team/:key",
+						params: { slug: activeSlug, key: team.bind("key") },
+						class: derived([active], (isActive) =>
+							cn(
+								"flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+								isActive
+									? "bg-accent font-medium text-accent-foreground"
+									: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+							),
+						),
+					},
+					Span(
+						{ class: "w-9 shrink-0 font-mono text-[11px] text-muted-foreground" },
+						team.bind("key"),
+					),
+					Span({ class: "truncate" }, team.bind("name")),
+					Span(
+						{ class: "ml-auto text-[11px] text-muted-foreground/70" },
+						team.bind((value) => (value.issueCount === 0 ? "" : `${value.issueCount}`)),
+					),
+				);
+			},
 		),
 	);
 }

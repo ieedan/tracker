@@ -27,17 +27,36 @@ export const WorkspaceSchema = v.object({
 	id: v.string(),
 	name: v.string(),
 	slug: v.string(),
-	key: v.string(),
 	role: WorkspaceRoleSchema,
 	createdAt: v.string(),
 });
 export type Workspace = v.InferOutput<typeof WorkspaceSchema>;
 
+/** A team owns issues, and its key is their prefix. */
+export const TeamSchema = v.object({
+	id: v.string(),
+	name: v.string(),
+	/** The `ENG` in `ENG-42`. */
+	key: v.string(),
+	issueCount: v.number(),
+	createdAt: v.string(),
+});
+export type Team = v.InferOutput<typeof TeamSchema>;
+
+/** The team as it appears on an issue — no counts, just identity. */
+export const TeamRefSchema = v.object({
+	id: v.string(),
+	name: v.string(),
+	key: v.string(),
+});
+export type TeamRef = v.InferOutput<typeof TeamRefSchema>;
+
 export const IssueSchema = v.object({
 	id: v.string(),
 	number: v.number(),
-	/** `ENG-42` — the workspace key and the issue number. */
+	/** `ENG-42` — the owning team's key and the issue number. */
 	identifier: v.string(),
+	team: TeamRefSchema,
 	title: v.string(),
 	description: v.string(),
 	status: IssueStatusSchema,
@@ -98,11 +117,17 @@ const trimmed = (min: number, max: number) =>
 
 export const CreateWorkspaceBody = v.object({
 	name: trimmed(1, 60),
-	/** Issue prefix. Uppercased server-side; defaults to the first letters of the name. */
+});
+
+export const CreateTeamBody = v.object({
+	name: trimmed(1, 60),
+	/** Issue prefix. Uppercased server-side; defaults to initials of the name. */
 	key: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(6))),
 });
 
 export const CreateIssueBody = v.object({
+	/** Which team files it — decides the identifier prefix. */
+	teamKey: v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6)),
 	title: trimmed(1, 200),
 	description: v.optional(v.pipe(v.string(), v.maxLength(20_000)), ""),
 	status: v.optional(IssueStatusSchema, "backlog"),
@@ -113,6 +138,8 @@ export const CreateIssueBody = v.object({
 
 export const UpdateIssueBody = v.partial(
 	v.object({
+		/** Moving between teams reallocates the number, so the identifier changes. */
+		teamKey: v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6)),
 		title: trimmed(1, 200),
 		description: v.pipe(v.string(), v.maxLength(20_000)),
 		status: IssueStatusSchema,

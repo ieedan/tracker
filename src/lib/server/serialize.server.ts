@@ -1,6 +1,15 @@
 // Row shapes → the JSON the API documents. Dates become ISO strings because a
 // load's return value has to survive being serialized into the page.
-import type { Comment, Issue, Label, Member, UserSummary, Workspace } from "@/lib/domain/schemas";
+import type {
+	Comment,
+	Issue,
+	Label,
+	Member,
+	Team,
+	TeamRef,
+	UserSummary,
+	Workspace,
+} from "@/lib/domain/schemas";
 import type { WorkspaceRole } from "@/lib/domain/issues";
 import type * as schema from "./schema.server";
 
@@ -9,6 +18,7 @@ type IssueRow = typeof schema.issue.$inferSelect;
 type LabelRow = typeof schema.label.$inferSelect;
 type CommentRow = typeof schema.comment.$inferSelect;
 type WorkspaceRow = typeof schema.workspace.$inferSelect;
+type TeamRow = typeof schema.team.$inferSelect;
 
 export const iso = (value: Date | null): string | null =>
 	value === null ? null : value.toISOString();
@@ -26,10 +36,23 @@ export function toWorkspace(row: WorkspaceRow, role: WorkspaceRole): Workspace {
 		id: row.id,
 		name: row.name,
 		slug: row.slug,
-		key: row.key,
 		role,
 		createdAt: row.createdAt.toISOString(),
 	};
+}
+
+export function toTeam(row: TeamRow, issueCount: number): Team {
+	return {
+		id: row.id,
+		name: row.name,
+		key: row.key,
+		issueCount,
+		createdAt: row.createdAt.toISOString(),
+	};
+}
+
+export function toTeamRef(row: Pick<TeamRow, "id" | "name" | "key">): TeamRef {
+	return { id: row.id, name: row.name, key: row.key };
 }
 
 export function identifierFor(key: string, number: number): string {
@@ -39,7 +62,7 @@ export function identifierFor(key: string, number: number): string {
 export function toIssue(
 	row: IssueRow,
 	context: {
-		workspaceKey: string;
+		team: Pick<TeamRow, "id" | "name" | "key">;
 		assignee: UserRow | null;
 		creator: Pick<UserRow, "id" | "name" | "email" | "image">;
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;
@@ -49,7 +72,8 @@ export function toIssue(
 	return {
 		id: row.id,
 		number: row.number,
-		identifier: identifierFor(context.workspaceKey, row.number),
+		identifier: identifierFor(context.team.key, row.number),
+		team: toTeamRef(context.team),
 		title: row.title,
 		description: row.description,
 		status: row.status,

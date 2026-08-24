@@ -43,6 +43,36 @@ function Wordmark() {
 	);
 }
 
+/**
+ * Turns better-auth's error into something a person can act on.
+ *
+ * Wrong password and "no such account" deliberately produce the *same* message:
+ * telling them apart turns the sign-in form into an account-enumeration oracle,
+ * and it makes no difference to someone who simply mistyped.
+ */
+function signInMessage(error: { status?: number; message?: string }): string {
+	if (error.status === 0) return "Could not reach the server. Check your connection.";
+	if (error.status === 401 || error.status === 403 || error.status === 400) {
+		return "Incorrect email or password.";
+	}
+	if (error.status === 429) return "Too many attempts. Wait a moment and try again.";
+	return error.message !== undefined && error.message !== ""
+		? error.message
+		: "Something went wrong signing you in.";
+}
+
+/** Sign-up's failures are different: the useful one is "that email is taken". */
+function signUpMessage(error: { status?: number; message?: string }): string {
+	if (error.status === 0) return "Could not reach the server. Check your connection.";
+	if (error.status === 409 || error.status === 422) {
+		return "An account with that email already exists.";
+	}
+	if (error.status === 429) return "Too many attempts. Wait a moment and try again.";
+	return error.message !== undefined && error.message !== ""
+		? error.message
+		: "Something went wrong creating your account.";
+}
+
 /** Where to land after authenticating — `?next=` when it is a safe local path. */
 function destination(): string {
 	if (typeof window === "undefined") return "/app";
@@ -74,7 +104,7 @@ export function LoginPage() {
 							password: output.password,
 						});
 						if (error) {
-							failure.set(error.message ?? "Could not sign you in");
+							failure.set(signInMessage(error));
 							return;
 						}
 						// A full load, so the server hook sees the new cookie.
@@ -118,7 +148,7 @@ export function SignUpPage() {
 							password: output.password,
 						});
 						if (error) {
-							failure.set(error.message ?? "Could not create your account");
+							failure.set(signUpMessage(error));
 							return;
 						}
 						window.location.assign(destination());

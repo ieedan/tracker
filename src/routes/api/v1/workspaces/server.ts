@@ -1,4 +1,3 @@
-import { error } from "@implementjs/kit/server";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as v from "valibot";
@@ -7,7 +6,8 @@ import { db } from "@/lib/server/db.server";
 import { requireUser } from "@/lib/server/guards.server";
 import { label, workspace, workspaceMember } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
-import { slugify, workspaceKeyFrom } from "@/lib/server/slug.server";
+import { slugify } from "@/lib/server/slug.server";
+import { createDefaultTeams } from "@/lib/server/teams.server";
 import { handler, json } from "./$types";
 
 export const GET = handler({
@@ -32,16 +32,10 @@ export const POST = handler({
 		const user = requireUser(locals);
 
 		const slug = await uniqueSlug(slugify(body.name));
-		const key = (body.key ?? workspaceKeyFrom(body.name)).toUpperCase();
-		if (!/^[A-Z][A-Z0-9]{0,5}$/.test(key)) {
-			error(400, "key must be 1–6 characters, starting with a letter");
-		}
-
 		const row = {
 			id: nanoid(),
 			name: body.name,
 			slug,
-			key,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		};
@@ -60,8 +54,9 @@ export const POST = handler({
 			createdAt: new Date(),
 		});
 
-		// A workspace with no labels at all is a dead end in the UI, so seed the
-		// set Linear starts you with.
+		// A workspace with no teams has nowhere to file an issue, and one with no
+		// labels is a dead end in the UI. Both are seeded on creation.
+		await createDefaultTeams(row.id);
 		await db.insert(label).values(
 			[
 				{ name: "Bug", color: "#e5484d" },

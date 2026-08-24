@@ -134,9 +134,9 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 												value: `${issue.get().identifier} ${issue.get().title}`,
 												onSelect: () =>
 													go(() =>
-														router.navigate("/app/:slug/issue/:number", {
+														router.navigate("/app/:slug/issue/:identifier", {
 															slug: activeSlug.get(),
-															number: String(issue.get().number),
+															identifier: issue.get().identifier,
 														}),
 													),
 											},

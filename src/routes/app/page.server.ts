@@ -17,5 +17,5 @@ export default async function load({ locals }: LoadEvent) {
 		.limit(1);
 
 	const first = rows[0];
-	redirect(303, first === undefined ? "/app/new" : `/app/${first.slug}`);
+	redirect(303, first === undefined ? "/workspaces/new" : `/app/${first.slug}`);
 }
