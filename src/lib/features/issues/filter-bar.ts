@@ -45,6 +45,7 @@ import {
 	STATUS_LABELS,
 } from "@/lib/domain/issues";
 import type { Label, Member, Team } from "@/lib/domain/schemas";
+import { cn } from "@/lib/utils";
 import {
 	FILTER_FIELD_LABELS,
 	FILTER_FIELDS,
@@ -72,41 +73,60 @@ interface FilterOption {
 	icon?: Child;
 }
 
-function optionsFor(field: FilterField, context: FilterContext): FilterOption[] {
+/**
+ * Glyph sizes differ by where they are shown. In the menu they sit beside 13px
+ * rows and match the issue list; in a 24px chip that same 20px avatar all but
+ * fills it, so chips get their own smaller set.
+ *
+ * `cn` runs these through tailwind-merge, so a `size-*` here beats the one baked
+ * into the glyph. The status ring additionally needs the `[&_svg]:` variant —
+ * its markup carries width/height attributes, and only CSS overrides those.
+ */
+const COMPACT = {
+	status: "size-3.5 [&_svg]:size-3.5",
+	avatar: "size-3.5 text-[8px]",
+	dot: "size-2",
+} as const;
+
+function optionsFor(field: FilterField, context: FilterContext, compact = false): FilterOption[] {
+	const avatar = compact ? COMPACT.avatar : undefined;
+
 	switch (field) {
 		case "status":
 			return ISSUE_STATUSES.map((status) => ({
 				value: status,
 				label: STATUS_LABELS[status],
-				icon: StatusIcon(status),
+				icon: StatusIcon(status, compact ? COMPACT.status : undefined),
 			}));
 		case "priority":
 			return ISSUE_PRIORITIES.map((priority) => ({
 				value: priority,
 				label: PRIORITY_LABELS[priority],
-				icon: PriorityIcon(priority),
+				// The priority bars are fixed heights rather than one box, so they
+				// shrink by scaling instead of by a size class.
+				icon: PriorityIcon(priority, compact ? "scale-90" : undefined),
 			}));
 		case "assignee":
 			return [
-				{ value: NO_ASSIGNEE, label: "No assignee", icon: UnassignedAvatar() },
+				{ value: NO_ASSIGNEE, label: "No assignee", icon: UnassignedAvatar(avatar) },
 				...context.members.map((member) => ({
 					value: member.user.id,
 					label: member.user.name,
-					icon: UserAvatar(member.user),
+					icon: UserAvatar(member.user, avatar),
 				})),
 			];
 		case "creator":
 			return context.members.map((member) => ({
 				value: member.user.id,
 				label: member.user.name,
-				icon: UserAvatar(member.user),
+				icon: UserAvatar(member.user, avatar),
 			}));
 		case "label":
 			return context.labels.map((label) => ({
 				value: label.id,
 				label: label.name,
 				icon: Span({
-					class: "size-2.5 shrink-0 rounded-full",
+					class: cn("shrink-0 rounded-full", compact ? COMPACT.dot : "size-2.5"),
 					style: { backgroundColor: label.color },
 				}),
 			}));
@@ -114,7 +134,12 @@ function optionsFor(field: FilterField, context: FilterContext): FilterOption[] 
 			return context.teams.map((team) => ({
 				value: team.key,
 				label: team.name,
-				icon: Span({ class: "w-8 shrink-0 font-mono text-[10px] text-muted-foreground" }, team.key),
+				icon: Span(
+					{
+						class: cn("shrink-0 font-mono text-[10px] text-muted-foreground", compact ? "" : "w-8"),
+					},
+					team.key,
+				),
 			}));
 	}
 }
@@ -135,7 +160,7 @@ const MAX_CHIP_ICONS = 3;
 
 function iconsFor(filter: Filter, context: FilterContext): Child[] {
 	if (filter.values.length > MAX_CHIP_ICONS) return [];
-	const options = optionsFor(filter.field, context);
+	const options = optionsFor(filter.field, context, true);
 	return filter.values
 		.map((value) => options.find((option) => option.value === value)?.icon)
 		.filter((icon): icon is Child => icon !== undefined && icon !== null);
