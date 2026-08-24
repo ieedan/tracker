@@ -1,0 +1,52 @@
+{
+	"name": "tracker",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"sync": "implement-kit sync",
+		"prepare": "implement-kit sync || echo ''",
+		"check": "implement-kit sync && tsc --noEmit",
+		"ui": "jsrepo add",
+		"lint": "oxlint",
+		"lint:fix": "oxlint --fix",
+		"format": "oxfmt",
+		"format:check": "oxfmt --check",
+		"db:push": "drizzle-kit push",
+		"db:seed": "tsx src/lib/db/seed.ts",
+		"db:studio": "drizzle-kit studio"
+	},
+	"dependencies": {
+		"@implementjs/core": "^0.0.4",
+		"@implementjs/formish": "^0.0.4",
+		"@implementjs/lucide": "^0.0.4",
+		"@implementjs/mode-watcher": "^0.0.4",
+		"@implementjs/primitives": "^0.0.5",
+		"@implementjs/router": "^0.0.5",
+		"@libsql/client": "^0.17.4",
+		"neverthrow": "^8.2.0",
+		"tailwind-merge": "^3.6.0",
+		"tailwind-variants": "^3.3.1",
+		"valibot": "^1.4.1"
+	},
+	"devDependencies": {
+		"@dotenvx/dotenvx": "^2.21.0",
+		"@implementjs/eslint": "^0.0.1",
+		"@implementjs/kit": "0.0.5",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/node": "^26.2.0",
+		"drizzle-kit": "1.0.0-rc.4",
+		"drizzle-orm": "1.0.0-rc.4",
+		"jsrepo": "^3.8.1",
+		"oxfmt": "^0.63.0",
+		"oxlint": "^1.78.0",
+		"tailwindcss": "^4.3.3",
+		"tsx": "^4.23.12",
+		"typescript": "^7.0.2",
+		"vite": "^7.3.0",
+		"zod": "^4.4.3"
+	}
+}

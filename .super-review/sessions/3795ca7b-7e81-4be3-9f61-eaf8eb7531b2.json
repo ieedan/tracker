@@ -1,0 +1,136 @@
+{
+  "id": "3795ca7b-7e81-4be3-9f61-eaf8eb7531b2",
+  "repoId": "1a9736eb6e33",
+  "key": "seed-default-labels",
+  "name": "Seed default labels",
+  "description": "Fresh databases now get a small built-in label set (feature, bug, and a few others). Re-running the seed skips names that already exist.",
+  "commitTitle": "feat: seed default issue labels",
+  "harness": "cursor",
+  "branch": "aidan-v2",
+  "baseRef": "a97ddd9fffd202a3394dd9a3f98cfb2a4dfb9813",
+  "createdAt": 1787454964799,
+  "updatedAt": 1787454964799,
+  "fileCount": 4,
+  "additions": 185,
+  "deletions": 0,
+  "stepCount": 4,
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Built-in labels",
+      "body": "This is the catalog that ships with the app. Feature and bug are the ones you asked for. The rest are the usual issue-tracker set: improvement, docs, chore, performance, and security. Each row has a color so chips can render later without another lookup.",
+      "paths": [
+        "src/lib/db/seed.ts"
+      ],
+      "callouts": [
+        {
+          "id": "step-1-c1",
+          "file": "src/lib/db/seed.ts",
+          "startLine": 5,
+          "endLine": 41,
+          "side": "new",
+          "body": "Names include the emoji, matching `💡 feature` / `🐞 bug`."
+        },
+        {
+          "id": "step-1-c2",
+          "file": "src/lib/db/seed.ts",
+          "startLine": 49,
+          "endLine": 49,
+          "side": "new",
+          "body": "`onConflictDoNothing` on `name` makes this safe to run on every labels GET and via `pnpm db:seed`."
+        }
+      ]
+    },
+    {
+      "id": "step-2",
+      "title": "Unique label names",
+      "body": "The conflict target only works if `name` is unique. That is also the right model: two labels named `🐞 bug` would be indistinguishable in the picker.",
+      "paths": [
+        "src/lib/db/schema.ts"
+      ],
+      "callouts": [
+        {
+          "id": "step-2-c1",
+          "file": "src/lib/db/schema.ts",
+          "startLine": 26,
+          "endLine": 26,
+          "side": "new",
+          "body": "Unique on `name` is what `onConflictDoNothing({ target: labels.name })` keys off."
+        }
+      ]
+    },
+    {
+      "id": "step-3",
+      "title": "Seed on first fetch",
+      "body": "The labels API is the only place the app reads this table today, so seeding here means a new database fills itself without a separate setup step.",
+      "paths": [
+        "src/routes/api/labels/server.ts"
+      ],
+      "callouts": [
+        {
+          "id": "step-3-c1",
+          "file": "src/routes/api/labels/server.ts",
+          "startLine": 8,
+          "endLine": 8,
+          "side": "new",
+          "body": "Runs once per process after the first successful insert, then becomes a no-op."
+        }
+      ]
+    },
+    {
+      "id": "step-4",
+      "title": "Local db scripts",
+      "body": "`db:push` applies the unique constraint. `db:seed` inserts the catalog into an existing database (already run against `local.db`).",
+      "paths": [
+        "package.json"
+      ],
+      "callouts": []
+    }
+  ],
+  "files": [
+    {
+      "path": "package.json",
+      "status": "added",
+      "additions": 52,
+      "deletions": 0,
+      "isBinary": false,
+      "patch": "diff --git a/package.json b/package.json\nnew file mode 100644\n--- /dev/null\n+++ b/package.json\n@@ -0,0 +1,52 @@\n+{\n+\t\"name\": \"tracker\",\n+\t\"version\": \"0.0.0\",\n+\t\"private\": true,\n+\t\"type\": \"module\",\n+\t\"scripts\": {\n+\t\t\"dev\": \"vite\",\n+\t\t\"build\": \"vite build\",\n+\t\t\"preview\": \"vite preview\",\n+\t\t\"sync\": \"implement-kit sync\",\n+\t\t\"prepare\": \"implement-kit sync || echo ''\",\n+\t\t\"check\": \"implement-kit sync && tsc --noEmit\",\n+\t\t\"ui\": \"jsrepo add\",\n+\t\t\"lint\": \"oxlint\",\n+\t\t\"lint:fix\": \"oxlint --fix\",\n+\t\t\"format\": \"oxfmt\",\n+\t\t\"format:check\": \"oxfmt --check\",\n+\t\t\"db:push\": \"drizzle-kit push\",\n+\t\t\"db:seed\": \"tsx src/lib/db/seed.ts\",\n+\t\t\"db:studio\": \"drizzle-kit studio\"\n+\t},\n+\t\"dependencies\": {\n+\t\t\"@implementjs/core\": \"^0.0.4\",\n+\t\t\"@implementjs/formish\": \"^0.0.4\",\n+\t\t\"@implementjs/lucide\": \"^0.0.4\",\n+\t\t\"@implementjs/mode-watcher\": \"^0.0.4\",\n+\t\t\"@implementjs/primitives\": \"^0.0.4\",\n+\t\t\"@implementjs/router\": \"^0.0.5\",\n+\t\t\"@libsql/client\": \"^0.17.4\",\n+\t\t\"neverthrow\": \"^8.2.0\",\n+\t\t\"tailwind-merge\": \"^3.6.0\",\n+\t\t\"tailwind-variants\": \"^3.3.1\",\n+\t\t\"valibot\": \"^1.4.1\"\n+\t},\n+\t\"devDependencies\": {\n+\t\t\"@dotenvx/dotenvx\": \"^2.21.0\",\n+\t\t\"@implementjs/eslint\": \"^0.0.1\",\n+\t\t\"@implementjs/kit\": \"0.0.5\",\n+\t\t\"@tailwindcss/vite\": \"^4.3.3\",\n+\t\t\"@types/node\": \"^26.2.0\",\n+\t\t\"drizzle-kit\": \"1.0.0-rc.4\",\n+\t\t\"drizzle-orm\": \"1.0.0-rc.4\",\n+\t\t\"jsrepo\": \"^3.8.1\",\n+\t\t\"oxfmt\": \"^0.63.0\",\n+\t\t\"oxlint\": \"^1.78.0\",\n+\t\t\"tailwindcss\": \"^4.3.3\",\n+\t\t\"tsx\": \"^4.23.12\",\n+\t\t\"typescript\": \"^7.0.2\",\n+\t\t\"vite\": \"^7.3.0\",\n+\t\t\"zod\": \"^4.4.3\"\n+\t}\n+}\n",
+      "oldContents": "",
+      "newContents": "{\n\t\"name\": \"tracker\",\n\t\"version\": \"0.0.0\",\n\t\"private\": true,\n\t\"type\": \"module\",\n\t\"scripts\": {\n\t\t\"dev\": \"vite\",\n\t\t\"build\": \"vite build\",\n\t\t\"preview\": \"vite preview\",\n\t\t\"sync\": \"implement-kit sync\",\n\t\t\"prepare\": \"implement-kit sync || echo ''\",\n\t\t\"check\": \"implement-kit sync && tsc --noEmit\",\n\t\t\"ui\": \"jsrepo add\",\n\t\t\"lint\": \"oxlint\",\n\t\t\"lint:fix\": \"oxlint --fix\",\n\t\t\"format\": \"oxfmt\",\n\t\t\"format:check\": \"oxfmt --check\",\n\t\t\"db:push\": \"drizzle-kit push\",\n\t\t\"db:seed\": \"tsx src/lib/db/seed.ts\",\n\t\t\"db:studio\": \"drizzle-kit studio\"\n\t},\n\t\"dependencies\": {\n\t\t\"@implementjs/core\": \"^0.0.4\",\n\t\t\"@implementjs/formish\": \"^0.0.4\",\n\t\t\"@implementjs/lucide\": \"^0.0.4\",\n\t\t\"@implementjs/mode-watcher\": \"^0.0.4\",\n\t\t\"@implementjs/primitives\": \"^0.0.4\",\n\t\t\"@implementjs/router\": \"^0.0.5\",\n\t\t\"@libsql/client\": \"^0.17.4\",\n\t\t\"neverthrow\": \"^8.2.0\",\n\t\t\"tailwind-merge\": \"^3.6.0\",\n\t\t\"tailwind-variants\": \"^3.3.1\",\n\t\t\"valibot\": \"^1.4.1\"\n\t},\n\t\"devDependencies\": {\n\t\t\"@dotenvx/dotenvx\": \"^2.21.0\",\n\t\t\"@implementjs/eslint\": \"^0.0.1\",\n\t\t\"@implementjs/kit\": \"0.0.5\",\n\t\t\"@tailwindcss/vite\": \"^4.3.3\",\n\t\t\"@types/node\": \"^26.2.0\",\n\t\t\"drizzle-kit\": \"1.0.0-rc.4\",\n\t\t\"drizzle-orm\": \"1.0.0-rc.4\",\n\t\t\"jsrepo\": \"^3.8.1\",\n\t\t\"oxfmt\": \"^0.63.0\",\n\t\t\"oxlint\": \"^1.78.0\",\n\t\t\"tailwindcss\": \"^4.3.3\",\n\t\t\"tsx\": \"^4.23.12\",\n\t\t\"typescript\": \"^7.0.2\",\n\t\t\"vite\": \"^7.3.0\",\n\t\t\"zod\": \"^4.4.3\"\n\t}\n}\n",
+      "truncated": false
+    },
+    {
+      "path": "src/lib/db/schema.ts",
+      "status": "added",
+      "additions": 65,
+      "deletions": 0,
+      "isBinary": false,
+      "patch": "diff --git a/src/lib/db/schema.ts b/src/lib/db/schema.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/lib/db/schema.ts\n@@ -0,0 +1,65 @@\n+import { index, int, sqliteTable, text, uniqueIndex } from \"drizzle-orm/sqlite-core\";\n+import { PRIORITIES, STATUSES } from \"../constants\";\n+\n+function defaultFields() {\n+\treturn {\n+\t\tcreatedAt: int({ mode: \"timestamp_ms\" })\n+\t\t\t.notNull()\n+\t\t\t.$defaultFn(() => new Date()),\n+\t\tupdatedAt: int({ mode: \"timestamp_ms\" })\n+\t\t\t.notNull()\n+\t\t\t.$defaultFn(() => new Date())\n+\t\t\t.$onUpdateFn(() => new Date()),\n+\t};\n+}\n+\n+export const teams = sqliteTable(\"teams\", {\n+\t...defaultFields(),\n+\tid: int().primaryKey({ autoIncrement: true }),\n+\tname: text().notNull(),\n+\tshortHand: text().notNull().unique(),\n+});\n+\n+export const labels = sqliteTable(\"labels\", {\n+\t...defaultFields(),\n+\tid: int().primaryKey({ autoIncrement: true }),\n+\tname: text().notNull().unique(),\n+\tdescription: text().notNull(),\n+\tcolor: text().notNull(),\n+});\n+\n+export const issues = sqliteTable(\n+\t\"issues\",\n+\t{\n+\t\t...defaultFields(),\n+\t\t// <team-slug>-000\n+\t\tid: int().primaryKey({ autoIncrement: true }),\n+\t\tteamId: int().notNull(),\n+\t\ttitle: text().notNull(),\n+\t\tbody: text().notNull(),\n+\t\tstatus: text({ enum: STATUSES }).notNull(),\n+\t\tpriority: text({ enum: PRIORITIES }).notNull().default(\"None\"),\n+\t\tassignee: int(),\n+\t\tassignedAt: int({ mode: \"timestamp_ms\" }),\n+\t},\n+\t(table) => [\n+\t\tindex(\"team_idx\").on(table.teamId),\n+\t\tindex(\"status_idx\").on(table.status),\n+\t\tindex(\"priority_idx\").on(table.priority),\n+\t\tindex(\"assignee\").on(table.assignee),\n+\t],\n+);\n+\n+export const issueLabels = sqliteTable(\n+\t\"issueLabels\",\n+\t{\n+\t\t...defaultFields(),\n+\t\tid: int().primaryKey({ autoIncrement: true }),\n+\t\tissueId: int(),\n+\t\tlabelId: int(),\n+\t},\n+\t(table) => [\n+\t\tindex(\"issue_id_idx\").on(table.issueId),\n+\t\tuniqueIndex(\"issue_labels_unique_idx\").on(table.issueId, table.labelId),\n+\t],\n+);\n",
+      "oldContents": "",
+      "newContents": "import { index, int, sqliteTable, text, uniqueIndex } from \"drizzle-orm/sqlite-core\";\nimport { PRIORITIES, STATUSES } from \"../constants\";\n\nfunction defaultFields() {\n\treturn {\n\t\tcreatedAt: int({ mode: \"timestamp_ms\" })\n\t\t\t.notNull()\n\t\t\t.$defaultFn(() => new Date()),\n\t\tupdatedAt: int({ mode: \"timestamp_ms\" })\n\t\t\t.notNull()\n\t\t\t.$defaultFn(() => new Date())\n\t\t\t.$onUpdateFn(() => new Date()),\n\t};\n}\n\nexport const teams = sqliteTable(\"teams\", {\n\t...defaultFields(),\n\tid: int().primaryKey({ autoIncrement: true }),\n\tname: text().notNull(),\n\tshortHand: text().notNull().unique(),\n});\n\nexport const labels = sqliteTable(\"labels\", {\n\t...defaultFields(),\n\tid: int().primaryKey({ autoIncrement: true }),\n\tname: text().notNull().unique(),\n\tdescription: text().notNull(),\n\tcolor: text().notNull(),\n});\n\nexport const issues = sqliteTable(\n\t\"issues\",\n\t{\n\t\t...defaultFields(),\n\t\t// <team-slug>-000\n\t\tid: int().primaryKey({ autoIncrement: true }),\n\t\tteamId: int().notNull(),\n\t\ttitle: text().notNull(),\n\t\tbody: text().notNull(),\n\t\tstatus: text({ enum: STATUSES }).notNull(),\n\t\tpriority: text({ enum: PRIORITIES }).notNull().default(\"None\"),\n\t\tassignee: int(),\n\t\tassignedAt: int({ mode: \"timestamp_ms\" }),\n\t},\n\t(table) => [\n\t\tindex(\"team_idx\").on(table.teamId),\n\t\tindex(\"status_idx\").on(table.status),\n\t\tindex(\"priority_idx\").on(table.priority),\n\t\tindex(\"assignee\").on(table.assignee),\n\t],\n);\n\nexport const issueLabels = sqliteTable(\n\t\"issueLabels\",\n\t{\n\t\t...defaultFields(),\n\t\tid: int().primaryKey({ autoIncrement: true }),\n\t\tissueId: int(),\n\t\tlabelId: int(),\n\t},\n\t(table) => [\n\t\tindex(\"issue_id_idx\").on(table.issueId),\n\t\tuniqueIndex(\"issue_labels_unique_idx\").on(table.issueId, table.labelId),\n\t],\n);\n",
+      "truncated": false
+    },
+    {
+      "path": "src/lib/db/seed.ts",
+      "status": "added",
+      "additions": 56,
+      "deletions": 0,
+      "isBinary": false,
+      "patch": "diff --git a/src/lib/db/seed.ts b/src/lib/db/seed.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/lib/db/seed.ts\n@@ -0,0 +1,56 @@\n+import { fileURLToPath } from \"node:url\";\n+import { db } from \"../db.server\";\n+import { labels } from \"./schema\";\n+\n+export const DEFAULT_LABELS = [\n+\t{\n+\t\tname: \"💡 feature\",\n+\t\tdescription: \"New functionality\",\n+\t\tcolor: \"#8B5CF6\",\n+\t},\n+\t{\n+\t\tname: \"🐞 bug\",\n+\t\tdescription: \"Something isn't working\",\n+\t\tcolor: \"#EF4444\",\n+\t},\n+\t{\n+\t\tname: \"✨ improvement\",\n+\t\tdescription: \"Enhancement to existing behavior\",\n+\t\tcolor: \"#10B981\",\n+\t},\n+\t{\n+\t\tname: \"📝 docs\",\n+\t\tdescription: \"Documentation\",\n+\t\tcolor: \"#6366F1\",\n+\t},\n+\t{\n+\t\tname: \"🧹 chore\",\n+\t\tdescription: \"Maintenance and cleanup\",\n+\t\tcolor: \"#6B7280\",\n+\t},\n+\t{\n+\t\tname: \"⚡ performance\",\n+\t\tdescription: \"Speed and efficiency\",\n+\t\tcolor: \"#F59E0B\",\n+\t},\n+\t{\n+\t\tname: \"🔒 security\",\n+\t\tdescription: \"Vulnerabilities and hardening\",\n+\t\tcolor: \"#F97316\",\n+\t},\n+] as const;\n+\n+let seeded = false;\n+\n+/** Inserts the built-in labels when they are missing. Safe to call more than once. */\n+export async function seedDefaultLabels() {\n+\tif (seeded) return;\n+\n+\tawait db.insert(labels).values(DEFAULT_LABELS).onConflictDoNothing({ target: labels.name });\n+\n+\tseeded = true;\n+}\n+\n+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {\n+\tawait seedDefaultLabels();\n+}\n",
+      "oldContents": "",
+      "newContents": "import { fileURLToPath } from \"node:url\";\nimport { db } from \"../db.server\";\nimport { labels } from \"./schema\";\n\nexport const DEFAULT_LABELS = [\n\t{\n\t\tname: \"💡 feature\",\n\t\tdescription: \"New functionality\",\n\t\tcolor: \"#8B5CF6\",\n\t},\n\t{\n\t\tname: \"🐞 bug\",\n\t\tdescription: \"Something isn't working\",\n\t\tcolor: \"#EF4444\",\n\t},\n\t{\n\t\tname: \"✨ improvement\",\n\t\tdescription: \"Enhancement to existing behavior\",\n\t\tcolor: \"#10B981\",\n\t},\n\t{\n\t\tname: \"📝 docs\",\n\t\tdescription: \"Documentation\",\n\t\tcolor: \"#6366F1\",\n\t},\n\t{\n\t\tname: \"🧹 chore\",\n\t\tdescription: \"Maintenance and cleanup\",\n\t\tcolor: \"#6B7280\",\n\t},\n\t{\n\t\tname: \"⚡ performance\",\n\t\tdescription: \"Speed and efficiency\",\n\t\tcolor: \"#F59E0B\",\n\t},\n\t{\n\t\tname: \"🔒 security\",\n\t\tdescription: \"Vulnerabilities and hardening\",\n\t\tcolor: \"#F97316\",\n\t},\n] as const;\n\nlet seeded = false;\n\n/** Inserts the built-in labels when they are missing. Safe to call more than once. */\nexport async function seedDefaultLabels() {\n\tif (seeded) return;\n\n\tawait db.insert(labels).values(DEFAULT_LABELS).onConflictDoNothing({ target: labels.name });\n\n\tseeded = true;\n}\n\nif (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {\n\tawait seedDefaultLabels();\n}\n",
+      "truncated": false
+    },
+    {
+      "path": "src/routes/api/labels/server.ts",
+      "status": "added",
+      "additions": 12,
+      "deletions": 0,
+      "isBinary": false,
+      "patch": "diff --git a/src/routes/api/labels/server.ts b/src/routes/api/labels/server.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/routes/api/labels/server.ts\n@@ -0,0 +1,12 @@\n+import { db } from \"@/lib/db.server\";\n+import { seedDefaultLabels } from \"@/lib/db/seed\";\n+import { labels } from \"@/lib/db/schema\";\n+import { handler } from \"./$types\";\n+\n+export const GET = handler({\n+\thandle: async () => {\n+\t\tawait seedDefaultLabels();\n+\n+\t\treturn await db.select().from(labels);\n+\t},\n+});\n",
+      "oldContents": "",
+      "newContents": "import { db } from \"@/lib/db.server\";\nimport { seedDefaultLabels } from \"@/lib/db/seed\";\nimport { labels } from \"@/lib/db/schema\";\nimport { handler } from \"./$types\";\n\nexport const GET = handler({\n\thandle: async () => {\n\t\tawait seedDefaultLabels();\n\n\t\treturn await db.select().from(labels);\n\t},\n});\n",
+      "truncated": false
+    }
+  ]
+}
