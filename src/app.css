@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@source ".";
+
+/* dark mode is a class on <html>, put there by @implementjs/mode-watcher */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+	--background: #fff;
+	--foreground: #000;
+	--card: #fff;
+	--card-foreground: #000;
+	--popover: #fff;
+	--popover-foreground: #000;
+	--primary: #000;
+	--primary-foreground: #fff;
+	--secondary: #f5f5f5;
+	--secondary-foreground: #000;
+	--muted: #f5f5f5;
+	--muted-foreground: #737373;
+	--accent: #f5f5f5;
+	--accent-foreground: #000;
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: #e5e5e5;
+	--input: #e5e5e5;
+	--ring: #000;
+}
+
+.dark {
+	--background: #000;
+	--foreground: #fff;
+	--card: #000;
+	--card-foreground: #fff;
+	--popover: #000;
+	--popover-foreground: #fff;
+	--primary: #fff;
+	--primary-foreground: #000;
+	--secondary: #222;
+	--secondary-foreground: #fff;
+	--muted: #222;
+	--muted-foreground: #a1a1a1;
+	--accent: #222;
+	--accent-foreground: #fff;
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: #222;
+	--input: #222;
+	--ring: #fff;
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	/* Accordion and Collapsible animate to a height the primitive measures onto the element at
+	   runtime. Without these they still open and close, they just snap instead of sliding. */
+	--animate-accordion-down: accordion-down 0.2s ease-out;
+	--animate-accordion-up: accordion-up 0.2s ease-out;
+	--animate-collapsible-down: collapsible-down 0.2s ease-out;
+	--animate-collapsible-up: collapsible-up 0.2s ease-out;
+
+	@keyframes accordion-down {
+		from {
+			height: 0;
+		}
+		to {
+			height: var(--ip-accordion-content-height);
+		}
+	}
+
+	@keyframes accordion-up {
+		from {
+			height: var(--ip-accordion-content-height);
+		}
+		to {
+			height: 0;
+		}
+	}
+
+	@keyframes collapsible-down {
+		from {
+			height: 0;
+		}
+		to {
+			height: var(--ip-collapsible-content-height);
+		}
+	}
+
+	@keyframes collapsible-up {
+		from {
+			height: var(--ip-collapsible-content-height);
+		}
+		to {
+			height: 0;
+		}
+	}
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+
+	html {
+		@apply antialiased;
+	}
+
+	body {
+		@apply min-h-dvh bg-background text-foreground;
+	}
+}
