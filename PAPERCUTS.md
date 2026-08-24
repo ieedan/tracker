@@ -6,8 +6,8 @@ time or surprised me while building this app. Outright bugs are in
 
 Each entry is written to be handed to an agent as-is.
 
-Versions: `@implementjs/kit@0.0.10`, `@implementjs/core@0.0.8`,
-`@implementjs/router@0.0.9`, `create-implement-app` kit template.
+Versions: `@implementjs/kit@0.0.11`, `@implementjs/core@0.0.8`,
+`@implementjs/router@0.0.9` (resolved by kit), `create-implement-app` kit template.
 
 ---
 

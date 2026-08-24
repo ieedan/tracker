@@ -103,9 +103,7 @@
 										"maxLength": 60
 									}
 								},
-								"required": [
-									"name"
-								],
+								"required": ["name"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -186,10 +184,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"key",
-										"plaintext"
-									],
+									"required": ["key", "plaintext"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -260,24 +255,14 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"slug",
-										"key",
-										"role",
-										"createdAt"
-									],
+									"required": ["id", "name", "slug", "key", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -321,25 +306,14 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"authVia": {
-											"enum": [
-												"session",
-												"api-key"
-											],
+											"enum": ["session", "api-key"],
 											"type": "string"
 										}
 									},
-									"required": [
-										"user",
-										"authVia"
-									],
+									"required": ["user", "authVia"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -413,12 +387,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image"
-												]
+												"required": ["id", "name", "email", "image"]
 											},
 											"workspaceSlug": {
 												"type": "string"
@@ -438,11 +407,7 @@
 																"type": "number"
 															}
 														},
-														"required": [
-															"identifier",
-															"title",
-															"number"
-														]
+														"required": ["identifier", "title", "number"]
 													},
 													{
 														"type": "null"
@@ -509,9 +474,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"ok"
-									],
+									"required": ["ok"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -539,9 +502,7 @@
 											"type": "number"
 										}
 									},
-									"required": [
-										"count"
-									],
+									"required": ["count"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -577,24 +538,14 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"name",
-											"slug",
-											"key",
-											"role",
-											"createdAt"
-										]
+										"required": ["id", "name", "slug", "key", "role", "createdAt"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -623,9 +574,7 @@
 										"maxLength": 6
 									}
 								},
-								"required": [
-									"name"
-								],
+								"required": ["name"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -652,24 +601,14 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"slug",
-										"key",
-										"role",
-										"createdAt"
-									],
+									"required": ["id", "name", "slug", "key", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -715,24 +654,14 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"slug",
-										"key",
-										"role",
-										"createdAt"
-									],
+									"required": ["id", "name", "slug", "key", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -765,9 +694,7 @@
 										"maxLength": 60
 									}
 								},
-								"required": [
-									"name"
-								],
+								"required": ["name"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -794,24 +721,14 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"slug",
-										"key",
-										"role",
-										"createdAt"
-									],
+									"required": ["id", "name", "slug", "key", "role", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -853,10 +770,7 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"url": {
@@ -879,15 +793,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"token",
-											"role",
-											"url",
-											"expiresAt",
-											"revoked",
-											"createdAt"
-										]
+										"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -916,10 +822,7 @@
 								"type": "object",
 								"properties": {
 									"role": {
-										"enum": [
-											"admin",
-											"member"
-										],
+										"enum": ["admin", "member"],
 										"type": "string",
 										"default": "member"
 									},
@@ -950,10 +853,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"url": {
@@ -976,15 +876,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"token",
-										"role",
-										"url",
-										"expiresAt",
-										"revoked",
-										"createdAt"
-									],
+									"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -1017,24 +909,12 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": [
-											"backlog",
-											"todo",
-											"in_progress",
-											"done",
-											"canceled"
-										],
+										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 										"type": "string"
 									}
 								},
 								{
-									"enum": [
-										"backlog",
-										"todo",
-										"in_progress",
-										"done",
-										"canceled"
-									],
+									"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 									"type": "string"
 								}
 							]
@@ -1049,24 +929,12 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string"
 									}
 								},
 								{
-									"enum": [
-										"none",
-										"urgent",
-										"high",
-										"medium",
-										"low"
-									],
+									"enum": ["none", "urgent", "high", "medium", "low"],
 									"type": "string"
 								}
 							]
@@ -1115,23 +983,11 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": [
-													"backlog",
-													"todo",
-													"in_progress",
-													"done",
-													"canceled"
-												],
+												"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 												"type": "string"
 											},
 											"priority": {
-												"enum": [
-													"none",
-													"urgent",
-													"high",
-													"medium",
-													"low"
-												],
+												"enum": ["none", "urgent", "high", "medium", "low"],
 												"type": "string"
 											},
 											"assignee": {
@@ -1159,12 +1015,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image"
-														]
+														"required": ["id", "name", "email", "image"]
 													},
 													{
 														"type": "null"
@@ -1194,12 +1045,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image"
-												]
+												"required": ["id", "name", "email", "image"]
 											},
 											"labels": {
 												"type": "array",
@@ -1216,11 +1062,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"color"
-													]
+													"required": ["id", "name", "color"]
 												}
 											},
 											"commentCount": {
@@ -1289,24 +1131,12 @@
 										"default": ""
 									},
 									"status": {
-										"enum": [
-											"backlog",
-											"todo",
-											"in_progress",
-											"done",
-											"canceled"
-										],
+										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 										"type": "string",
 										"default": "backlog"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string",
 										"default": "none"
 									},
@@ -1327,9 +1157,7 @@
 										}
 									}
 								},
-								"required": [
-									"title"
-								],
+								"required": ["title"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1359,23 +1187,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"backlog",
-												"todo",
-												"in_progress",
-												"done",
-												"canceled"
-											],
+											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -1403,12 +1219,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image"
-													]
+													"required": ["id", "name", "email", "image"]
 												},
 												{
 													"type": "null"
@@ -1438,12 +1249,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"labels": {
 											"type": "array",
@@ -1460,11 +1266,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -1549,23 +1351,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"backlog",
-												"todo",
-												"in_progress",
-												"done",
-												"canceled"
-											],
+											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -1593,12 +1383,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image"
-													]
+													"required": ["id", "name", "email", "image"]
 												},
 												{
 													"type": "null"
@@ -1628,12 +1413,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"labels": {
 											"type": "array",
@@ -1650,11 +1430,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -1730,23 +1506,11 @@
 										"maxLength": 20000
 									},
 									"status": {
-										"enum": [
-											"backlog",
-											"todo",
-											"in_progress",
-											"done",
-											"canceled"
-										],
+										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 										"type": "string"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string"
 									},
 									"assigneeId": {
@@ -1796,23 +1560,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"backlog",
-												"todo",
-												"in_progress",
-												"done",
-												"canceled"
-											],
+											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -1840,12 +1592,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image"
-													]
+													"required": ["id", "name", "email", "image"]
 												},
 												{
 													"type": "null"
@@ -1875,12 +1622,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"labels": {
 											"type": "array",
@@ -1897,11 +1639,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -2036,12 +1774,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image"
-												]
+												"required": ["id", "name", "email", "image"]
 											},
 											"createdAt": {
 												"type": "string"
@@ -2050,13 +1783,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"body",
-											"author",
-											"createdAt",
-											"updatedAt"
-										]
+										"required": ["id", "body", "author", "createdAt", "updatedAt"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2102,9 +1829,7 @@
 										"maxLength": 10000
 									}
 								},
-								"required": [
-									"body"
-								],
+								"required": ["body"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2147,12 +1872,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"createdAt": {
 											"type": "string"
@@ -2161,13 +1881,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"body",
-										"author",
-										"createdAt",
-										"updatedAt"
-									],
+									"required": ["id", "body", "author", "createdAt", "updatedAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2212,11 +1926,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"name",
-											"color"
-										]
+										"required": ["id", "name", "color"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2254,10 +1964,7 @@
 										"pattern": "^#[0-9a-fA-F]{6}$"
 									}
 								},
-								"required": [
-									"name",
-									"color"
-								],
+								"required": ["name", "color"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2281,11 +1988,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"color"
-									],
+									"required": ["id", "name", "color"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2324,10 +2027,7 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"user": {
@@ -2353,23 +2053,13 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image"
-												]
+												"required": ["id", "name", "email", "image"]
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"role",
-											"user",
-											"createdAt"
-										]
+										"required": ["id", "role", "user", "createdAt"]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2402,17 +2092,12 @@
 										"format": "email"
 									},
 									"role": {
-										"enum": [
-											"admin",
-											"member"
-										],
+										"enum": ["admin", "member"],
 										"type": "string",
 										"default": "member"
 									}
 								},
-								"required": [
-									"email"
-								],
+								"required": ["email"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2430,10 +2115,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"user": {
@@ -2459,23 +2141,13 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image"
-											]
+											"required": ["id", "name", "email", "image"]
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"role",
-										"user",
-										"createdAt"
-									],
+									"required": ["id", "role", "user", "createdAt"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}

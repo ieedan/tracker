@@ -6,8 +6,8 @@ wanted. Sharp edges on things that _do_ exist are in
 
 Each entry is written to be handed to an agent as-is.
 
-Versions: `@implementjs/kit@0.0.10`, `@implementjs/core@0.0.8`,
-`@implementjs/router@0.0.9`.
+Versions: `@implementjs/kit@0.0.11`, `@implementjs/core@0.0.8`,
+`@implementjs/router@0.0.9` (resolved by kit).
 
 For context on what this app needed: session auth, an API-key-authenticated
 REST API, a generated OpenAPI document, workspaces with members and invites,

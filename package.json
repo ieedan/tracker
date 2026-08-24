@@ -27,7 +27,6 @@
 		"@implementjs/lucide": "~0.0.3",
 		"@implementjs/mode-watcher": "~0.0.3",
 		"@implementjs/primitives": "~0.0.3",
-		"@implementjs/router": "~0.0.4",
 		"@libsql/client": "^0.17.4",
 		"better-auth": "^1.7.1",
 		"drizzle-orm": "^0.45.2",
@@ -39,7 +38,7 @@
 	"devDependencies": {
 		"@implementjs/adapter-vercel": "^0.0.11",
 		"@implementjs/eslint": "~0.0.1",
-		"@implementjs/kit": "~0.0.4",
+		"@implementjs/kit": "~0.0.11",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.2.0",
 		"@valibot/to-json-schema": "^1.7.1",

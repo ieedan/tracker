@@ -7,9 +7,9 @@ Where a bug is worked around in this repo, the workaround is tagged
 `// implement:bug:#<number>` at the site. When a bug is fixed, grep for its tag
 and undo the workaround.
 
-Versions: `@implementjs/kit@0.0.10`, `@implementjs/core@0.0.8`,
-`@implementjs/router@0.0.9`, `@implementjs/adapter-vercel@0.0.11`, vite 7.3.6,
-node 22.
+Versions: `@implementjs/kit@0.0.11`, `@implementjs/core@0.0.8`,
+`@implementjs/router@0.0.9` (resolved by kit, not a direct dependency),
+`@implementjs/adapter-vercel@0.0.11`, vite 7.3.6, node 22.
 
 | #   | Area          | One line                                                              | Worked around in                                            |
 | --- | ------------- | --------------------------------------------------------------------- | ----------------------------------------------------------- |

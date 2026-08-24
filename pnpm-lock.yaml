@@ -26,9 +26,6 @@ importers:
       '@implementjs/primitives':
         specifier: ~0.0.3
         version: 0.0.9
-      '@implementjs/router':
-        specifier: ~0.0.4
-        version: 0.0.9
       '@libsql/client':
         specifier: ^0.17.4
         version: 0.17.4
@@ -53,13 +50,13 @@ importers:
     devDependencies:
       '@implementjs/adapter-vercel':
         specifier: ^0.0.11
-        version: 0.0.11(@implementjs/kit@0.0.10(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
+        version: 0.0.11(@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
       '@implementjs/eslint':
         specifier: ~0.0.1
         version: 0.0.1
       '@implementjs/kit':
-        specifier: ~0.0.4
-        version: 0.0.10(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+        specifier: ~0.0.11
+        version: 0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
@@ -666,8 +663,8 @@ packages:
     peerDependencies:
       valibot: '>=1.4.1 <2'
 
-  '@implementjs/kit@0.0.10':
-    resolution: {integrity: sha512-GD1nBGEUNQ678PgPg2YVGavec1p8fM1v8YO2SwZcXeK0qnUjNOxbpsZyZZZybsiWQdfUfVURIieO+MVWSYMGlg==}
+  '@implementjs/kit@0.0.11':
+    resolution: {integrity: sha512-aipIdu0nQyRmjPdsLtR/RcenhJnY+78jHuVadxzvuW7SEjAV6QaX0wxtS5gQ0AFtrgmdtzOyT3SikTvDv/h20g==}
     hasBin: true
     peerDependencies:
       neverthrow: ^8.0.0
@@ -2560,9 +2557,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@implementjs/adapter-vercel@0.0.11(@implementjs/kit@0.0.10(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
+  '@implementjs/adapter-vercel@0.0.11(@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
     dependencies:
-      '@implementjs/kit': 0.0.10(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      '@implementjs/kit': 0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
 
   '@implementjs/core@0.0.8':
     dependencies:
@@ -2577,7 +2574,7 @@ snapshots:
       '@implementjs/core': 0.0.8
       valibot: 1.4.2(typescript@7.0.2)
 
-  '@implementjs/kit@0.0.10(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
+  '@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
     dependencies:
       '@implementjs/core': 0.0.8
       '@implementjs/router': 0.0.9
