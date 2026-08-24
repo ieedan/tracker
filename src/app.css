@@ -6,45 +6,56 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-	--background: #fff;
-	--foreground: #000;
-	--card: #fff;
-	--card-foreground: #000;
-	--popover: #fff;
-	--popover-foreground: #000;
-	--primary: #000;
-	--primary-foreground: #fff;
-	--secondary: #f5f5f5;
-	--secondary-foreground: #000;
-	--muted: #f5f5f5;
-	--muted-foreground: #737373;
-	--accent: #f5f5f5;
-	--accent-foreground: #000;
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: #e5e5e5;
-	--input: #e5e5e5;
-	--ring: #000;
+	/* Linear's light surface: near-white page, one step down for panels. */
+	--background: #ffffff;
+	--foreground: #08090a;
+	--card: #ffffff;
+	--card-foreground: #08090a;
+	--popover: #ffffff;
+	--popover-foreground: #08090a;
+	--primary: #5e6ad2;
+	--primary-foreground: #ffffff;
+	--secondary: #f4f5f8;
+	--secondary-foreground: #08090a;
+	--muted: #f4f5f8;
+	--muted-foreground: #6b6f76;
+	--accent: #eef0f3;
+	--accent-foreground: #08090a;
+	--destructive: #e5484d;
+	--border: #e6e7eb;
+	--input: #e6e7eb;
+	--ring: #5e6ad2;
+
+	/* App chrome — the sidebar sits a shade off the page in both themes. */
+	--sidebar: #fbfbfc;
+	--sidebar-border: #e6e7eb;
+	--elevated: #ffffff;
 }
 
 .dark {
-	--background: #000;
-	--foreground: #fff;
-	--card: #000;
-	--card-foreground: #fff;
-	--popover: #000;
-	--popover-foreground: #fff;
-	--primary: #fff;
-	--primary-foreground: #000;
-	--secondary: #222;
-	--secondary-foreground: #fff;
-	--muted: #222;
-	--muted-foreground: #a1a1a1;
-	--accent: #222;
-	--accent-foreground: #fff;
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: #222;
-	--input: #222;
-	--ring: #fff;
+	/* Linear's signature near-black. Not pure #000 — the panels need somewhere to go. */
+	--background: #08090a;
+	--foreground: #f7f8f8;
+	--card: #0f1011;
+	--card-foreground: #f7f8f8;
+	--popover: #131417;
+	--popover-foreground: #f7f8f8;
+	--primary: #5e6ad2;
+	--primary-foreground: #ffffff;
+	--secondary: #1c1d21;
+	--secondary-foreground: #f7f8f8;
+	--muted: #1c1d21;
+	--muted-foreground: #8a8f98;
+	--accent: #1f2023;
+	--accent-foreground: #f7f8f8;
+	--destructive: #e5484d;
+	--border: #23252a;
+	--input: #23252a;
+	--ring: #5e6ad2;
+
+	--sidebar: #0b0c0d;
+	--sidebar-border: #191a1d;
+	--elevated: #131417;
 }
 
 @theme inline {
@@ -66,6 +77,9 @@
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-elevated: var(--elevated);
 
 	/* Accordion and Collapsible animate to a height the primitive measures onto the element at
 	   runtime. Without these they still open and close, they just snap instead of sliding. */
@@ -122,5 +136,24 @@
 
 	body {
 		@apply min-h-dvh bg-background text-foreground;
+		font-feature-settings: "cv01", "cv03", "cv04";
+	}
+
+	/* Linear is a dense product — the default 16px body is too loose for it. */
+	html {
+		font-size: 15px;
+	}
+
+	/* Thin, self-effacing scrollbars, like the app this is modelled on. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+}
+
+@layer utilities {
+	/* One row of the issue list, and the hover state that makes it feel clickable. */
+	.row-hover {
+		@apply transition-colors duration-75 hover:bg-accent/60;
 	}
 }

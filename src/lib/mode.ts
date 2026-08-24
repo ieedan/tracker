@@ -1,18 +1,10 @@
-import { Button } from "@implementjs/core";
 import { createModeManager } from "@implementjs/mode-watcher";
 
-const styles = {
-	toggle: "cursor-pointer text-sm text-muted-foreground hover:text-foreground",
-};
-
-/** Module scope, so anything can import it and change the mode. */
-export const mode = createModeManager();
-
-/** Flips between light and dark, starting from whatever is rendering right now. */
-export function ModeToggle() {
-	return Button(
-		{ class: styles.toggle, onClick: () => mode.toggleMode() },
-		// undefined during a server render, where there is no operating system to ask
-		mode.mode.bind((current) => (current === "dark" ? "Light mode" : "Dark mode")),
-	);
-}
+/**
+ * Module scope, so anything can import it and change the mode.
+ *
+ * Dark by default rather than `"system"`: this is a Linear-shaped app and the
+ * dark palette is the one it was designed in. A visitor who picks light still
+ * gets light, and the choice is remembered.
+ */
+export const mode = createModeManager({ defaultMode: "dark" });
