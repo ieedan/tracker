@@ -23,9 +23,6 @@ importers:
       '@implementjs/primitives':
         specifier: ~0.0.3
         version: 0.0.9
-      '@implementjs/router':
-        specifier: ~0.0.4
-        version: 0.0.9
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
