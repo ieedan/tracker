@@ -247,6 +247,18 @@ async function main(): Promise<void> {
 			origin: kept === "" ? "generated" : "current",
 		});
 
+		// --- webhooks ----------------------------------------------------------
+
+		const keptCron = existing.CRON_SECRET ?? "";
+		values.CRON_SECRET = await ask(rl, {
+			key: "CRON_SECRET",
+			blurb: "Authorises the webhook retry drain. Blank disables it (and retries with it).",
+			schema: serverEnvSchema.CRON_SECRET,
+			fallback: keptCron === "" ? randomBytes(24).toString("base64url") : keptCron,
+			secret: true,
+			origin: keptCron === "" ? "generated" : "current",
+		});
+
 		values.BETTER_AUTH_URL = await ask(rl, {
 			key: "BETTER_AUTH_URL",
 			blurb: "The origin the app is served from. Must match the URL you open.",
@@ -259,7 +271,8 @@ async function main(): Promise<void> {
 
 		console.log(`\n${bold("Summary")}`);
 		for (const [key, value] of Object.entries(values)) {
-			const secret = key === "BETTER_AUTH_SECRET" || key === "DATABASE_AUTH_TOKEN";
+			const secret =
+				key === "BETTER_AUTH_SECRET" || key === "DATABASE_AUTH_TOKEN" || key === "CRON_SECRET";
 			const shown = value === "" ? dim("(empty)") : secret ? mask(value) : value;
 			console.log(`  ${key.padEnd(21)} ${shown}`);
 		}
@@ -282,6 +295,10 @@ async function main(): Promise<void> {
 			"# Signs session cookies.",
 			`BETTER_AUTH_SECRET=${values.BETTER_AUTH_SECRET}`,
 			`BETTER_AUTH_URL=${values.BETTER_AUTH_URL}`,
+			"",
+			"# Authorises POST /api/v1/webhooks/drain, which retries failed webhook",
+			"# deliveries. Blank closes that route.",
+			`CRON_SECRET=${values.CRON_SECRET}`,
 			"",
 		].join("\n");
 

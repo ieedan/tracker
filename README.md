@@ -89,6 +89,46 @@ they cannot reach better-auth's account endpoints, and they cannot mint more
 keys — that needs a signed-in session. See `src/lib/server/api-key.server.ts`
 for why.
 
+## Webhooks
+
+Add one under **Settings → Webhooks**, choose the events, and the signing secret
+is shown once. Events: `issue.created`, `issue.updated`, `issue.assigned`,
+`issue.status_changed`, `issue.deleted`, `comment.created`.
+
+Every request is a JSON POST carrying:
+
+```
+x-tracker-event      issue.created
+x-tracker-delivery   the delivery id — use it as an idempotency key
+x-tracker-timestamp  when it was sent
+x-tracker-signature  sha256=<HMAC-SHA256 of the raw body, with your secret>
+```
+
+Verify before trusting the body — over the raw bytes, not a re-serialised object:
+
+```js
+const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+const ok =
+	expected.length === signature.length &&
+	crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+```
+
+The payload is `{ id, event, createdAt, workspace, actor, data }`. `data.issue`
+is the full issue; `issue.updated` also carries `data.changes` as
+`{ field: { from, to } }`.
+
+**Delivery is at-least-once.** Deliveries are written to the database before
+anything is sent, attempted immediately, and retried on a backoff
+(1m → 5m → 30m → 2h, five attempts) by `POST /api/v1/webhooks/drain`. That route
+is authorised by `CRON_SECRET` and 404s when it is unset. `pnpm build`
+registers it as a Vercel cron automatically; on any other host, schedule it
+yourself. Deduplicate on the delivery id.
+
+URLs resolving to loopback, private, link-local or carrier-NAT addresses are
+refused — a webhook URL is user-supplied, and without that check the endpoint is
+a server-side request forgery primitive. Loopback is allowed outside production
+so you can point one at a local listener while developing.
+
 ## Layout
 
 ```
@@ -103,6 +143,7 @@ src/
 └ routes/
    ├ api/auth/[...all]/  better-auth's own surface
    ├ api/v1/             the documented REST API
+   │  └ webhooks/drain/  cron-authorised delivery retries
    ├ app/[slug]/         the product, behind a session
    │  ├ team/[key]/      one team's issues
    │  └ issue/[identifier]/   ENG-42
@@ -121,5 +162,7 @@ Built for Vercel (`@implementjs/adapter-vercel`); `vite build` writes
 `DATABASE_URL` at a Turso database (`libsql://…`) with `DATABASE_AUTH_TOKEN`,
 and set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`.
 
+Set `CRON_SECRET` too, or webhook retries stay off.
+
 Note that `src/lib/env.server.ts` values are baked in at build time, so rotating
-a secret means rebuilding — see MISSING.md #8.
+a secret means rebuilding — see MISSING.md #9.

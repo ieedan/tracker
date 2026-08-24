@@ -20,6 +20,7 @@ import { Button } from "@/lib/components/ui/button";
 import type { ApiKey, Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { relativeTime } from "@/lib/format";
+import { WebhooksSection } from "./webhooks-section";
 
 interface PageData {
 	workspace: Workspace;
@@ -46,6 +47,7 @@ export function SettingsPage({
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				MembersSection(data, params),
 				LabelsSection(data, params),
+				WebhooksSectionBlock(params),
 				ApiKeysSection(),
 			),
 		),
@@ -393,6 +395,15 @@ function ApiKeysSection() {
 				"Create key",
 			),
 		),
+	);
+}
+
+/** Only admins can manage webhooks, so the section is theirs alone. */
+function WebhooksSectionBlock(params: { slug: Readable<string> }) {
+	return Section(
+		"Webhooks",
+		"Get a signed POST whenever something happens in this workspace.",
+		WebhooksSection(params.slug, copy),
 	);
 }
 

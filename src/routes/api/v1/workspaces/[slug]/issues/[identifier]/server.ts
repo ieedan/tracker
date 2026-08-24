@@ -13,6 +13,7 @@ import {
 	setIssueLabels,
 	validLabelIds,
 } from "@/lib/server/issues.server";
+import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
 import { notify } from "@/lib/server/notifications.server";
 import { issue, team } from "@/lib/server/schema.server";
 import { identifierFor } from "@/lib/server/serialize.server";
@@ -142,6 +143,58 @@ export const PATCH = handler({
 
 		const updated = await getIssueById(before.id);
 		if (updated === undefined) error(500, "issue vanished after update");
+
+		// One `issue.updated` for the change as a whole, plus the specific events
+		// worth subscribing to on their own. A receiver listening to both sees the
+		// assignment twice, which is why the delivery id is the dedupe key.
+		const diff: Record<string, { from: unknown; to: unknown }> = {};
+		if (body.title !== undefined && body.title !== before.title) {
+			diff.title = { from: before.title, to: body.title };
+		}
+		if (body.description !== undefined && body.description !== before.description) {
+			diff.description = { from: before.description, to: body.description };
+		}
+		if (body.priority !== undefined && body.priority !== before.priority) {
+			diff.priority = { from: before.priority, to: body.priority };
+		}
+		if (body.status !== undefined && body.status !== before.status) {
+			diff.status = { from: before.status, to: body.status };
+		}
+		if (body.assigneeId !== undefined && body.assigneeId !== before.assigneeId) {
+			diff.assigneeId = { from: before.assigneeId, to: body.assigneeId };
+		}
+		if (body.teamKey !== undefined && body.teamKey !== row.team.key) {
+			diff.team = { from: row.team.key, to: body.teamKey };
+		}
+		if (body.labelIds !== undefined) {
+			diff.labels = { from: null, to: updated.labels.map((entry) => entry.name) };
+		}
+
+		if (Object.keys(diff).length > 0) {
+			await emitIssueEvent("issue.updated", {
+				workspace,
+				actor: user,
+				issue: updated,
+				changes: diff,
+			});
+		}
+		if (diff.assigneeId !== undefined) {
+			await emitIssueEvent("issue.assigned", {
+				workspace,
+				actor: user,
+				issue: updated,
+				changes: diff,
+			});
+		}
+		if (diff.status !== undefined) {
+			await emitIssueEvent("issue.status_changed", {
+				workspace,
+				actor: user,
+				issue: updated,
+				changes: diff,
+			});
+		}
+
 		return updated;
 	},
 });
@@ -149,16 +202,29 @@ export const PATCH = handler({
 export const DELETE = handler({
 	params: IdentifierParams,
 	async handle({ locals, params }) {
-		const { workspace } = await requireMembership(locals, params.slug);
+		const { workspace, user } = await requireMembership(locals, params.slug);
 		const { key, number } = split(params.identifier);
 
 		const owningTeam = await requireTeam(workspace.id, key);
 		const deleted = await db
 			.delete(issue)
 			.where(and(eq(issue.teamId, owningTeam.id), eq(issue.number, number)))
-			.returning({ id: issue.id });
+			.returning({ id: issue.id, title: issue.title });
 
-		if (deleted.length === 0) error(404, `no issue ${key}-${number}`);
+		const removed = deleted[0];
+		if (removed === undefined) error(404, `no issue ${key}-${number}`);
+
+		// The row is gone, so the payload carries what it was rather than a lookup.
+		await emitIssueDeleted({
+			workspace,
+			actor: user,
+			issue: {
+				id: removed.id,
+				identifier: identifierFor(owningTeam.key, number),
+				title: removed.title,
+				team: { key: owningTeam.key, name: owningTeam.name },
+			},
+		});
 		// 204 — kit turns an undefined return into an empty response.
 	},
 });

@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build",
+		"build": "vite build && tsx scripts/vercel-cron.ts",
 		"preview": "vite preview",
 		"dev:setup": "tsx scripts/setup.ts",
 		"sync": "implement-kit sync",

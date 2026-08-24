@@ -17,6 +17,7 @@ import {
 	setIssueLabels,
 	validLabelIds,
 } from "@/lib/server/issues.server";
+import { emitIssueEvent } from "@/lib/server/events.server";
 import { notify } from "@/lib/server/notifications.server";
 import { issue } from "@/lib/server/schema.server";
 import { identifierFor } from "@/lib/server/serialize.server";
@@ -102,6 +103,8 @@ export const POST = handler({
 
 		const created = await getIssueById(id);
 		if (created === undefined) error(500, "issue vanished after insert");
+
+		await emitIssueEvent("issue.created", { workspace, actor: user, issue: created });
 		return json(created, { status: 201 });
 	},
 });

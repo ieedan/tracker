@@ -27,4 +27,10 @@ export const serverEnvSchema = {
 	DATABASE_AUTH_TOKEN: v.optional(v.string(), ""),
 	BETTER_AUTH_SECRET: v.pipe(v.string(), v.minLength(16, "must be at least 16 characters")),
 	BETTER_AUTH_URL: v.pipe(v.string(), v.url("must be an absolute URL")),
+	/**
+	 * Authorises the webhook drain endpoint that retries failed deliveries.
+	 * Leave empty and the endpoint stays closed — the safe default, since an
+	 * open drain lets anyone make the server fire outbound requests.
+	 */
+	CRON_SECRET: v.optional(v.string(), ""),
 };

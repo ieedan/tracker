@@ -6,6 +6,8 @@ import { parseIdentifier } from "@/lib/domain/issues";
 import { CommentSchema, CreateCommentBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
+import { emitCommentEvent } from "@/lib/server/events.server";
+import { getIssueById } from "@/lib/server/issues.server";
 import { notify } from "@/lib/server/notifications.server";
 import { comment, issue, team, user } from "@/lib/server/schema.server";
 import { identifierFor, toComment } from "@/lib/server/serialize.server";
@@ -92,6 +94,16 @@ export const POST = handler({
 				issueId: target.issue.id,
 				type: "issue_commented",
 				body: `${author.name} commented on ${identifier}`,
+			});
+		}
+
+		const full = await getIssueById(target.issue.id);
+		if (full !== undefined) {
+			await emitCommentEvent({
+				workspace,
+				actor: author,
+				issue: full,
+				comment: { id: row.id, body: row.body, createdAt: row.createdAt.toISOString() },
 			});
 		}
 

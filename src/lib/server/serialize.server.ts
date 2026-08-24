@@ -8,6 +8,8 @@ import type {
 	Team,
 	TeamRef,
 	UserSummary,
+	Webhook,
+	WebhookDelivery,
 	Workspace,
 } from "@/lib/domain/schemas";
 import type { WorkspaceRole } from "@/lib/domain/issues";
@@ -108,6 +110,41 @@ export function toMember(
 		id: row.id,
 		role: row.role,
 		user: toUser(user),
+		createdAt: row.createdAt.toISOString(),
+	};
+}
+
+type WebhookRow = typeof schema.webhook.$inferSelect;
+type DeliveryRow = typeof schema.webhookDelivery.$inferSelect;
+
+/** The secret is deliberately absent — it is shown once, at creation. */
+export function toWebhook(
+	row: WebhookRow,
+	health: { lastAt: Date | null; lastStatus: string | null; failingSince: Date | null } | undefined,
+): Webhook {
+	return {
+		id: row.id,
+		url: row.url,
+		description: row.description,
+		events: row.events,
+		enabled: row.enabled,
+		createdAt: row.createdAt.toISOString(),
+		lastDeliveryAt: iso(health?.lastAt ?? null),
+		lastDeliveryStatus: (health?.lastStatus ?? null) as Webhook["lastDeliveryStatus"],
+		failingSince: iso(health?.failingSince ?? null),
+	};
+}
+
+export function toDelivery(row: DeliveryRow): WebhookDelivery {
+	return {
+		id: row.id,
+		event: row.event,
+		status: row.status,
+		attempts: row.attempts,
+		responseStatus: row.responseStatus,
+		error: row.error,
+		nextAttemptAt: iso(row.nextAttemptAt),
+		deliveredAt: iso(row.deliveredAt),
 		createdAt: row.createdAt.toISOString(),
 	};
 }

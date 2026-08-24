@@ -3,6 +3,7 @@
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
+import { DELIVERY_STATUSES, WEBHOOK_EVENTS } from "./webhooks";
 
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
 export const IssuePrioritySchema = v.picklist(ISSUE_PRIORITIES);
@@ -98,6 +99,50 @@ export const NotificationSchema = v.object({
 	createdAt: v.string(),
 });
 export type Notification = v.InferOutput<typeof NotificationSchema>;
+
+export const WebhookEventSchema = v.picklist(WEBHOOK_EVENTS);
+
+export const WebhookSchema = v.object({
+	id: v.string(),
+	url: v.string(),
+	description: v.string(),
+	events: v.array(WebhookEventSchema),
+	enabled: v.boolean(),
+	createdAt: v.string(),
+	/** Rolling health, so a broken endpoint is visible without opening it. */
+	lastDeliveryAt: v.nullable(v.string()),
+	lastDeliveryStatus: v.nullable(v.picklist(DELIVERY_STATUSES)),
+	failingSince: v.nullable(v.string()),
+});
+export type Webhook = v.InferOutput<typeof WebhookSchema>;
+
+export const WebhookDeliverySchema = v.object({
+	id: v.string(),
+	event: WebhookEventSchema,
+	status: v.picklist(DELIVERY_STATUSES),
+	attempts: v.number(),
+	responseStatus: v.nullable(v.number()),
+	error: v.nullable(v.string()),
+	nextAttemptAt: v.nullable(v.string()),
+	deliveredAt: v.nullable(v.string()),
+	createdAt: v.string(),
+});
+export type WebhookDelivery = v.InferOutput<typeof WebhookDeliverySchema>;
+
+export const CreateWebhookBody = v.object({
+	url: v.pipe(v.string(), v.trim(), v.url("must be an absolute http(s) URL")),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ""),
+	/** At least one — a webhook subscribed to nothing would never fire. */
+	events: v.pipe(v.array(WebhookEventSchema), v.minLength(1, "choose at least one event")),
+});
+
+export const UpdateWebhookBody = v.partial(
+	v.object({
+		description: v.pipe(v.string(), v.trim(), v.maxLength(200)),
+		events: v.pipe(v.array(WebhookEventSchema), v.minLength(1, "choose at least one event")),
+		enabled: v.boolean(),
+	}),
+);
 
 export const ApiKeySchema = v.object({
 	id: v.string(),

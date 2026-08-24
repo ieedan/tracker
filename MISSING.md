@@ -156,7 +156,40 @@ This app polls its inbox on a 15s timer instead. Polling is a defensible choice
 here, but it was made because SSE was an unknown rather than because it was
 better.
 
-## 7. No test utilities for loads, handlers or hooks
+## 7. No way to do work after a response — and no adapter escape hatch
+
+Give kit a `waitUntil`-shaped primitive on the request event, and have the
+adapters that can honour it do so.
+
+Webhook delivery is the canonical case: the request that creates an issue should
+return immediately, and the outbound HTTP to somebody else's server should
+happen after. There is nowhere to put that work. `event.platform` is the obvious
+channel — Cloudflare's `ctx.waitUntil` would slot straight in — but
+`@implementjs/adapter-vercel` never populates `platform` at all, so even on a
+runtime that supports it there is no way to reach it. A bare `void promise()` is
+not a substitute: once the response is returned the invocation may be frozen or
+reclaimed, and the work is silently dropped.
+
+What this app does instead: writes every delivery to the database _before_
+responding, attempts it opportunistically, and relies on a cron-driven drain
+endpoint to retry whatever was abandoned (`src/lib/server/webhooks.server.ts`).
+That is a reasonable design for at-least-once delivery and I would keep the
+durable queue regardless — but the whole "attempt it now" half exists only
+because there is no way to say "finish this after the response".
+
+```ts
+export default async function handler({ waitUntil }: RequestEvent) {
+	const issue = await createIssue(body);
+	waitUntil(deliverWebhooks(issue)); // runs after the response, guaranteed
+	return issue;
+}
+```
+
+Adjacent, and cheaper: `@implementjs/adapter-vercel` could populate
+`event.platform` with the request context it already has, which would let apps
+reach `waitUntil` themselves without kit growing an abstraction at all.
+
+## 8. No test utilities for loads, handlers or hooks
 
 Ship a way to invoke a load / `handler()` / the hook chain against a synthetic
 `RequestEvent`, with `locals` supplied.
@@ -178,7 +211,7 @@ const response = await GET(
 );
 ```
 
-## 8. Server env is build-time only, with no dynamic counterpart
+## 9. Server env is build-time only, with no dynamic counterpart
 
 Add a validated, per-request environment read — SvelteKit's `$env/dynamic/private`.
 

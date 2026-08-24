@@ -2366,6 +2366,681 @@
 					}
 				}
 			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugWebhooks",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"url": {
+												"type": "string"
+											},
+											"description": {
+												"type": "string"
+											},
+											"events": {
+												"type": "array",
+												"items": {
+													"enum": [
+														"issue.created",
+														"issue.updated",
+														"issue.assigned",
+														"issue.status_changed",
+														"issue.deleted",
+														"comment.created"
+													],
+													"type": "string"
+												}
+											},
+											"enabled": {
+												"type": "boolean"
+											},
+											"createdAt": {
+												"type": "string"
+											},
+											"lastDeliveryAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"lastDeliveryStatus": {
+												"anyOf": [
+													{
+														"enum": ["pending", "succeeded", "failed"],
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"failingSince": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											}
+										},
+										"required": [
+											"id",
+											"url",
+											"description",
+											"events",
+											"enabled",
+											"createdAt",
+											"lastDeliveryAt",
+											"lastDeliveryStatus",
+											"failingSince"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugWebhooks",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"url": {
+										"type": "string",
+										"format": "uri"
+									},
+									"description": {
+										"type": "string",
+										"maxLength": 200,
+										"default": ""
+									},
+									"events": {
+										"type": "array",
+										"items": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created"
+											],
+											"type": "string"
+										},
+										"minItems": 1
+									}
+								},
+								"required": ["url", "events"],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"webhook": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"url": {
+													"type": "string"
+												},
+												"description": {
+													"type": "string"
+												},
+												"events": {
+													"type": "array",
+													"items": {
+														"enum": [
+															"issue.created",
+															"issue.updated",
+															"issue.assigned",
+															"issue.status_changed",
+															"issue.deleted",
+															"comment.created"
+														],
+														"type": "string"
+													}
+												},
+												"enabled": {
+													"type": "boolean"
+												},
+												"createdAt": {
+													"type": "string"
+												},
+												"lastDeliveryAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"lastDeliveryStatus": {
+													"anyOf": [
+														{
+															"enum": ["pending", "succeeded", "failed"],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"failingSince": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"url",
+												"description",
+												"events",
+												"enabled",
+												"createdAt",
+												"lastDeliveryAt",
+												"lastDeliveryStatus",
+												"failingSince"
+											]
+										},
+										"secret": {
+											"type": "string"
+										}
+									},
+									"required": ["webhook", "secret"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}": {
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugWebhooksById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"description": {
+										"type": "string",
+										"maxLength": 200
+									},
+									"events": {
+										"type": "array",
+										"items": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created"
+											],
+											"type": "string"
+										},
+										"minItems": 1
+									},
+									"enabled": {
+										"type": "boolean"
+									}
+								},
+								"required": [],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"url": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"events": {
+											"type": "array",
+											"items": {
+												"enum": [
+													"issue.created",
+													"issue.updated",
+													"issue.assigned",
+													"issue.status_changed",
+													"issue.deleted",
+													"comment.created"
+												],
+												"type": "string"
+											}
+										},
+										"enabled": {
+											"type": "boolean"
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"lastDeliveryAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"lastDeliveryStatus": {
+											"anyOf": [
+												{
+													"enum": ["pending", "succeeded", "failed"],
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"failingSince": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										}
+									},
+									"required": [
+										"id",
+										"url",
+										"description",
+										"events",
+										"enabled",
+										"createdAt",
+										"lastDeliveryAt",
+										"lastDeliveryStatus",
+										"failingSince"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugWebhooksById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/deliveries": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugWebhooksByIdDeliveries",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "limit",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": "25"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"event": {
+												"enum": [
+													"issue.created",
+													"issue.updated",
+													"issue.assigned",
+													"issue.status_changed",
+													"issue.deleted",
+													"comment.created"
+												],
+												"type": "string"
+											},
+											"status": {
+												"enum": ["pending", "succeeded", "failed"],
+												"type": "string"
+											},
+											"attempts": {
+												"type": "number"
+											},
+											"responseStatus": {
+												"anyOf": [
+													{
+														"type": "number"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"error": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"nextAttemptAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"deliveredAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"event",
+											"status",
+											"attempts",
+											"responseStatus",
+											"error",
+											"nextAttemptAt",
+											"deliveredAt",
+											"createdAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/test": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugWebhooksByIdTest",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"event": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created"
+											],
+											"type": "string"
+										},
+										"status": {
+											"enum": ["pending", "succeeded", "failed"],
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number"
+										},
+										"responseStatus": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"error": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"nextAttemptAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"deliveredAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"event",
+										"status",
+										"attempts",
+										"responseStatus",
+										"error",
+										"nextAttemptAt",
+										"deliveredAt",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }

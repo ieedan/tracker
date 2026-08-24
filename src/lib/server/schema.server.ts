@@ -13,6 +13,7 @@ import type {
 	NotificationType,
 	WorkspaceRole,
 } from "@/lib/domain/issues";
+import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
 export * from "./auth-schema.server";
@@ -193,10 +194,77 @@ export const notification = sqliteTable(
 	(table) => [index("notification_user").on(table.userId, table.readAt)],
 );
 
+/**
+ * A registered endpoint. `secret` signs every delivery so the receiver can tell
+ * a real payload from anything else that finds the URL.
+ */
+export const webhook = sqliteTable(
+	"webhook",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		url: text("url").notNull(),
+		/** Shown once at creation, then only ever used to sign. */
+		secret: text("secret").notNull(),
+		description: text("description").notNull().default(""),
+		/** JSON array of event names — SQLite has no array type. */
+		events: text("events", { mode: "json" }).$type<WebhookEvent[]>().notNull(),
+		enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+		createdBy: text("createdBy")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [index("webhook_workspace").on(table.workspaceId)],
+);
+
+/**
+ * One row per attempt-set: written *before* anything is sent, so an event is
+ * never lost if the process goes away mid-request. This table is the queue —
+ * see `webhooks.server.ts`.
+ */
+export const webhookDelivery = sqliteTable(
+	"webhook_delivery",
+	{
+		id: text("id").primaryKey(),
+		webhookId: text("webhookId")
+			.notNull()
+			.references(() => webhook.id, { onDelete: "cascade" }),
+		event: text("event").$type<WebhookEvent>().notNull(),
+		/** The exact bytes that were signed and sent. */
+		payload: text("payload").notNull(),
+		status: text("status").$type<DeliveryStatus>().notNull().default("pending"),
+		attempts: integer("attempts").notNull().default(0),
+		responseStatus: integer("responseStatus"),
+		error: text("error"),
+		/** When the next attempt becomes due. Null once it is settled. */
+		nextAttemptAt: timestamp("nextAttemptAt"),
+		deliveredAt: timestamp("deliveredAt"),
+		createdAt: now(),
+	},
+	(table) => [
+		index("delivery_webhook").on(table.webhookId, table.createdAt),
+		// The drain query: everything still pending and now due.
+		index("delivery_due").on(table.status, table.nextAttemptAt),
+	],
+);
+
+export const webhookRelations = relations(webhook, ({ one, many }) => ({
+	workspace: one(workspace, { fields: [webhook.workspaceId], references: [workspace.id] }),
+	deliveries: many(webhookDelivery),
+}));
+
+export const webhookDeliveryRelations = relations(webhookDelivery, ({ one }) => ({
+	webhook: one(webhook, { fields: [webhookDelivery.webhookId], references: [webhook.id] }),
+}));
+
 export const workspaceRelations = relations(workspace, ({ many }) => ({
 	members: many(workspaceMember),
 	teams: many(team),
 	labels: many(label),
+	webhooks: many(webhook),
 }));
 
 export const teamRelations = relations(team, ({ one, many }) => ({
