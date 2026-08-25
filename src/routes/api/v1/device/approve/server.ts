@@ -47,6 +47,8 @@ export const POST = handler({
 			workspaceId: membership.workspace.id,
 			installerUserId: membership.user.id,
 			scopes,
+			harness: body.harness,
+			name: body.name ?? "",
 		});
 
 		await auth.api.deviceApprove({

@@ -15,10 +15,17 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Copy, Plus, Send, Trash2 } from "@implementjs/lucide";
+import { Copy, Plus, Send, Trash2, Webhook as WebhookIcon } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label } from "@/lib/components/ui/label";
@@ -238,9 +245,13 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 
 		If(
 			derived([loading, hooks], (busy, list) => !busy && list.length === 0),
-			P(
-				{ class: "text-[12px] text-muted-foreground" },
-				"No webhooks yet. Create one to get a signed POST whenever these events happen.",
+			Empty(
+				{ class: "border md:p-8" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, WebhookIcon({ "aria-hidden": true })),
+					EmptyTitle("No webhooks yet"),
+					EmptyDescription("Create one to get a signed POST whenever these events happen."),
+				),
 			),
 		),
 
@@ -485,7 +496,14 @@ function DeliveryLog(deliveries: Readable<WebhookDelivery[]>) {
 		{ class: "border-t border-border bg-secondary/30 px-3 py-2" },
 		If(
 			deliveries.bind((list) => list.length === 0),
-			P({ class: "py-1 text-[11px] text-muted-foreground" }, "No deliveries recorded yet."),
+			Empty(
+				{ class: "p-4 md:p-4" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, Send({ "aria-hidden": true })),
+					EmptyTitle("No deliveries yet"),
+					EmptyDescription("A test send or a live event will show up here."),
+				),
+			),
 		),
 		ForEach(
 			deliveries,

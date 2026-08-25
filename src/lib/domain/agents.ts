@@ -85,15 +85,94 @@ export interface AgentScopeDescription {
 	hint: string;
 }
 
-/** One line per scope for the consent screen. */
+/**
+ * One line per *resource*, not per scope.
+ *
+ * `write` implies `read` in `hasPermission`, so a grant of both is one
+ * capability, not two — listing them separately reads as "Read issues, Read and
+ * write issues", which says nothing and looks like a bug.
+ */
 export function describeScopes(scopes: readonly string[]): AgentScopeDescription[] {
-	return scopes.filter(isAgentScope).map((scope) => {
-		const [resource, action] = scope.split(":") as [ApiKeyResource, ApiKeyAction];
-		const verb = action === "write" ? "Read and write" : "Read";
-		return {
-			scope,
-			label: `${verb} ${API_KEY_RESOURCE_LABELS[resource].toLowerCase()}`,
-			hint: API_KEY_RESOURCE_HINTS[resource],
-		};
-	});
+	const granted = scopesToPermissions(scopes.filter(isAgentScope).join(" "));
+
+	return API_KEY_RESOURCES.filter((resource) => (granted[resource]?.length ?? 0) > 0).map(
+		(resource) => {
+			const write = granted[resource]?.includes("write") === true;
+			const action: ApiKeyAction = write ? "write" : "read";
+			return {
+				scope: `${resource}:${action}` as AgentScope,
+				label: `${write ? "Read and write" : "Read"} ${API_KEY_RESOURCE_LABELS[resource].toLowerCase()}`,
+				hint: API_KEY_RESOURCE_HINTS[resource],
+			};
+		},
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Harnesses
+// ---------------------------------------------------------------------------
+
+/**
+ * The coding agent behind a client, as asserted by the person authorizing it.
+ *
+ * Registration is open, so a client's own `client_name` is a claim, not a fact
+ * — this is the human's answer to "what actually is this?", which is why it is
+ * chosen on the consent screen rather than read off the registration. The
+ * catalog exists so a bot shows a real name and mark instead of whatever
+ * generic string the harness happened to register with.
+ */
+export const AGENT_HARNESSES = [
+	"claude-code",
+	"cursor",
+	"codex",
+	"opencode",
+	"copilot",
+	"other",
+] as const;
+export type HarnessKind = (typeof AGENT_HARNESSES)[number];
+
+const HARNESS_LABELS: Record<HarnessKind, string> = {
+	"claude-code": "Claude Code",
+	cursor: "Cursor",
+	codex: "Codex",
+	opencode: "OpenCode",
+	copilot: "GitHub Copilot",
+	other: "Coding agent",
+};
+
+/** The catalog name for a harness. Always the same string for a given kind. */
+export function harnessLabel(harness: HarnessKind): string {
+	return HARNESS_LABELS[harness];
+}
+
+/**
+ * What a bot is actually called.
+ *
+ * A name the person typed always wins — "Claude on CI" is a reasonable thing to
+ * call a Claude Code agent, and two agents of the same kind in one workspace
+ * need telling apart. The catalog label is only the default for a blank name.
+ */
+export function agentDisplayName(harness: HarnessKind, name?: string): string {
+	const chosen = name?.trim() ?? "";
+	return chosen === "" ? harnessLabel(harness) : chosen;
+}
+
+export function isHarnessKind(value: string): value is HarnessKind {
+	return (AGENT_HARNESSES as readonly string[]).includes(value);
+}
+
+/**
+ * A first guess at the harness from what the client registered as.
+ *
+ * Only ever a default for the consent screen's picker — the person confirms or
+ * corrects it, and nothing downstream trusts the client's own string.
+ */
+export function guessHarness(clientName: string): HarnessKind {
+	const name = clientName.toLowerCase();
+	if (name.includes("claude")) return "claude-code";
+	if (name.includes("cursor")) return "cursor";
+	if (name.includes("codex")) return "codex";
+	if (name.includes("opencode")) return "opencode";
+	if (name.includes("copilot")) return "copilot";
+	return "other";
 }

@@ -10,6 +10,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { nanoid } from "nanoid";
+import { agentDisplayName, type HarnessKind } from "@/lib/domain/agents";
 import { db } from "./db.server";
 import { agentGrant, agentIdentity, oauthClient, user, workspaceMember } from "./schema.server";
 
@@ -63,14 +64,21 @@ function botEmail(clientId: string, workspaceId: string): string {
  *
  * Idempotent: authorizing again re-uses the same bot and updates the scopes on
  * that person's grant, which is also how a previously revoked grant comes back.
+ *
+ * `name` and `harness` are what the person chose on the consent screen, and
+ * they apply only when the bot is *created*. A second person authorizing the
+ * same agent joins the existing one rather than renaming it out from under the
+ * workspace — correcting a name is `renameAgent`, from Settings.
  */
 export async function grantAgentAccess(input: {
 	client: AgentClient;
 	workspaceId: string;
 	installerUserId: string;
 	scopes: string[];
+	name: string;
+	harness: HarnessKind;
 }): Promise<{ agentIdentityId: string; botUserId: string }> {
-	const { client, workspaceId, installerUserId, scopes } = input;
+	const { client, workspaceId, installerUserId, scopes, name, harness } = input;
 
 	const existing = await db
 		.select()
@@ -88,10 +96,14 @@ export async function grantAgentAccess(input: {
 
 		await db.insert(user).values({
 			id: botUserId,
-			name: client.name,
+			name: agentDisplayName(harness, name),
+			harness,
 			email: botEmail(client.clientId, workspaceId),
 			emailVerified: false,
-			image: client.icon,
+			// Deliberately not `client.icon`: a registered `logo_uri` is a URL the
+			// client chose, and this app never renders one. The mark comes from
+			// `harness` instead, which a person picked.
+			image: null,
 			type: "agent",
 			createdAt: now,
 			updatedAt: now,
@@ -137,9 +149,10 @@ export async function grantAgentAccess(input: {
 
 export interface InstalledAgent {
 	grantId: string;
+	agentId: string;
 	clientId: string;
 	name: string;
-	image: string | null;
+	harness: HarnessKind;
 	scopes: string[];
 	installedBy: { id: string; name: string };
 	lastUsedAt: Date | null;
@@ -158,14 +171,51 @@ export async function listInstalledAgents(workspaceId: string): Promise<Installe
 
 	return rows.map((row) => ({
 		grantId: row.grant.id,
+		agentId: row.identity.id,
 		clientId: row.identity.clientId,
 		name: row.bot.name,
-		image: row.bot.image ?? null,
+		harness: row.bot.harness ?? "other",
 		scopes: row.grant.scopes,
 		installedBy: { id: row.installer.id, name: row.installer.name },
 		lastUsedAt: row.grant.lastUsedAt,
 		createdAt: row.grant.createdAt,
 	}));
+}
+
+/**
+ * Renames an agent and re-badges which harness it is.
+ *
+ * Scoped to the workspace, and keyed by a grant so it works straight off a row
+ * in Settings. The change lands on the shared bot, so everyone sees it: a bot
+ * is one identity per workspace, and its name is workspace-wide by design.
+ */
+export async function renameAgent(
+	workspaceId: string,
+	grantId: string,
+	changes: { name?: string; harness?: HarnessKind },
+): Promise<boolean> {
+	const rows = await db
+		.select({ identity: agentIdentity, bot: user })
+		.from(agentGrant)
+		.innerJoin(agentIdentity, eq(agentIdentity.id, agentGrant.agentIdentityId))
+		.innerJoin(user, eq(user.id, agentIdentity.userId))
+		.where(and(eq(agentGrant.id, grantId), eq(agentIdentity.workspaceId, workspaceId)))
+		.limit(1);
+
+	const row = rows[0];
+	if (row === undefined) return false;
+
+	const harness = changes.harness ?? row.bot.harness ?? "other";
+	// An empty name falls back to the harness label rather than leaving a bot
+	// with a blank byline on every comment it has written.
+	const name = agentDisplayName(harness, changes.name);
+
+	await db
+		.update(user)
+		.set({ name, harness, updatedAt: new Date() })
+		.where(eq(user.id, row.identity.userId));
+
+	return true;
 }
 
 /**

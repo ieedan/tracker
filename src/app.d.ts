@@ -1,4 +1,4 @@
-import type { UserType } from "@/lib/domain/agents";
+import type { HarnessKind, UserType } from "@/lib/domain/agents";
 import type { ApiKeyPermissions } from "@/lib/domain/api-keys";
 import type { WorkspaceRole } from "@/lib/domain/issues";
 
@@ -15,6 +15,8 @@ declare global {
 			 * through, without every call site having to know about agents.
 			 */
 			type: UserType;
+			/** For a bot, which coding agent it is. `null` for a person. */
+			harness: HarnessKind | null;
 			/** For a bot, the human whose delegation it is acting on. */
 			onBehalfOf?: { id: string; name: string } | null;
 		}

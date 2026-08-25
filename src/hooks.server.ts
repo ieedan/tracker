@@ -58,6 +58,7 @@ const authenticate: Handle = async ({ event, resolve }) => {
 				email: result.user.email,
 				image: result.user.image ?? null,
 				type: "human",
+				harness: null,
 			};
 			event.locals.authVia = "session";
 		}

@@ -7,9 +7,14 @@
  * Uploads go **straight from the browser to storage** with a presigned PUT
  * rather than through this server. That is not an optimisation: a Vercel
  * function has a request body limit around 4.5MB, so proxying an upload would
- * cap attachments at roughly one phone photo. Downloads are the mirror image —
- * a short-lived presigned GET — which keeps the bucket private without this
- * server streaming every byte of every video.
+ * cap attachments at roughly one phone photo.
+ *
+ * Downloads go the other way, back through this server. A presigned GET would
+ * save the bytes, but it puts a second origin between the page and its own
+ * files, and every browser rule about that origin — content blockers, per-site
+ * image settings, proxies — becomes a way for a file to silently fail to load.
+ * `presignDownload` is kept for anything large enough to be worth that risk;
+ * nothing is today.
  */
 import {
 	GetObjectCommand,
@@ -138,11 +143,12 @@ export async function presignDownload(options: {
 	return forBrowser(await getSignedUrl(s3(), command, { expiresIn: 900 }));
 }
 
-/** Confirms the object actually landed, and how big it really is. */
+/** Streams the object back through this server, so it stays same-origin. */
 export async function streamObject(options: {
 	key: string;
 	filename: string;
-	contentType: string;
+	/** Omit to serve back whatever type storage recorded on the object. */
+	contentType?: string;
 	inline: boolean;
 }): Promise<Response | null> {
 	try {
@@ -153,7 +159,7 @@ export async function streamObject(options: {
 
 		const disposition = options.inline ? "inline" : "attachment";
 		const headers = new Headers({
-			"content-type": options.contentType,
+			"content-type": options.contentType ?? result.ContentType ?? "application/octet-stream",
 			"content-disposition": `${disposition}; filename="${sanitizeFilename(options.filename)}"`,
 			"cache-control": "private, max-age=120",
 		});
@@ -167,6 +173,7 @@ export async function streamObject(options: {
 	}
 }
 
+/** Confirms the object actually landed, and how big it really is. */
 export async function headObject(
 	key: string,
 ): Promise<{ size: number; contentType: string } | null> {

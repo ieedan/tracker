@@ -1,5 +1,5 @@
 /**
- * Rendering attachments, and the drop target that adds them.
+ * Rendering attachments.
  *
  * Images and video are shown in place — an attachment you have to download to
  * look at is barely an attachment. Everything else is a chip with its size and
@@ -11,7 +11,6 @@ import {
 	ForEach,
 	If,
 	Img,
-	Input,
 	Span,
 	Video,
 	derived,
@@ -25,8 +24,6 @@ import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { formatBytes, isAudio, isImage, isVideo } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
-import { cn } from "@/lib/utils";
-import { beginUploads, filesFromList } from "./file-drop";
 import { ImageLightbox } from "./image-lightbox";
 import type { Upload } from "./uploader";
 
@@ -203,106 +200,6 @@ function UploadRow(upload: Readable<Upload>) {
 			current.status.bind((status) => status === "error"),
 			Span({ class: "text-[11px] leading-snug text-destructive" }, current.error),
 		),
-	);
-}
-
-// ---------------------------------------------------------------------------
-
-export interface AttachmentTarget {
-	slug: Readable<string>;
-	issueId?: string;
-	commentId?: string;
-}
-
-/**
- * Wraps a region so files dropped anywhere on it are uploaded.
- *
- * The counter is not fussiness: `dragleave` fires when the pointer crosses into
- * a *child* element, so tracking depth is the only way to know it actually left.
- */
-export function DropZone(options: {
-	target: AttachmentTarget;
-	uploads: Signal<Upload[]>;
-	onUploaded: (attachment: Attachment) => void;
-	children: ReturnType<typeof Div>;
-}) {
-	const depth = signal(0);
-	const over = derived([depth], (value) => value > 0);
-
-	const accept = (files: FileList | File[] | null) => {
-		beginUploads({
-			files: filesFromList(files),
-			slug: options.target.slug.get(),
-			issueId: options.target.issueId,
-			commentId: options.target.commentId,
-			uploads: options.uploads,
-			onUploaded: options.onUploaded,
-		});
-	};
-
-	return Div(
-		{
-			class: derived([over], (isOver) =>
-				cn(
-					"relative rounded-md transition-colors",
-					isOver && "outline-2 outline-dashed outline-primary/60",
-				),
-			),
-			onDragenter: (event) => {
-				event.preventDefault();
-				depth.increment();
-			},
-			onDragover: (event) => event.preventDefault(),
-			onDragleave: () => depth.update((value) => Math.max(0, value - 1)),
-			onDrop: (event) => {
-				event.preventDefault();
-				depth.set(0);
-				accept(event.dataTransfer?.files ?? null);
-			},
-		},
-		If(
-			over,
-			Div(
-				{
-					class:
-						"pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/70 text-[13px] font-medium",
-				},
-				"Drop to attach",
-			),
-		),
-		options.children,
-		AttachButton(accept),
-	);
-}
-
-/** The picker, for people who would rather not drag. */
-function AttachButton(accept: (files: FileList | null) => void) {
-	const input = signal<HTMLInputElement | null>(null);
-
-	return Div(
-		{ class: "mt-2 flex items-center gap-2" },
-		Input({
-			this: input,
-			type: "file",
-			multiple: true,
-			class: "hidden",
-			onChange: (event) => {
-				accept(event.target.files);
-				// Reset, so picking the same file twice in a row still fires.
-				event.target.value = "";
-			},
-		}),
-		Button(
-			{
-				size: "sm",
-				variant: "ghost",
-				class: "h-7 gap-1.5 text-[12px] text-muted-foreground",
-				onClick: () => input.get()?.click(),
-			},
-			Paperclip({ class: "size-3.5" }),
-			"Attach files",
-		),
-		Span({ class: "text-[11px] text-muted-foreground" }, "or drop them here"),
 	);
 }
 

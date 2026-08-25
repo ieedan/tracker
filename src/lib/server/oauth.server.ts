@@ -94,6 +94,7 @@ export async function resolveAgentToken(presented: string): Promise<AgentPrincip
 			email: row.bot.email,
 			image: row.bot.image ?? null,
 			type: "agent",
+			harness: row.bot.harness ?? "other",
 			onBehalfOf: { id: row.installer.id, name: row.installer.name },
 		},
 		agentIdentityId: row.identity.id,

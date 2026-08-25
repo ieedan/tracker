@@ -9,6 +9,7 @@ import {
 	P,
 	Span,
 	Textarea,
+	derived,
 	signal,
 	type Child,
 	type Readable,
@@ -28,15 +29,17 @@ import type {
 	Team,
 	Workspace,
 } from "@/lib/domain/schemas";
+import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
 import {
-	AttachmentGrid,
-	DropZone,
-	removeAttachment,
-} from "@/lib/features/attachments/attachment-list";
+	AttachTrigger,
+	FileDragOverlay,
+	beginUploads,
+	preventFilePaste,
+} from "@/lib/features/attachments/file-drop";
 import type { Upload } from "@/lib/features/attachments/uploader";
 import { fullTime, relativeTime } from "@/lib/format";
 import { CopyPromptButton } from "./copy-prompt";
-import { openCreateIssue } from "./create-issue-dialog";
+import { createIssueOpen, openCreateIssue } from "./create-issue-dialog";
 import { isTyping } from "@/lib/client/is-typing";
 import {
 	AssigneePicker,
@@ -81,6 +84,16 @@ export function IssueDetailPage({
 	const attachments = signal(data.get().attachments);
 	data.onChange((next) => attachments.set(next.attachments));
 	const uploads = signal<Upload[]>([]);
+
+	const attachToIssue = (files: File[]) => {
+		beginUploads({
+			files,
+			slug: params.slug.get(),
+			issueId: issue.get().id,
+			uploads,
+			onUploaded: (attachment) => attachments.push(attachment),
+		});
+	};
 
 	const repositories = data.bind((value) => value.repositories);
 	const linkedPull = signal(data.get().issue.pullRequest);
@@ -135,6 +148,11 @@ export function IssueDetailPage({
 	return Div(
 		{ class: "flex min-h-0 flex-1" },
 
+		FileDragOverlay({
+			enabled: derived([createIssueOpen], (dialogOpen) => !dialogOpen),
+			onFiles: attachToIssue,
+		}),
+
 		ImplementDocument({
 			onKeydown: (event) => {
 				if (isTyping(event.target)) return;
@@ -187,22 +205,21 @@ export function IssueDetailPage({
 				Div(
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 					EditableTitle(issue, update),
-					EditableDescription(issue, update, params),
-
-					// The whole body is the drop target, not just a small well —
-					// dragging a screenshot onto the issue is the gesture people try.
-					DropZone({
-						target: { slug: params.slug, issueId: data.get().issue.id },
-						uploads,
-						onUploaded: (attachment) => attachments.push(attachment),
-						children: AttachmentGrid({
+					Div(
+						{
+							class: "flex flex-col gap-2",
+							onPaste: (event) => preventFilePaste(event, attachToIssue),
+						},
+						EditableDescription(issue, update, params),
+						AttachmentGrid({
 							attachments,
 							uploads,
 							slug: params.slug,
 							onRemove: (attachment) =>
 								void removeAttachment(params.slug.get(), attachment, attachments),
 						}),
-					}),
+						AttachTrigger({ onFiles: attachToIssue }),
+					),
 
 					CommentThread(
 						comments,
@@ -471,6 +488,8 @@ function CommentThread(
 	const draft = signal("");
 	const posting = signal(false);
 	const draftRef = signal<HTMLTextAreaElement | null>(null);
+	const draftAttachments = signal<Attachment[]>([]);
+	const draftUploads = signal<Upload[]>([]);
 
 	// The same `@` as the description, narrowed to the issue's repository.
 	const mentions = fileMentions({
@@ -479,6 +498,15 @@ function CommentThread(
 		repository: () => repositoryId.get(),
 		element: draftRef,
 	});
+
+	const attach = (files: File[]) => {
+		beginUploads({
+			files,
+			slug: params.slug.get(),
+			uploads: draftUploads,
+			onUploaded: (attachment) => draftAttachments.push(attachment),
+		});
+	};
 
 	const post = async () => {
 		const body = draft.get().trim();
@@ -489,7 +517,10 @@ function CommentThread(
 			"/api/v1/workspaces/[slug]/issues/[identifier]/comments",
 			{
 				params: { slug: params.slug.get(), identifier: params.identifier.get() },
-				body: { body },
+				body: {
+					body,
+					attachmentIds: draftAttachments.get().map((attachment) => attachment.id),
+				},
 			},
 		);
 		posting.set(false);
@@ -500,6 +531,8 @@ function CommentThread(
 		}
 		comments.push(data);
 		draft.set("");
+		draftAttachments.set([]);
+		draftUploads.set([]);
 	};
 
 	return Div(
@@ -534,12 +567,19 @@ function CommentThread(
 							{ class: "text-[13px] leading-relaxed whitespace-pre-wrap" },
 							MentionText(comment.bind("body")),
 						),
+						AttachmentGrid({
+							attachments: comment.bind("attachments"),
+							slug: params.slug,
+						}),
 					),
 				),
 		),
 
 		Div(
-			{ class: "relative flex flex-col gap-2 rounded-md border border-border p-3" },
+			{
+				class: "relative flex flex-col gap-2 rounded-md border border-border p-3",
+				onPaste: (event) => preventFilePaste(event, attach),
+			},
 			Textarea({
 				this: draftRef,
 				value: draft,
@@ -555,17 +595,26 @@ function CommentThread(
 				},
 			}),
 			MentionMenu(mentions),
+			AttachmentGrid({
+				attachments: draftAttachments,
+				uploads: draftUploads,
+				slug: params.slug,
+				onRemove: (attachment) =>
+					void removeAttachment(params.slug.get(), attachment, draftAttachments),
+			}),
 			Div(
-				{ class: "flex items-center justify-end gap-2" },
-				Span({ class: "mr-auto text-[11px] text-muted-foreground" }, "⌘↵ to comment"),
+				{ class: "flex items-center gap-2" },
+				AttachTrigger({ onFiles: attach }),
 				Button(
 					{
 						size: "sm",
+						class: "ml-auto",
 						loading: posting,
 						disabled: draft.bind((value) => value.trim() === ""),
 						onClick: () => void post(),
 					},
 					"Comment",
+					Span({ class: "text-[11px] font-normal opacity-70" }, "⌘⏎"),
 				),
 			),
 		),

@@ -1,7 +1,9 @@
 import { derived, Div, Dynamic, Span, Svg, type Readable } from "@implementjs/core";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/domain/issues";
+import type { HarnessKind, UserType } from "@/lib/domain/agents";
 import { cn } from "@/lib/utils";
+import { HarnessLogo } from "./harness-logo";
 
 /**
  * One glyph size for every inline chip — a picker trigger, a filter pill, a
@@ -177,9 +179,28 @@ export interface AvatarUser {
 	id: string;
 	name: string;
 	image?: string | null;
+	/** Set on bot members — see `type`/`harness` on `UserSummary`. */
+	type?: UserType;
+	harness?: HarnessKind | null;
 }
 
 export function UserAvatar(user: AvatarUser, className?: string) {
+	// A bot wears its harness mark rather than initials. "CC" in a coloured
+	// circle reads as a person; the Cursor or Claude mark is what actually tells
+	// someone an agent wrote this.
+	if (user.type === "agent") {
+		return Span(
+			{
+				class: cn(
+					"inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary",
+					className,
+				),
+				title: user.name,
+			},
+			HarnessLogo(user.harness ?? "other", "size-3.5"),
+		);
+	}
+
 	return Span(
 		{
 			class: cn(

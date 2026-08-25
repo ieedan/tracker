@@ -73,7 +73,7 @@ export function AppShell(
 	};
 
 	return Div(
-		{ class: "flex min-h-dvh" },
+		{ class: "flex h-dvh overflow-clip" },
 		ImplementLifecycle({
 			onMount: () => {
 				const timer = setInterval(() => void poll(), POLL_MS);
@@ -98,7 +98,7 @@ export function AppShell(
 			},
 		}),
 		Sidebar(data, activeSlug, url, unread),
-		Main({ class: "flex min-w-0 flex-1 flex-col bg-background" }, children),
+		Main({ class: "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background" }, children),
 
 		ImplementDocument({
 			onKeydown: (event) => {
@@ -127,7 +127,7 @@ function Sidebar(
 	return Aside(
 		{
 			class:
-				"flex w-[232px] shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar px-3 py-3",
+				"flex h-full min-h-0 w-[232px] shrink-0 flex-col gap-1 overflow-clip border-r border-sidebar-border bg-sidebar px-3 py-3",
 		},
 		WorkspaceSwitcher(data, activeSlug),
 
@@ -143,14 +143,14 @@ function Sidebar(
 			Span({ class: "ml-auto text-[11px] text-muted-foreground" }, "C"),
 		),
 
-		NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
-		NavItem(url, activeSlug, "/app/:slug", LayoutList, "All issues"),
-		NavItem(url, activeSlug, "/app/:slug/feedback", MessageSquareQuote, "User feedback"),
-		NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
-
-		TeamNav(data, activeSlug, url),
-
-		Div({ class: "flex-1" }),
+		Div(
+			{ class: "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" },
+			NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
+			NavItem(url, activeSlug, "/app/:slug", LayoutList, "All issues"),
+			NavItem(url, activeSlug, "/app/:slug/feedback", MessageSquareQuote, "User feedback"),
+			NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
+			TeamNav(data, activeSlug, url),
+		),
 
 		Button(
 			{
@@ -173,6 +173,7 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 	);
 
 	return DropdownMenu(
+		{ preventScroll: false },
 		DropdownMenuTrigger(
 			{
 				variant: "ghost",
@@ -288,6 +289,7 @@ function NavItem(
 
 function UserMenu(data: Readable<ShellData>) {
 	return DropdownMenu(
+		{ preventScroll: false },
 		DropdownMenuTrigger(
 			{ variant: "ghost", class: "h-9 w-full justify-start gap-2 px-2 hover:bg-accent" },
 			UserAvatar(data.get().user),

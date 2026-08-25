@@ -2,7 +2,7 @@
 // OpenAPI document, and the browser. Kit forbids a client file from importing
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
-import { USER_TYPES } from "./agents";
+import { AGENT_HARNESSES, USER_TYPES } from "./agents";
 import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
@@ -24,6 +24,8 @@ export const UserSummary = v.object({
 	 * UI can badge a comment or an assignee without a second lookup.
 	 */
 	type: v.picklist(USER_TYPES),
+	/** Which coding agent a bot is, so its mark renders anywhere it appears. */
+	harness: v.nullable(v.picklist(AGENT_HARNESSES)),
 });
 export type UserSummary = v.InferOutput<typeof UserSummary>;
 
@@ -507,9 +509,10 @@ export const MarkNotificationsBody = v.object({
 
 export const InstalledAgentSchema = v.object({
 	grantId: v.string(),
+	agentId: v.string(),
 	clientId: v.string(),
 	name: v.string(),
-	image: v.nullable(v.string()),
+	harness: v.picklist(AGENT_HARNESSES),
 	scopes: v.array(v.string()),
 	installedBy: v.object({ id: v.string(), name: v.string() }),
 	lastUsedAt: v.nullable(v.string()),
@@ -523,7 +526,21 @@ export const ApproveDeviceBody = v.object({
 	/** Which workspace the agent is being let into. */
 	slug: v.pipe(v.string(), v.trim(), v.minLength(1)),
 	scopes: v.pipe(v.array(v.string()), v.minLength(1, "choose at least one permission")),
+	/**
+	 * What this agent is, as the person authorizing it says — never read off
+	 * the client's own registration, which anyone can write.
+	 */
+	harness: v.picklist(AGENT_HARNESSES),
+	/** Overrides the harness's catalog name. Blank means "use the catalog name". */
+	name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 });
+
+export const UpdateAgentBody = v.partial(
+	v.object({
+		name: v.pipe(v.string(), v.trim(), v.maxLength(60)),
+		harness: v.picklist(AGENT_HARNESSES),
+	}),
+);
 
 export const DenyDeviceBody = v.object({
 	userCode: v.pipe(v.string(), v.trim(), v.minLength(1)),

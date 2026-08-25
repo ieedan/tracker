@@ -79,6 +79,7 @@ export async function resolveApiKey(presented: string): Promise<ApiKeyPrincipal 
 			image: row.owner.image ?? null,
 			// A key acts as the person who minted it, so it is still a person.
 			type: "human",
+			harness: null,
 		},
 		keyId: row.key.id,
 		permissions: parsePermissions(row.key.permissions),

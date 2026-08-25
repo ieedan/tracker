@@ -21,7 +21,7 @@ importers:
         specifier: 1.7.1
         version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.10)(kysely@0.29.5)(nanostores@1.5.2))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@libsql/client@0.17.4)(kysely@0.29.5)))(better-call@1.4.0(zod@4.4.3))
       '@implementjs/core':
-        specifier: ~0.0.3
+        specifier: ~0.0.8
         version: 0.0.8
       '@implementjs/formish':
         specifier: ~0.0.3
@@ -58,14 +58,14 @@ importers:
         version: 1.4.2(typescript@7.0.2)
     devDependencies:
       '@implementjs/adapter-vercel':
-        specifier: ^0.0.11
-        version: 0.0.11(@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
+        specifier: ^0.0.12
+        version: 0.0.12(@implementjs/kit@0.0.12(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
       '@implementjs/eslint':
         specifier: ~0.0.1
         version: 0.0.1
       '@implementjs/kit':
-        specifier: ~0.0.11
-        version: 0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+        specifier: ~0.0.12
+        version: 0.0.12(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
@@ -741,10 +741,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@implementjs/adapter-vercel@0.0.11':
-    resolution: {integrity: sha512-BZplpXe1XIaH85Ctk/gTilPW9B18DQZuna+YbyZ4YXp4qL/FNjRv7f8vtaeVGqIGjHTOyKm2nav6VsjHrUL1mQ==}
+  '@implementjs/adapter-vercel@0.0.12':
+    resolution: {integrity: sha512-b0SFrlAOX1BGELUPzFKFVSdD/s0uUsDCSvSdTUOVf9srAlPNj4J7pQdGfDf3oPhE0OOwLyrp7Xn+6UzmLNr29Q==}
     peerDependencies:
-      '@implementjs/kit': 0.0.11
+      '@implementjs/kit': 0.0.12
 
   '@implementjs/core@0.0.8':
     resolution: {integrity: sha512-Z4rBQbDpT1u5w0/WRQToweMbstKkDESDjXYGp9SOc4IpdzpNtP20vSDmdJ3ckK7O8y7QhY37+7wsd/UDHkD4vQ==}
@@ -757,8 +757,8 @@ packages:
     peerDependencies:
       valibot: '>=1.4.1 <2'
 
-  '@implementjs/kit@0.0.11':
-    resolution: {integrity: sha512-aipIdu0nQyRmjPdsLtR/RcenhJnY+78jHuVadxzvuW7SEjAV6QaX0wxtS5gQ0AFtrgmdtzOyT3SikTvDv/h20g==}
+  '@implementjs/kit@0.0.12':
+    resolution: {integrity: sha512-GiZmQ86azlQq/0FsiIU5wJAltNbbgbqe3XNUmxJ24GD28etaihsB3xZNt1skn4VCa+51aeAS3PMUGppOhRmlIw==}
     hasBin: true
     peerDependencies:
       neverthrow: ^8.0.0
@@ -776,8 +776,8 @@ packages:
   '@implementjs/primitives@0.0.9':
     resolution: {integrity: sha512-COKYYiRFP8E6boLSo5727CM92jxlErnhOTmUuf+gSIy2ynmheTGFnzTRWqKtFUn3amImKh27ts2K8aNf3n3jrw==}
 
-  '@implementjs/router@0.0.9':
-    resolution: {integrity: sha512-IJZZ3LFrBY/leaqe0oeJe97H9gq/cOrE8qG8ANi+c9Oyr0OI3XvzV3nPvkXUeqEHERd4E+kJLpjnElvYi0Btyg==}
+  '@implementjs/router@0.0.10':
+    resolution: {integrity: sha512-hBYO+Qc/cd3u4vq3AjA0P9CvHwyHuEdNmKj8xdMWF7NqIPVEQhtA2UXdd2jvZFAsVqoCxA8RR/bDpsI0GuIF9g==}
 
   '@implementjs/vite@0.0.1':
     resolution: {integrity: sha512-nzjv5BESnpIBSA6EqJpa7dNQnwclz+RfQAwKlk14JfCXr0EESTrm2vsM/yhcW4hyBegDob7u9Qs7Sekp6bZCLQ==}
@@ -2862,9 +2862,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@implementjs/adapter-vercel@0.0.11(@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
+  '@implementjs/adapter-vercel@0.0.12(@implementjs/kit@0.0.12(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
     dependencies:
-      '@implementjs/kit': 0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      '@implementjs/kit': 0.0.12(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
 
   '@implementjs/core@0.0.8':
     dependencies:
@@ -2879,10 +2879,10 @@ snapshots:
       '@implementjs/core': 0.0.8
       valibot: 1.4.2(typescript@7.0.2)
 
-  '@implementjs/kit@0.0.11(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
+  '@implementjs/kit@0.0.12(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
     dependencies:
       '@implementjs/core': 0.0.8
-      '@implementjs/router': 0.0.9
+      '@implementjs/router': 0.0.10
       '@implementjs/vite': 0.0.1(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@resvg/resvg-js': 2.6.2
       '@standard-schema/spec': 1.1.0
@@ -2903,7 +2903,7 @@ snapshots:
     dependencies:
       '@implementjs/core': 0.0.8
 
-  '@implementjs/router@0.0.9':
+  '@implementjs/router@0.0.10':
     dependencies:
       '@implementjs/core': 0.0.8
 

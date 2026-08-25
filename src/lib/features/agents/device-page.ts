@@ -10,7 +10,13 @@ import { TriangleAlert } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
-import { describeScopes } from "@/lib/domain/agents";
+import { HarnessLogo } from "@/lib/components/harness-logo";
+import {
+	AGENT_HARNESSES,
+	describeScopes,
+	harnessLabel,
+	type HarnessKind,
+} from "@/lib/domain/agents";
 import { cn } from "@/lib/utils";
 
 interface AgentRequest {
@@ -20,6 +26,7 @@ interface AgentRequest {
 	uri: string | null;
 	trusted: boolean;
 	scopes: string[];
+	guessedHarness: HarnessKind;
 }
 
 interface PageData {
@@ -86,13 +93,32 @@ function Consent(request: AgentRequest, userCode: string, workspaces: PageData["
 	const busy = signal(false);
 	const scopes = describeScopes(request.scopes);
 
+	// What this agent will be called and badged as. Seeded from a guess at the
+	// client's name, but this is the person's assertion, not the client's — a
+	// harness that registers as "Coding Agent" still ends up correctly labelled.
+	const harness = signal<HarnessKind>(request.guessedHarness);
+	const name = signal(harnessLabel(request.guessedHarness));
+	// Once someone edits the name, changing the harness stops overwriting it.
+	let nameEdited = false;
+
+	const pickHarness = (kind: HarnessKind) => {
+		harness.set(kind);
+		if (!nameEdited) name.set(harnessLabel(kind));
+	};
+
 	const approve = async () => {
 		const target = slug.get();
 		if (target === "") return;
 
 		busy.set(true);
 		const { error } = await api.POST("/api/v1/device/approve", {
-			body: { userCode, slug: target, scopes: request.scopes },
+			body: {
+				userCode,
+				slug: target,
+				scopes: request.scopes,
+				harness: harness.get(),
+				name: name.get().trim(),
+			},
 		});
 		busy.set(false);
 
@@ -164,6 +190,50 @@ function Consent(request: AgentRequest, userCode: string, workspaces: PageData["
 								request.uri,
 							),
 				),
+			),
+		),
+
+		// The person says what this is. A client registering as "Coding Agent"
+		// would otherwise leave a bot by that name on every comment it writes.
+		Div(
+			{ class: "flex flex-col gap-1.5" },
+			Span({ class: "text-[13px] font-medium" }, "This agent is"),
+			Div(
+				{ class: "grid grid-cols-3 gap-1.5" },
+				...AGENT_HARNESSES.map((kind) =>
+					Button(
+						{
+							variant: "ghost",
+							type: "button",
+							class: harness.bind((current) =>
+								cn(
+									"h-auto flex-col gap-1.5 rounded-md border px-2 py-2.5 text-[11px] font-normal",
+									current === kind
+										? "border-primary bg-primary/10 text-foreground"
+										: "border-border text-muted-foreground",
+								),
+							),
+							onClick: () => pickHarness(kind),
+						},
+						HarnessLogo(kind, "size-5"),
+						Span({ class: "truncate" }, harnessLabel(kind)),
+					),
+				),
+			),
+			Input({
+				value: name,
+				placeholder: "Name in this workspace",
+				"aria-label": "Agent name",
+				maxLength: 60,
+				class:
+					"h-8 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
+				onInput: () => {
+					nameEdited = true;
+				},
+			}),
+			P(
+				{ class: "text-[11px] text-muted-foreground" },
+				"This is the name and mark its comments and issues will carry.",
 			),
 		),
 

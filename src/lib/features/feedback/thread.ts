@@ -6,11 +6,18 @@
  * leave an internal note). Building two would guarantee they drifted.
  */
 import { Div, ForEach, If, P, Span, Textarea, signal, type Readable } from "@implementjs/core";
-import { Lock } from "@implementjs/lucide";
+import { Lock, MessageSquare } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import type { FeedbackComment } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 
@@ -58,7 +65,14 @@ export function FeedbackThread(options: {
 
 		If(
 			options.comments.bind((list) => list.length === 0),
-			Div({ class: "text-[12px] text-muted-foreground" }, "No replies yet."),
+			Empty(
+				{ class: "border p-4 md:p-6" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, MessageSquare({ "aria-hidden": true })),
+					EmptyTitle("No replies yet"),
+					EmptyDescription("Be the first to reply."),
+				),
+			),
 		),
 
 		ForEach(

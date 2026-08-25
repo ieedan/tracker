@@ -10,7 +10,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface, type Interface } from "node:readline/promises";
 import * as v from "valibot";
@@ -18,6 +18,17 @@ import { publicEnvSchema, serverEnvSchema } from "../src/lib/env.schema";
 
 const ENV_PATH = resolve(process.cwd(), ".env");
 const ACCEPT_DEFAULTS = process.argv.includes("--yes") || process.argv.includes("-y");
+
+const SECRET_KEYS = new Set([
+	"BETTER_AUTH_SECRET",
+	"DATABASE_AUTH_TOKEN",
+	"CRON_SECRET",
+	"GITHUB_CLIENT_SECRET",
+	"GITHUB_APP_PRIVATE_KEY",
+	"GITHUB_APP_WEBHOOK_SECRET",
+	"GITHUB_DEV_TOKEN",
+	"S3_SECRET_ACCESS_KEY",
+]);
 
 const ESC = "\u001b[";
 const style = (code: string) => (text: string) => `${ESC}${code}m${text}${ESC}0m`;
@@ -133,6 +144,290 @@ async function choose(
 		const picked = Number(answer);
 		if (Number.isInteger(picked) && picked >= 1 && picked <= options.length) return picked - 1;
 	}
+}
+
+function filled(value: string | undefined): boolean {
+	return value !== undefined && value !== "";
+}
+
+function originOf(url: string): string {
+	return url.replace(/\/+$/, "");
+}
+
+/** Quote a .env value so spaces, `#`, and `\n` escapes survive a round trip. */
+function envEncode(value: string): string {
+	if (value === "") return "";
+	const flattened = value.replace(/\r?\n/g, "\\n");
+	if (/[\s#"']/.test(flattened) || flattened.includes("\\")) {
+		return `"${flattened.replace(/"/g, '\\"')}"`;
+	}
+	return flattened;
+}
+
+function envLine(key: string, value: string | undefined): string {
+	return `${key}=${envEncode(value ?? "")}`;
+}
+
+function looksLikePemPath(input: string): boolean {
+	if (input.endsWith(".pem") || input.endsWith(".key")) return true;
+	const path = resolve(process.cwd(), input);
+	try {
+		return existsSync(path) && statSync(path).isFile();
+	} catch {
+		return false;
+	}
+}
+
+function flattenPem(value: string): string {
+	return value.replace(/\r\n/g, "\n").replace(/\n/g, "\\n").trim();
+}
+
+function checkPem(value: string): string | null {
+	if (value === "") return "a GitHub App needs a private key";
+	const expanded = value.replace(/\\n/g, "\n");
+	if (!expanded.includes("BEGIN") || !expanded.includes("PRIVATE KEY")) {
+		return "that is not a PEM private key";
+	}
+	return null;
+}
+
+async function askPrivateKey(rl: Interface, fallback: string): Promise<string> {
+	console.log(
+		`\n${bold("GITHUB_APP_PRIVATE_KEY")}  ${dim("Paste the PEM, or a path to the .pem GitHub downloaded.")}`,
+	);
+
+	if (ACCEPT_DEFAULTS) {
+		const problem = fallback === "" ? null : checkPem(fallback);
+		if (problem !== null) {
+			throw new Error(`--yes cannot answer GITHUB_APP_PRIVATE_KEY: ${problem}.`);
+		}
+		console.log(`  ${dim("using")} ${fallback === "" ? dim("(empty)") : mask(fallback)}`);
+		return fallback;
+	}
+
+	for (;;) {
+		const suffix = fallback === "" ? "" : ` ${dim(`[${mask(fallback)} — current]`)}`;
+		const first = (await rl.question(`  ${cyan("›")}${suffix} `)).trim();
+		let raw = first === "" ? fallback : first;
+
+		if (raw === "") {
+			console.log(`  ${red("✗")} a GitHub App needs a private key`);
+			continue;
+		}
+
+		if (first !== "" && looksLikePemPath(first)) {
+			const path = resolve(process.cwd(), first);
+			if (!existsSync(path) || !statSync(path).isFile()) {
+				console.log(`  ${red("✗")} no file at ${first}`);
+				continue;
+			}
+			raw = readFileSync(path, "utf8");
+		} else if (first.includes("BEGIN") && !first.includes("END")) {
+			const lines = [first];
+			for (;;) {
+				const line = await rl.question(`  ${dim("|")} `);
+				lines.push(line);
+				if (line.includes("END")) break;
+			}
+			raw = lines.join("\n");
+		}
+
+		const normalized = flattenPem(raw);
+		const problem = checkPem(normalized);
+		if (problem === null) return normalized;
+		console.log(`  ${red("✗")} ${problem}`);
+	}
+}
+
+interface GithubCreds {
+	GITHUB_CLIENT_ID: string;
+	GITHUB_CLIENT_SECRET: string;
+	GITHUB_APP_ID: string;
+	GITHUB_APP_SLUG: string;
+	GITHUB_APP_PRIVATE_KEY: string;
+	GITHUB_APP_WEBHOOK_SECRET: string;
+	GITHUB_DEV_TOKEN: string;
+	GITHUB_API_URL: string;
+}
+
+function existingGithub(existing: Record<string, string>): GithubCreds {
+	return {
+		GITHUB_CLIENT_ID: existing.GITHUB_CLIENT_ID ?? "",
+		GITHUB_CLIENT_SECRET: existing.GITHUB_CLIENT_SECRET ?? "",
+		GITHUB_APP_ID: existing.GITHUB_APP_ID ?? "",
+		GITHUB_APP_SLUG: existing.GITHUB_APP_SLUG ?? "",
+		GITHUB_APP_PRIVATE_KEY: existing.GITHUB_APP_PRIVATE_KEY ?? "",
+		GITHUB_APP_WEBHOOK_SECRET: existing.GITHUB_APP_WEBHOOK_SECRET ?? "",
+		GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN ?? "",
+		GITHUB_API_URL: existing.GITHUB_API_URL || "https://api.github.com",
+	};
+}
+
+async function setupGithubSignIn(
+	rl: Interface,
+	existing: GithubCreds,
+	origin: string,
+	appName: string,
+): Promise<Pick<GithubCreds, "GITHUB_CLIENT_ID" | "GITHUB_CLIENT_SECRET">> {
+	const already = filled(existing.GITHUB_CLIENT_ID) && filled(existing.GITHUB_CLIENT_SECRET);
+	const proceed = already
+		? !(await confirm(rl, "\nKeep existing GitHub sign-in?", true))
+		: await confirm(rl, "\nSet up GitHub sign-in?", false);
+
+	if (!proceed) {
+		return {
+			GITHUB_CLIENT_ID: existing.GITHUB_CLIENT_ID,
+			GITHUB_CLIENT_SECRET: existing.GITHUB_CLIENT_SECRET,
+		};
+	}
+
+	console.log(`\n  Open ${cyan("https://github.com/settings/applications/new")}`);
+	console.log();
+	console.log(`    Application name             ${appName}`);
+	console.log(`    Homepage URL                 ${origin}`);
+	console.log(`    Authorization callback URL   ${origin}/api/auth/callback/github`);
+	console.log();
+	console.log(
+		"  Create the app, then paste the Client ID. Generate a client secret and paste that next.",
+	);
+
+	const id = await ask(rl, {
+		key: "GITHUB_CLIENT_ID",
+		blurb: "From the OAuth app page.",
+		schema: v.pipe(v.string(), v.minLength(1, "paste the Client ID")),
+		fallback: existing.GITHUB_CLIENT_ID,
+		origin: filled(existing.GITHUB_CLIENT_ID) ? "current" : undefined,
+	});
+	const secret = await ask(rl, {
+		key: "GITHUB_CLIENT_SECRET",
+		blurb: "Generate a new client secret on the same page.",
+		schema: v.pipe(v.string(), v.minLength(1, "paste the client secret")),
+		fallback: existing.GITHUB_CLIENT_SECRET,
+		secret: true,
+		origin: filled(existing.GITHUB_CLIENT_SECRET) ? "current" : undefined,
+	});
+
+	return { GITHUB_CLIENT_ID: id, GITHUB_CLIENT_SECRET: secret };
+}
+
+async function setupGithubRepos(
+	rl: Interface,
+	existing: GithubCreds,
+	origin: string,
+): Promise<Omit<GithubCreds, "GITHUB_CLIENT_ID" | "GITHUB_CLIENT_SECRET" | "GITHUB_API_URL">> {
+	const hasApp = filled(existing.GITHUB_APP_ID) && filled(existing.GITHUB_APP_PRIVATE_KEY);
+	const hasToken = filled(existing.GITHUB_DEV_TOKEN);
+
+	if (hasApp) {
+		if (await confirm(rl, "\nKeep existing GitHub App?", true)) {
+			return {
+				GITHUB_APP_ID: existing.GITHUB_APP_ID,
+				GITHUB_APP_SLUG: existing.GITHUB_APP_SLUG,
+				GITHUB_APP_PRIVATE_KEY: existing.GITHUB_APP_PRIVATE_KEY,
+				GITHUB_APP_WEBHOOK_SECRET: existing.GITHUB_APP_WEBHOOK_SECRET,
+				GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN,
+			};
+		}
+	} else if (hasToken) {
+		if (await confirm(rl, "\nKeep existing GitHub personal access token?", true)) {
+			return {
+				GITHUB_APP_ID: "",
+				GITHUB_APP_SLUG: "",
+				GITHUB_APP_PRIVATE_KEY: "",
+				GITHUB_APP_WEBHOOK_SECRET: "",
+				GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN,
+			};
+		}
+	} else if (!(await confirm(rl, "\nSet up repository linking?", false))) {
+		return {
+			GITHUB_APP_ID: "",
+			GITHUB_APP_SLUG: "",
+			GITHUB_APP_PRIVATE_KEY: "",
+			GITHUB_APP_WEBHOOK_SECRET: "",
+			GITHUB_DEV_TOKEN: "",
+		};
+	}
+
+	const kind = await choose(
+		rl,
+		"How should this app reach GitHub repositories?",
+		[
+			{ label: "GitHub App", hint: "install on an org — what the Settings page uses" },
+			{ label: "Personal access token", hint: "development only" },
+		],
+		0,
+	);
+
+	if (kind === 1) {
+		console.log(`\n  Open ${cyan("https://github.com/settings/personal-access-tokens/new")}`);
+		console.log();
+		console.log("    Token name                  tracker-dev");
+		console.log(
+			"    Repository access           All repositories, or only the ones you want to try",
+		);
+		console.log("    Permissions (read-only)     Contents, Metadata, Pull requests");
+		console.log();
+		console.log("  Generate the token and paste it.");
+
+		const token = await ask(rl, {
+			key: "GITHUB_DEV_TOKEN",
+			blurb: "A fine-grained personal access token.",
+			schema: v.pipe(v.string(), v.minLength(1, "paste the token")),
+			fallback: existing.GITHUB_DEV_TOKEN,
+			secret: true,
+			origin: filled(existing.GITHUB_DEV_TOKEN) ? "current" : undefined,
+		});
+
+		return {
+			GITHUB_APP_ID: "",
+			GITHUB_APP_SLUG: "",
+			GITHUB_APP_PRIVATE_KEY: "",
+			GITHUB_APP_WEBHOOK_SECRET: "",
+			GITHUB_DEV_TOKEN: token,
+		};
+	}
+
+	console.log(`\n  Open ${cyan("https://github.com/settings/apps/new")}`);
+	console.log();
+	console.log(`    GitHub App name             anything unique`);
+	console.log(`    Homepage URL                ${origin}`);
+	console.log(`    Callback URL                ${origin}/api/v1/github/callback`);
+	console.log(`    Setup URL                   ${origin}/api/v1/github/callback`);
+	console.log("    Webhook                     uncheck Active");
+	console.log("    Repository permissions      Contents, Metadata, Pull requests — all Read-only");
+	console.log("    Where can this GitHub App be installed?    Any account");
+	console.log();
+	console.log(
+		"  Create the app. The App ID is on the next page; the slug is the last part of github.com/apps/<slug>. Generate a private key at the bottom.",
+	);
+
+	const appId = await ask(rl, {
+		key: "GITHUB_APP_ID",
+		blurb: "A number, shown as App ID on the app page.",
+		schema: v.pipe(v.string(), v.regex(/^\d+$/, "the App ID is a number")),
+		fallback: existing.GITHUB_APP_ID,
+		origin: filled(existing.GITHUB_APP_ID) ? "current" : undefined,
+	});
+	const slug = await ask(rl, {
+		key: "GITHUB_APP_SLUG",
+		blurb: "From https://github.com/apps/<slug>.",
+		schema: v.pipe(v.string(), v.minLength(1, "paste the slug")),
+		fallback: existing.GITHUB_APP_SLUG,
+		origin: filled(existing.GITHUB_APP_SLUG) ? "current" : undefined,
+	});
+	const privateKey = await askPrivateKey(rl, existing.GITHUB_APP_PRIVATE_KEY);
+	const webhookSecret =
+		existing.GITHUB_APP_WEBHOOK_SECRET === ""
+			? randomBytes(20).toString("hex")
+			: existing.GITHUB_APP_WEBHOOK_SECRET;
+
+	return {
+		GITHUB_APP_ID: appId,
+		GITHUB_APP_SLUG: slug,
+		GITHUB_APP_PRIVATE_KEY: privateKey,
+		GITHUB_APP_WEBHOOK_SECRET: webhookSecret,
+		GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN,
+	};
 }
 
 /** Whichever package manager invoked this, so the printed hints match reality. */
@@ -267,14 +562,39 @@ async function main(): Promise<void> {
 			origin: existing.BETTER_AUTH_URL === undefined ? undefined : "current",
 		});
 
+		// --- GitHub -----------------------------------------------------------
+		// After BETTER_AUTH_URL so the callback URLs we print match the origin
+		// they just confirmed.
+
+		const origin = originOf(values.BETTER_AUTH_URL ?? "http://localhost:5173");
+		const previousGithub = existingGithub(existing);
+		const github: GithubCreds = {
+			...previousGithub,
+			...(await setupGithubSignIn(rl, previousGithub, origin, values.PUBLIC_APP_NAME ?? "tracker")),
+			...(await setupGithubRepos(rl, previousGithub, origin)),
+		};
+
+		// Local MinIO (`docker compose up -d`). Kept if already set, so a
+		// production R2 config is not overwritten by a later setup run.
+		const s3 = {
+			S3_ENDPOINT: existing.S3_ENDPOINT ?? "http://localhost:9000",
+			S3_REGION: existing.S3_REGION ?? "auto",
+			S3_BUCKET: existing.S3_BUCKET ?? "tracker-attachments",
+			S3_ACCESS_KEY_ID: existing.S3_ACCESS_KEY_ID ?? "tracker",
+			S3_SECRET_ACCESS_KEY: existing.S3_SECRET_ACCESS_KEY ?? "tracker-dev-secret",
+			S3_PUBLIC_ENDPOINT: existing.S3_PUBLIC_ENDPOINT ?? "",
+		};
+
 		// --- write --------------------------------------------------------------
 
 		console.log(`\n${bold("Summary")}`);
-		for (const [key, value] of Object.entries(values)) {
-			const secret =
-				key === "BETTER_AUTH_SECRET" || key === "DATABASE_AUTH_TOKEN" || key === "CRON_SECRET";
-			const shown = value === "" ? dim("(empty)") : secret ? mask(value) : value;
-			console.log(`  ${key.padEnd(21)} ${shown}`);
+		for (const [key, value] of [
+			...Object.entries(values),
+			...Object.entries(s3),
+			...Object.entries(github),
+		]) {
+			const shown = value === "" ? dim("(empty)") : SECRET_KEYS.has(key) ? mask(value) : value;
+			console.log(`  ${key.padEnd(26)} ${shown}`);
 		}
 
 		if (!(await confirm(rl, `\nWrite ${hadEnv ? "over the existing " : ""}.env?`, true))) {
@@ -285,25 +605,80 @@ async function main(): Promise<void> {
 		const file = [
 			"# Written by `pnpm dev:setup`. Gitignored — the committed list is .env.example.",
 			"",
-			`PUBLIC_APP_NAME=${values.PUBLIC_APP_NAME}`,
+			envLine("PUBLIC_APP_NAME", values.PUBLIC_APP_NAME),
 			"",
 			"# libSQL. A local file in dev; a Turso URL (libsql://...) in production.",
-			`DATABASE_URL=${values.DATABASE_URL}`,
+			envLine("DATABASE_URL", values.DATABASE_URL),
 			"# Only needed for a remote Turso database.",
-			`DATABASE_AUTH_TOKEN=${values.DATABASE_AUTH_TOKEN}`,
+			envLine("DATABASE_AUTH_TOKEN", values.DATABASE_AUTH_TOKEN),
 			"",
 			"# Signs session cookies.",
-			`BETTER_AUTH_SECRET=${values.BETTER_AUTH_SECRET}`,
-			`BETTER_AUTH_URL=${values.BETTER_AUTH_URL}`,
+			envLine("BETTER_AUTH_SECRET", values.BETTER_AUTH_SECRET),
+			envLine("BETTER_AUTH_URL", values.BETTER_AUTH_URL),
 			"",
 			"# Authorises POST /api/v1/webhooks/drain, which retries failed webhook",
 			"# deliveries. Blank closes that route.",
-			`CRON_SECRET=${values.CRON_SECRET}`,
+			envLine("CRON_SECRET", values.CRON_SECRET),
 			"",
-		].join("\n");
+			"# Object storage for attachments. `docker compose up -d` runs MinIO locally.",
+			envLine("S3_ENDPOINT", s3.S3_ENDPOINT),
+			envLine("S3_REGION", s3.S3_REGION),
+			envLine("S3_BUCKET", s3.S3_BUCKET),
+			envLine("S3_ACCESS_KEY_ID", s3.S3_ACCESS_KEY_ID),
+			envLine("S3_SECRET_ACCESS_KEY", s3.S3_SECRET_ACCESS_KEY),
+			"# Only when the browser reaches storage at a different host than the server does.",
+			envLine("S3_PUBLIC_ENDPOINT", s3.S3_PUBLIC_ENDPOINT),
+			"",
+			"# --- GitHub -----------------------------------------------------------------",
+			"# OAuth app: Sign in with GitHub. Blank hides the button.",
+			envLine("GITHUB_CLIENT_ID", github.GITHUB_CLIENT_ID),
+			envLine("GITHUB_CLIENT_SECRET", github.GITHUB_CLIENT_SECRET),
+			"",
+			"# GitHub App: repository access. Blank leaves linking unavailable.",
+			envLine("GITHUB_APP_ID", github.GITHUB_APP_ID),
+			envLine("GITHUB_APP_SLUG", github.GITHUB_APP_SLUG),
+			envLine("GITHUB_APP_PRIVATE_KEY", github.GITHUB_APP_PRIVATE_KEY),
+			envLine("GITHUB_APP_WEBHOOK_SECRET", github.GITHUB_APP_WEBHOOK_SECRET),
+			"",
+			"# Development only. Ignored when GITHUB_APP_ID is set.",
+			envLine("GITHUB_DEV_TOKEN", github.GITHUB_DEV_TOKEN),
+			envLine("GITHUB_API_URL", github.GITHUB_API_URL),
+			"",
+		];
+
+		const known = new Set([
+			"PUBLIC_APP_NAME",
+			"DATABASE_URL",
+			"DATABASE_AUTH_TOKEN",
+			"BETTER_AUTH_SECRET",
+			"BETTER_AUTH_URL",
+			"CRON_SECRET",
+			"S3_ENDPOINT",
+			"S3_REGION",
+			"S3_BUCKET",
+			"S3_ACCESS_KEY_ID",
+			"S3_SECRET_ACCESS_KEY",
+			"S3_PUBLIC_ENDPOINT",
+			"GITHUB_CLIENT_ID",
+			"GITHUB_CLIENT_SECRET",
+			"GITHUB_APP_ID",
+			"GITHUB_APP_SLUG",
+			"GITHUB_APP_PRIVATE_KEY",
+			"GITHUB_APP_WEBHOOK_SECRET",
+			"GITHUB_DEV_TOKEN",
+			"GITHUB_API_URL",
+		]);
+		const extras = Object.entries(existing).filter(([key]) => !known.has(key));
+		if (extras.length > 0) {
+			file.push(
+				"# Kept from the existing .env.",
+				...extras.map(([key, value]) => envLine(key, value)),
+				"",
+			);
+		}
 
 		// 0600: the file holds a signing secret and possibly a database token.
-		writeFileSync(ENV_PATH, file, { mode: 0o600 });
+		writeFileSync(ENV_PATH, file.join("\n"), { mode: 0o600 });
 		console.log(`${green("✓")} wrote .env`);
 
 		// --- offer the next two steps -------------------------------------------
@@ -321,6 +696,9 @@ async function main(): Promise<void> {
 		}
 
 		console.log(`\n${bold("Ready.")} Start the app with ${cyan(`${pm} dev`)}.`);
+		if (filled(github.GITHUB_APP_SLUG)) {
+			console.log(dim("Install the GitHub App from Settings → Repositories after you sign in."));
+		}
 	} finally {
 		rl.close();
 	}

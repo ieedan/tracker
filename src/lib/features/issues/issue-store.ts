@@ -56,3 +56,56 @@ export async function patchIssue(
 	issues.set(issues.get().map((issue) => (issue.id === id ? data : issue)));
 	return data;
 }
+
+/**
+ * Same as `patchIssue`, for a set of rows. Optimistic first, then one request
+ * each — sequential so a team move does not collide on the next number.
+ */
+export async function patchIssues(
+	issues: Signal<Issue[]>,
+	slug: string,
+	ids: readonly string[],
+	patch: IssuePatch | ((issue: Issue) => IssuePatch),
+	apply: (issue: Issue) => Issue,
+): Promise<Issue[]> {
+	const wanted = new Set(ids);
+	const snapshot = new Map(issues.get().map((issue) => [issue.id, issue]));
+	const targets = [...wanted]
+		.map((id) => snapshot.get(id))
+		.filter((issue): issue is Issue => issue !== undefined);
+	if (targets.length === 0) return [];
+
+	issues.set(issues.get().map((issue) => (wanted.has(issue.id) ? apply(issue) : issue)));
+
+	const succeeded: Issue[] = [];
+	const failed: string[] = [];
+
+	for (const issue of targets) {
+		const body = typeof patch === "function" ? patch(issue) : patch;
+		const { data, error } = await api.PATCH("/api/v1/workspaces/[slug]/issues/[identifier]", {
+			params: { slug, identifier: issue.identifier },
+			body,
+		});
+
+		if (error !== undefined || data === undefined) {
+			failed.push(issue.id);
+			issues.update((list) =>
+				list.map((row) => (row.id === issue.id ? (snapshot.get(issue.id) ?? row) : row)),
+			);
+			continue;
+		}
+
+		succeeded.push(data);
+		issues.update((list) => list.map((row) => (row.id === issue.id ? data : row)));
+	}
+
+	if (failed.length === targets.length) {
+		toastError("Could not update the issues");
+	} else if (failed.length > 0) {
+		toastError(
+			`Updated ${succeeded.length} issue${succeeded.length === 1 ? "" : "s"}, ${failed.length} failed`,
+		);
+	}
+
+	return succeeded;
+}

@@ -17,11 +17,25 @@ import {
 	signal,
 	type Readable,
 } from "@implementjs/core";
-import { ExternalLink, Link2Off, RefreshCw, Search } from "@implementjs/lucide";
+import {
+	ExternalLink,
+	FolderGit2,
+	Link2Off,
+	RefreshCw,
+	Search,
+	TriangleAlert,
+} from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { GithubMark } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import type { Repository } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 
@@ -178,12 +192,15 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 
 				// Not configured at all — say so rather than showing a dead button.
 				If(providerReady.bind((ready) => !ready)).Then(
-					Div(
-						{
-							class:
-								"rounded-md border border-dashed border-border p-3 text-[12px] text-muted-foreground",
-						},
-						"No git provider is configured on this server. Set the GitHub App credentials to enable this.",
+					Empty(
+						{ class: "border md:p-8" },
+						EmptyHeader(
+							EmptyMedia({ variant: "icon" }, TriangleAlert({ "aria-hidden": true })),
+							EmptyTitle("No git provider"),
+							EmptyDescription(
+								"No git provider is configured on this server. Set the GitHub App credentials to enable this.",
+							),
+						),
 					),
 				),
 
@@ -308,12 +325,15 @@ function LinkedList(
 		{ class: "flex flex-col gap-1.5" },
 		If(
 			repositories.bind((list) => list.length === 0),
-			Div(
-				{
-					class:
-						"rounded-md border border-dashed border-border p-3 text-[12px] text-muted-foreground",
-				},
-				"No repositories linked yet.",
+			Empty(
+				{ class: "border md:p-8" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, FolderGit2({ "aria-hidden": true })),
+					EmptyTitle("No repositories linked"),
+					EmptyDescription(
+						"Add a repository to scope issues, mention files, and attach pull requests.",
+					),
+				),
 			),
 		),
 		ForEach(

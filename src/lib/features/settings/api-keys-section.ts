@@ -15,10 +15,17 @@ import {
 	signal,
 	type Signal,
 } from "@implementjs/core";
-import { Copy, Plus, Trash2 } from "@implementjs/lucide";
+import { Copy, KeyRound, Plus, Trash2 } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label } from "@/lib/components/ui/label";
@@ -149,9 +156,13 @@ export function ApiKeysSection(copy: (value: string) => Promise<void>) {
 
 		If(
 			keys.bind((list) => list.length === 0),
-			P(
-				{ class: "text-[12px] text-muted-foreground" },
-				"No API keys yet. Create one to call the REST API from a script or CI.",
+			Empty(
+				{ class: "border md:p-8" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, KeyRound({ "aria-hidden": true })),
+					EmptyTitle("No API keys yet"),
+					EmptyDescription("Create one to call the REST API from a script or CI."),
+				),
 			),
 		),
 

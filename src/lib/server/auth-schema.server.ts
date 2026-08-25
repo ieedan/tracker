@@ -3,7 +3,7 @@
 // @better-auth/oauth-provider@1.7.1. Column names are the `fieldName`s
 // better-auth uses, so they stay camelCase on purpose.
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { UserType } from "@/lib/domain/agents";
+import type { HarnessKind, UserType } from "@/lib/domain/agents";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp_ms" });
 
@@ -27,6 +27,13 @@ export const user = sqliteTable("user", {
 	 * they exist so an agent's writes have an identity of their own to carry.
 	 */
 	type: text("type").$type<UserType>().notNull().default("human"),
+	/**
+	 * For an agent, which coding agent it is — `null` for a person.
+	 *
+	 * Lives here rather than on `agent_identity` (which it is 1:1 with) so every
+	 * place that already loads a user can show the right mark without a join.
+	 */
+	harness: text("harness").$type<HarnessKind>(),
 	createdAt: timestamp("createdAt").notNull(),
 	updatedAt: timestamp("updatedAt").notNull(),
 });

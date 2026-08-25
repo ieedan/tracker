@@ -32,7 +32,7 @@ export const iso = (value: Date | null): string | null =>
 	value === null ? null : value.toISOString();
 
 /** The user columns every serializer needs. `type` badges bot members. */
-export type UserFields = Pick<UserRow, "id" | "name" | "email" | "image" | "type">;
+export type UserFields = Pick<UserRow, "id" | "name" | "email" | "image" | "type" | "harness">;
 
 export function toUser(row: UserFields): UserSummary {
 	return {
@@ -41,6 +41,7 @@ export function toUser(row: UserFields): UserSummary {
 		email: row.email,
 		image: row.image ?? null,
 		type: row.type,
+		harness: row.harness ?? null,
 	};
 }
 

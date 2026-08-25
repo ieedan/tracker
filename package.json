@@ -26,7 +26,7 @@
 		"@aws-sdk/s3-request-presigner": "^3.1117.0",
 		"@better-auth/api-key": "^1.7.1",
 		"@better-auth/oauth-provider": "1.7.1",
-		"@implementjs/core": "~0.0.3",
+		"@implementjs/core": "~0.0.8",
 		"@implementjs/formish": "~0.0.3",
 		"@implementjs/lucide": "~0.0.3",
 		"@implementjs/mode-watcher": "~0.0.3",
@@ -40,9 +40,9 @@
 		"valibot": "^1.4.1"
 	},
 	"devDependencies": {
-		"@implementjs/adapter-vercel": "^0.0.11",
+		"@implementjs/adapter-vercel": "^0.0.12",
 		"@implementjs/eslint": "~0.0.1",
-		"@implementjs/kit": "~0.0.11",
+		"@implementjs/kit": "~0.0.12",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.2.0",
 		"@valibot/to-json-schema": "^1.7.1",

@@ -58,6 +58,8 @@ import { RepositoryPicker, type RepositoryRef } from "./repository-picker";
 import { MentionMenu, fileMentions } from "./file-mentions";
 
 const open = signal(false);
+/** So the issue page can yield the drop overlay while this dialog is up. */
+export { open as createIssueOpen };
 const slug = signal("");
 /** Which team the composer opens on — the one you were looking at, if any. */
 const preferredTeam = signal("");

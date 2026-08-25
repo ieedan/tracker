@@ -1,9 +1,17 @@
 import { router } from "$implement/router";
 import { Div, ForEach, H1, If, Span, signal, type Readable } from "@implementjs/core";
+import { Inbox } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import type { Notification, Workspace } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -69,12 +77,11 @@ export function InboxPage({
 			{ class: "min-h-0 flex-1 overflow-y-auto" },
 			If(
 				notifications.bind((list) => list.length === 0),
-				Div(
-					{ class: "flex flex-col items-center justify-center gap-2 py-24 text-center" },
-					Span({ class: "text-[13px] text-muted-foreground" }, "Nothing here yet."),
-					Span(
-						{ class: "text-[12px] text-muted-foreground/70" },
-						"Assignments, status changes and comments land here.",
+				Empty(
+					EmptyHeader(
+						EmptyMedia({ variant: "icon" }, Inbox({ "aria-hidden": true })),
+						EmptyTitle("Nothing here yet"),
+						EmptyDescription("Assignments, status changes and comments land here."),
 					),
 				),
 			),

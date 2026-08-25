@@ -10,8 +10,15 @@ import {
 	signal,
 	type Readable,
 } from "@implementjs/core";
-import { ArrowRight, ExternalLink, Search } from "@implementjs/lucide";
+import { ArrowRight, ExternalLink, MessageSquareQuote, Search } from "@implementjs/lucide";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import {
 	FEEDBACK_STATUSES,
 	FEEDBACK_STATUS_LABELS,
@@ -286,24 +293,45 @@ function EmptyState(
 	statusFilter: Readable<FeedbackStatus | null>,
 	data: Readable<PageData>,
 ) {
-	return Div(
-		{ class: "flex flex-col items-center justify-center gap-3 px-6 py-24 text-center" },
-		Div(
-			{ class: "text-[13px] text-muted-foreground" },
-			derived([query, statusFilter], (term, status) => {
-				if (term.trim() !== "") return `Nothing matches “${term}”.`;
-				if (status !== null)
-					return `No feedback is ${FEEDBACK_STATUS_LABELS[status].toLowerCase()}.`;
-				return "No feedback yet.";
-			}),
-		),
-		Div(
-			{ class: "max-w-md text-[12px] text-muted-foreground/80" },
-			data.bind((value) =>
-				value.workspace.feedbackIntake === "disabled"
-					? "Feedback intake is closed. Open it in Settings to start collecting."
-					: `POST to /api/v1/workspaces/${value.workspace.slug}/user-feedback to send some.`,
+	return If(
+		query.bind((term) => term.trim() !== ""),
+		Empty(
+			EmptyHeader(
+				EmptyMedia({ variant: "icon" }, Search({ "aria-hidden": true })),
+				EmptyTitle("Nothing matches"),
+				EmptyDescription(query.bind((term) => `No feedback matches “${term.trim()}”.`)),
 			),
 		),
-	);
+	)
+		.ElseIf(
+			statusFilter.bind((status) => status !== null),
+			Empty(
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, MessageSquareQuote({ "aria-hidden": true })),
+					EmptyTitle("Nothing in this status"),
+					EmptyDescription(
+						statusFilter.bind((status) =>
+							status === null
+								? ""
+								: `No feedback is ${FEEDBACK_STATUS_LABELS[status].toLowerCase()}.`,
+						),
+					),
+				),
+			),
+		)
+		.Else(
+			Empty(
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, MessageSquareQuote({ "aria-hidden": true })),
+					EmptyTitle("No feedback yet"),
+					EmptyDescription(
+						data.bind((value) =>
+							value.workspace.feedbackIntake === "disabled"
+								? "Feedback intake is closed. Open it in Settings to start collecting."
+								: `POST to /api/v1/workspaces/${value.workspace.slug}/user-feedback to send some.`,
+						),
+					),
+				),
+			),
+		);
 }

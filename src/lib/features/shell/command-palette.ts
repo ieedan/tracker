@@ -26,6 +26,7 @@ import { Dialog, DialogContent } from "@/lib/components/ui/dialog";
 import { StatusIcon } from "@/lib/components/glyphs";
 import type { Issue } from "@/lib/domain/schemas";
 import { mode } from "@/lib/mode";
+import { tryOpenBulkCommandPalette } from "@/lib/features/issues/bulk-actions";
 import { openCreateIssue } from "@/lib/features/issues/create-issue-dialog";
 
 const open = signal(false);
@@ -62,6 +63,10 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 			onKeydown: (event) => {
 				if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
 					event.preventDefault();
+					if (tryOpenBulkCommandPalette()) {
+						open.set(false);
+						return;
+					}
 					void load();
 					open.set(true);
 				}

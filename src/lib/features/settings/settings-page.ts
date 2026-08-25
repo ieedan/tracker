@@ -56,7 +56,7 @@ export function SettingsPage({
 					data.bind((value) => value.workspace),
 					params,
 				),
-				AgentsSection(params.slug),
+				AgentsSection(params.slug, copy),
 				WebhooksSection(params.slug, copy),
 				ApiKeysSection(copy),
 			),
@@ -204,7 +204,14 @@ function MembersSection(data: Readable<PageData>, params: { slug: Readable<strin
 							),
 							Div(
 								{ class: "truncate text-[12px] text-muted-foreground" },
-								member.bind((value) => value.user.email),
+								// A bot's address is a synthetic `@agents.invalid` placeholder
+								// that exists only because `user.email` is NOT NULL. Showing it
+								// is noise, and it leaks the client id.
+								member.bind((value) =>
+									value.user.type === "agent"
+										? "Authorized to act in this workspace"
+										: value.user.email,
+								),
 							),
 						),
 						Span(

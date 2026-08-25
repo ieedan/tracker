@@ -1,6 +1,6 @@
 import { redirect } from "@implementjs/kit/server";
 import { eq } from "drizzle-orm";
-import { AGENT_GRANTABLE_SCOPES } from "@/lib/domain/agents";
+import { AGENT_GRANTABLE_SCOPES, guessHarness, type HarnessKind } from "@/lib/domain/agents";
 import { getAgentClient } from "@/lib/server/agents.server";
 import { auth } from "@/lib/server/auth.server";
 import { db } from "@/lib/server/db.server";
@@ -54,6 +54,7 @@ interface AgentRequest {
 	uri: string | null;
 	trusted: boolean;
 	scopes: string[];
+	guessedHarness: HarnessKind;
 }
 
 async function describe(verification: unknown): Promise<AgentRequest | null> {
@@ -71,7 +72,13 @@ async function describe(verification: unknown): Promise<AgentRequest | null> {
 	const asked = String(record.scope ?? "").split(/\s+/);
 	const scopes = AGENT_GRANTABLE_SCOPES.filter((scope) => asked.includes(scope));
 
-	return { ...client, scopes: scopes.length > 0 ? scopes : ["issues:read"] };
+	return {
+		...client,
+		scopes: scopes.length > 0 ? scopes : ["issues:read"],
+		// Only a default for the picker. The client's own name is a claim, so
+		// the person confirms or corrects it before anything is created.
+		guessedHarness: guessHarness(client.name),
+	};
 }
 
 function firstString(record: Record<string, unknown>, keys: string[]): string | null {

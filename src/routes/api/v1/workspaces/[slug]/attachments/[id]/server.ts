@@ -64,5 +64,5 @@ export async function DELETE(event: RequestEvent): Promise<Response> {
 	return new Response(null, { status: 204 });
 }
 
-// Redirects to a credentialed URL; not part of the documented JSON surface.
+// Answers with bytes; not part of the documented JSON surface.
 export const openapi = false;

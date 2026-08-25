@@ -13,11 +13,27 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Plus, Search } from "@implementjs/lucide";
+import { LayoutList, ListFilter, Plus, Search } from "@implementjs/lucide";
 import { navigateTo } from "@implementjs/core";
 import { isTyping } from "@/lib/client/is-typing";
 import { StatusIcon } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
+import {
+	BulkActionsDialog,
+	BulkSelectionBar,
+	IssueCheckbox,
+	SelectIssuesCheckbox,
+	rowCheckboxClass,
+	type BulkView,
+} from "./bulk-actions";
 import {
 	ISSUE_STATUSES,
 	STATUS_LABELS,
@@ -42,6 +58,7 @@ interface PageData {
 	teams: Team[];
 	members: Member[];
 	labels: Label[];
+	user: { id: string };
 }
 
 export function IssueListPage({
@@ -98,9 +115,29 @@ export function IssueListPage({
 	const searchRef = signal<HTMLInputElement | null>(null);
 	const hoveredId = signal<string | null>(null);
 	const rowMenu = signal<{ id: string; field: "status" | "priority" | "assignee" } | null>(null);
+	const selected = signal<string[]>([]);
+	const bulkOpen = signal(false);
+	const bulkView = signal<BulkView>("root");
+	const anySelected = selected.bind((ids) => ids.length > 0);
+
+	const openBulk = (view: BulkView = "root") => {
+		bulkView.set(view);
+		bulkOpen.set(true);
+	};
 
 	return Div(
-		{ class: "flex min-h-0 flex-1 flex-col" },
+		{ class: "relative flex min-h-0 flex-1 flex-col" },
+
+		ImplementLifecycle({
+			onMount: () =>
+				issues.onChange((list) => {
+					const live = new Set(list.map((issue) => issue.id));
+					selected.update((ids) => {
+						const next = ids.filter((id) => live.has(id));
+						return next.length === ids.length ? ids : next;
+					});
+				}),
+		}),
 
 		// The composer lives in the shell, outside this page, so a create is
 		// announced through a module signal. It outlives the page, so the
@@ -124,7 +161,14 @@ export function IssueListPage({
 			onKeydown: (event) => {
 				if (isTyping(event.target)) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				if (bulkOpen.get()) return;
 				const key = event.key.toLowerCase();
+				if (key === "escape") {
+					if (selected.get().length === 0) return;
+					event.preventDefault();
+					selected.set([]);
+					return;
+				}
 				if (key === "c") {
 					event.preventDefault();
 					openCreateIssue(params.slug.get(), data.get().team?.key);
@@ -141,6 +185,33 @@ export function IssueListPage({
 					return;
 				}
 				const hovered = hoveredId.get();
+				if (key === "x" && hovered !== null) {
+					event.preventDefault();
+					selected.update((ids) =>
+						ids.includes(hovered) ? ids.filter((id) => id !== hovered) : [...ids, hovered],
+					);
+					return;
+				}
+				// With a selection, shortcuts apply to the set — not the hovered row.
+				if (selected.get().length > 0) {
+					if (key === "s") {
+						event.preventDefault();
+						openBulk("status");
+					} else if (key === "p") {
+						event.preventDefault();
+						openBulk("priority");
+					} else if (key === "a") {
+						event.preventDefault();
+						openBulk("assignee");
+					} else if (key === "l") {
+						event.preventDefault();
+						openBulk("labels");
+					} else if (key === "t") {
+						event.preventDefault();
+						openBulk("team");
+					}
+					return;
+				}
 				if (hovered === null) return;
 				if (key === "s") {
 					event.preventDefault();
@@ -165,19 +236,44 @@ export function IssueListPage({
 			filterContext,
 			applyFilters,
 			addFilterOpen,
+			selected,
 		),
 		FilterBar({ filters, context: filterContext, onChange: applyFilters }),
+		BulkActionsDialog({
+			open: bulkOpen,
+			view: bulkView,
+			slug: params.slug,
+			userId: data.bind((value) => value.user.id),
+			issues,
+			selected,
+			members: data.bind((value) => value.members),
+			labels: data.bind((value) => value.labels),
+			teams: data.bind((value) => value.teams),
+		}),
 
 		Div(
-			{ class: "min-h-0 flex-1 overflow-y-auto" },
+			{
+				class: ["min-h-0 flex-1 overflow-y-auto", anySelected.bind((on) => (on ? "pb-16" : ""))],
+			},
 			If(
 				visible.bind((list) => list.length === 0),
 				EmptyState(query, params, data, filters, applyFilters),
 			),
 			...ISSUE_STATUSES.map((status) =>
-				StatusGroup(status, visible, issues, data, params, hoveredId, rowMenu),
+				StatusGroup(
+					status,
+					visible,
+					issues,
+					data,
+					params,
+					hoveredId,
+					rowMenu,
+					selected,
+					anySelected,
+				),
 			),
 		),
+		BulkSelectionBar({ selected, open: bulkOpen, view: bulkView }),
 	);
 }
 
@@ -191,11 +287,17 @@ function Header(
 	filterContext: Readable<FilterContext>,
 	applyFilters: (next: Filter[]) => void,
 	addFilterOpen: ReturnType<typeof signal<boolean>>,
+	selected: ReturnType<typeof signal<string[]>>,
 ) {
 	return Div(
 		{
 			class: "flex h-12 shrink-0 items-center gap-3 border-b border-border px-4",
 		},
+		SelectIssuesCheckbox({
+			selected,
+			issues: visible,
+			label: "Select all visible issues",
+		}),
 		H1(
 			{ class: "text-[15px] font-semibold tracking-tight" },
 			data.bind((value) => value.team?.name ?? "All issues"),
@@ -251,38 +353,53 @@ function EmptyState(
 	filters: Readable<Filter[]>,
 	applyFilters: (next: Filter[]) => void,
 ) {
-	return Div(
-		{ class: "flex flex-col items-center justify-center gap-3 py-24 text-center" },
-
-		// "Nothing here" means three different things; say which one.
-		Div(
-			{ class: "text-[13px] text-muted-foreground" },
-			derived([query, filters], (term, active) => {
-				if (term.trim() !== "") return `Nothing matches \u201C${term}\u201D.`;
-				return active.length > 0 ? "No issues match these filters." : "No issues yet.";
-			}),
+	// "Nothing here" means three different things; say which one.
+	return If(
+		query.bind((term) => term.trim() !== ""),
+		Empty(
+			EmptyHeader(
+				EmptyMedia({ variant: "icon" }, Search({ "aria-hidden": true })),
+				EmptyTitle("Nothing matches"),
+				EmptyDescription(query.bind((term) => `No issues match \u201C${term.trim()}\u201D.`)),
+			),
 		),
-
-		If(
+	)
+		.ElseIf(
 			filters.bind((active) => active.length > 0),
-			Button(
-				{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
-				"Clear filters",
+			Empty(
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, ListFilter({ "aria-hidden": true })),
+					EmptyTitle("No matching issues"),
+					EmptyDescription("No issues match these filters."),
+				),
+				EmptyContent(
+					Button(
+						{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
+						"Clear filters",
+					),
+				),
 			),
-		),
-
-		If(
-			derived([query, filters], (term, active) => term.trim() === "" && active.length === 0),
-			Button(
-				{
-					size: "sm",
-					variant: "secondary",
-					onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
-				},
-				"Create the first issue",
+		)
+		.Else(
+			Empty(
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, LayoutList({ "aria-hidden": true })),
+					EmptyTitle("No issues yet"),
+					EmptyDescription("Create the first issue to start tracking work."),
+				),
+				EmptyContent(
+					Button(
+						{
+							size: "sm",
+							variant: "secondary",
+							onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
+						},
+						Plus({ class: "size-3.5" }),
+						"Create the first issue",
+					),
+				),
 			),
-		),
-	);
+		);
 }
 
 /** Linear groups the backlog by status, with a count on each band. */
@@ -294,6 +411,8 @@ function StatusGroup(
 	params: { slug: Readable<string> },
 	hoveredId: ReturnType<typeof signal<string | null>>,
 	rowMenu: Signal<{ id: string; field: "status" | "priority" | "assignee" } | null>,
+	selected: ReturnType<typeof signal<string[]>>,
+	anySelected: Readable<boolean>,
 ) {
 	const rows = derived([visible], (list) =>
 		list
@@ -315,6 +434,12 @@ function StatusGroup(
 					class:
 						"flex h-8 items-center gap-2 border-b border-border/60 bg-secondary/40 px-4 text-[12px] font-medium",
 				},
+				SelectIssuesCheckbox({
+					selected,
+					issues: rows,
+					label: `Select ${STATUS_LABELS[status]} issues`,
+					class: "size-3.5",
+				}),
 				StatusIcon(status),
 				Span({}, STATUS_LABELS[status]),
 				Span(
@@ -325,7 +450,7 @@ function StatusGroup(
 			ForEach(
 				rows,
 				(issue) => issue.id,
-				(issue) => IssueRow(issue, issues, data, params, hoveredId, rowMenu),
+				(issue) => IssueRow(issue, issues, data, params, hoveredId, rowMenu, selected, anySelected),
 			),
 		),
 	);
@@ -338,6 +463,8 @@ function IssueRow(
 	params: { slug: Readable<string> },
 	hoveredId: ReturnType<typeof signal<string | null>>,
 	rowMenu: Signal<{ id: string; field: "status" | "priority" | "assignee" } | null>,
+	selected: ReturnType<typeof signal<string[]>>,
+	anySelected: Readable<boolean>,
 ) {
 	const slug = params.slug;
 	const id = issue.get().id;
@@ -347,11 +474,23 @@ function IssueRow(
 
 	return Div(
 		{
-			class:
+			class: [
 				"row-hover group flex h-10 items-center gap-2 border-b border-border/40 px-4 text-[13px]",
+				selected.bind((ids) => (ids.includes(id) ? "bg-accent/40" : "")),
+			],
 			onMouseenter: () => hoveredId.set(id),
 			onMouseleave: () => hoveredId.set(null),
 		},
+
+		IssueCheckbox({
+			checked: selected.bind((ids) => ids.includes(id)),
+			onChange: (checked) =>
+				selected.update((ids) =>
+					checked ? (ids.includes(id) ? ids : [...ids, id]) : ids.filter((entry) => entry !== id),
+				),
+			label: `Select ${issue.get().identifier}`,
+			class: rowCheckboxClass(anySelected),
+		}),
 
 		PriorityPicker(
 			issue.bind("priority"),

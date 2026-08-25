@@ -47,6 +47,26 @@ export const auth = betterAuth({
 		minPasswordLength: 8,
 	},
 	socialProviders: githubSignIn(),
+	account: {
+		accountLinking: {
+			// Someone who signed up with a password and later clicks "Sign in with
+			// GitHub" must land in their existing account, not a second one. The
+			// default gate blocks that here forever: linking normally demands the
+			// local row already have `emailVerified`, and with no verification mail
+			// configured (see `emailAndPassword` above) no local row ever will.
+			//
+			// Turning the gate off makes GitHub's own `email_verified` claim the
+			// proof of ownership instead. The accepted risk is pre-registration: an
+			// attacker who creates a password account at your address *before* your
+			// first GitHub sign-in captures the linked account, because they still
+			// know that password. Closing that needs real email verification on
+			// sign-up — do it before this app is open to untrusted sign-ups.
+			//
+			// TODO: better-auth deprecated this flag; the gate becomes unconditional
+			// in 1.8, so email verification has to land before that upgrade.
+			requireLocalEmailVerified: false,
+		},
+	},
 	user: {
 		additionalFields: {
 			// "agent" rows are bot members created when a client is authorized into

@@ -25,10 +25,17 @@ import {
 	signal,
 	type Readable,
 } from "@implementjs/core";
-import { ChevronLeft, Mail } from "@implementjs/lucide";
+import { ChevronLeft, Mail, MessageSquareQuote, Search } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/lib/components/ui/empty";
 import {
 	FEEDBACK_STATUSES,
 	FEEDBACK_STATUS_LABELS,
@@ -97,30 +104,61 @@ export function PublicBoardPage({ data }: { data: Readable<BoardData> }) {
 				}),
 			),
 
-			If(
-				visible.bind((list) => list.length === 0),
-				Div(
-					{ class: "py-16 text-center text-[13px] text-muted-foreground" },
-					derived([query, statusFilter], (term, status) => {
-						if (term.trim() !== "") return `Nothing matches “${term}”.`;
-						if (status !== null) {
-							return `Nothing is ${FEEDBACK_STATUS_LABELS[status].toLowerCase()} right now.`;
-						}
-						return "No public feedback yet.";
-					}),
+			If(visible.bind((list) => list.length === 0))
+				.Then(BoardEmpty(query, statusFilter))
+				.Else(
+					Div(
+						{ class: "flex flex-col divide-y divide-border rounded-md border border-border" },
+						ForEach(
+							visible,
+							(entry) => entry.id,
+							(entry) => BoardRow(entry, data),
+						),
+					),
 				),
-			),
-
-			Div(
-				{ class: "flex flex-col divide-y divide-border rounded-md border border-border" },
-				ForEach(
-					visible,
-					(entry) => entry.id,
-					(entry) => BoardRow(entry, data),
-				),
-			),
 		),
 	);
+}
+
+function BoardEmpty(query: Readable<string>, statusFilter: Readable<FeedbackStatus | null>) {
+	return If(
+		query.bind((term) => term.trim() !== ""),
+		Empty(
+			{ class: "border" },
+			EmptyHeader(
+				EmptyMedia({ variant: "icon" }, Search({ "aria-hidden": true })),
+				EmptyTitle("Nothing matches"),
+				EmptyDescription(query.bind((term) => `Nothing matches “${term.trim()}”.`)),
+			),
+		),
+	)
+		.ElseIf(
+			statusFilter.bind((status) => status !== null),
+			Empty(
+				{ class: "border" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, MessageSquareQuote({ "aria-hidden": true })),
+					EmptyTitle("Nothing in this status"),
+					EmptyDescription(
+						statusFilter.bind((status) =>
+							status === null
+								? ""
+								: `Nothing is ${FEEDBACK_STATUS_LABELS[status].toLowerCase()} right now.`,
+						),
+					),
+				),
+			),
+		)
+		.Else(
+			Empty(
+				{ class: "border" },
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, MessageSquareQuote({ "aria-hidden": true })),
+					EmptyTitle("No public feedback yet"),
+					EmptyDescription("What people ask for will show up here."),
+				),
+			),
+		);
 }
 
 function StatusFilter(
