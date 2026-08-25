@@ -23,6 +23,7 @@ import {
 	LogOut,
 	Plus,
 	Settings as SettingsIcon,
+	UserCog,
 	SunMoon,
 } from "@implementjs/lucide";
 import { preloadRoute } from "@implementjs/kit/runtime";
@@ -302,6 +303,13 @@ function UserMenu(data: Readable<ShellData>) {
 			{ class: "w-56", align: "start", side: "top" },
 			DropdownMenuGroup(
 				DropdownMenuGroupHeading(data.bind((shell) => shell.user.email)),
+				DropdownMenuItem(
+					{
+						onSelect: () => window.location.assign(`/app/${data.get().workspace.slug}/account`),
+					},
+					UserCog({ class: "size-3.5" }),
+					"Account settings",
+				),
 				DropdownMenuItem(
 					{ onSelect: () => mode.toggleMode() },
 					SunMoon({ class: "size-3.5" }),

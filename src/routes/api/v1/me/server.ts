@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { UserSummary } from "@/lib/domain/schemas";
+import { workspacesFor } from "@/lib/server/agents.server";
 import { requireUser } from "@/lib/server/guards.server";
 import { handler } from "./$types";
 
@@ -8,8 +9,8 @@ import { handler } from "./$types";
  * an agent token.
  *
  * For an agent this reports the *bot*, which is the whole point: it is the
- * identity its writes will carry. `agent.installedBy` names the human whose
- * access it borrows.
+ * identity its writes will carry — along with every workspace it can reach,
+ * which is whatever the person named by `installedBy` belongs to.
  */
 export const GET = handler({
 	response: v.object({
@@ -22,23 +23,25 @@ export const GET = handler({
 		agent: v.nullable(
 			v.object({
 				clientId: v.string(),
-				workspaceId: v.string(),
 				installedBy: v.string(),
+				/** Every workspace this agent can act in. */
+				workspaces: v.array(v.object({ slug: v.string(), name: v.string() })),
 			}),
 		),
 	}),
-	handle({ locals }) {
+	async handle({ locals }) {
 		const user = requireUser(locals);
+		const agent = locals.agent;
 		return {
 			user,
 			authVia: locals.authVia ?? "session",
 			agent:
-				locals.agent === null
+				agent === null
 					? null
 					: {
-							clientId: locals.agent.clientId,
-							workspaceId: locals.agent.workspaceId,
-							installedBy: locals.agent.installedByUserId,
+							clientId: agent.clientId,
+							installedBy: agent.installedByUserId,
+							workspaces: await workspacesFor(agent.installedByUserId),
 						},
 		};
 	},

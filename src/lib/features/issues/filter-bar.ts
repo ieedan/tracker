@@ -29,7 +29,7 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Check, ListFilter, X } from "@implementjs/lucide";
+import { Check, CircleUser, ListFilter, Tag, User, Users, X } from "@implementjs/lucide";
 import {
 	Command,
 	CommandEmpty,
@@ -176,6 +176,24 @@ function iconsFor(filter: Filter, context: FilterContext): Child[] {
 
 const availableFields = (context: FilterContext): FilterField[] =>
 	FILTER_FIELDS.filter((field) => !(field === "team" && context.hideTeam));
+
+/** The glyph for a filter *type* — not a value — so the add menu is scannable. */
+function iconForField(field: FilterField): Child {
+	switch (field) {
+		case "status":
+			return StatusIcon("todo", CHIP_GLYPH.status);
+		case "priority":
+			return PriorityIcon("none", CHIP_GLYPH.priority);
+		case "assignee":
+			return User({ class: CHIP_GLYPH.icon, "aria-hidden": true });
+		case "creator":
+			return CircleUser({ class: CHIP_GLYPH.icon, "aria-hidden": true });
+		case "label":
+			return Tag({ class: CHIP_GLYPH.icon, "aria-hidden": true });
+		case "team":
+			return Users({ class: CHIP_GLYPH.icon, "aria-hidden": true });
+	}
+}
 
 function valuesOf(list: Filter[], field: FilterField): string[] {
 	return list.find((filter) => filter.field === field)?.values ?? [];
@@ -404,7 +422,7 @@ function FieldSubmenu(
 	const { selected, sync } = bindFilterValues(filters, field, onChange);
 
 	return DropdownMenuSub(
-		DropdownMenuSubTrigger(FILTER_FIELD_LABELS[field]),
+		DropdownMenuSubTrigger(iconForField(field), FILTER_FIELD_LABELS[field]),
 		DropdownMenuSubContent(
 			{ class: "max-h-72 w-56 overflow-y-auto", align: "start" },
 			...sync,

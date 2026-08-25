@@ -1,12 +1,14 @@
 // In-progress composer state, kept in localStorage so a refresh does not lose
 // the issue they were writing. Keyed by workspace slug; the dialog restores
 // and auto-saves. SSR has no storage, so every helper no-ops there.
+import * as v from "valibot";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
 	type IssuePriority,
 	type IssueStatus,
 } from "@/lib/domain/issues";
+import { AttachmentSchema, type Attachment } from "@/lib/domain/schemas";
 
 export type IssueDraft = {
 	title: string;
@@ -18,6 +20,8 @@ export type IssueDraft = {
 	teamKey: string | null;
 	/** The repository the issue was scoped to, if any. */
 	repositoryId: string | null;
+	/** Ready uploads; ids are adopted when the issue is created. */
+	attachments: Attachment[];
 };
 
 export function issueDraftKey(slug: string): string {
@@ -58,11 +62,28 @@ function parseDraft(raw: string): IssueDraft | null {
 		const labelIds = Array.isArray(record.labelIds)
 			? record.labelIds.filter((id): id is string => typeof id === "string")
 			: [];
+		// Drafts written before attachments were persisted simply have none.
+		const attachments = parseAttachments(record.attachments);
 
-		return { title, description, status, priority, assigneeId, labelIds, teamKey, repositoryId };
+		return {
+			title,
+			description,
+			status,
+			priority,
+			assigneeId,
+			labelIds,
+			teamKey,
+			repositoryId,
+			attachments,
+		};
 	} catch {
 		return null;
 	}
+}
+
+function parseAttachments(value: unknown): Attachment[] {
+	const parsed = v.safeParse(v.array(AttachmentSchema), value);
+	return parsed.success ? parsed.output : [];
 }
 
 /** True when the form is still at defaults — nothing worth keeping. */
@@ -76,7 +97,8 @@ export function isBlankIssueDraft(draft: IssueDraft): boolean {
 		draft.labelIds.length === 0 &&
 		// Unlike the team, which is chosen for you, a repository scope is only
 		// ever there because somebody picked it.
-		draft.repositoryId === null
+		draft.repositoryId === null &&
+		draft.attachments.length === 0
 	);
 }
 

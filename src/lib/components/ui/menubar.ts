@@ -1,5 +1,5 @@
 import { Span, type Child, type ComponentProps } from "@implementjs/core";
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "@implementjs/lucide";
+import { CheckIcon, ChevronRightIcon } from "@implementjs/lucide";
 import {
 	Menubar as MenubarPrimitive,
 	MenubarCheckboxGroup as MenubarCheckboxGroupPrimitive,
@@ -184,9 +184,9 @@ export const MenubarRadioItem = createComponent(function MenubarRadioItem(
 				"data-slot": "menu-item-indicator",
 				class: "pointer-events-none absolute left-2 flex size-3.5 items-center justify-center",
 			},
-			CircleIcon({
+			CheckIcon({
 				"aria-hidden": true,
-				class: "size-2 hidden fill-current group-data-[state=checked]/menu-item:block",
+				class: "size-4 hidden group-data-[state=checked]/menu-item:block",
 			}),
 		),
 		...children,

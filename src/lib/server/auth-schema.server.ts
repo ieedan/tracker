@@ -269,26 +269,3 @@ export const oauthClientAssertion = sqliteTable("oauthClientAssertion", {
 	id: text("id").primaryKey(),
 	expiresAt: timestamp("expiresAt").notNull(),
 });
-
-/** RFC 8628 device + user codes, in the OAuth-aware build of the plugin. */
-export const deviceCode = sqliteTable(
-	"deviceCode",
-	{
-		id: text("id").primaryKey(),
-		deviceCode: text("deviceCode").notNull(),
-		userCode: text("userCode").notNull(),
-		userId: text("userId"),
-		status: text("status").notNull(),
-		clientId: text("clientId"),
-		oauthClientId: text("oauthClientId"),
-		scope: text("scope"),
-		resources: jsonList("resources"),
-		pollingInterval: integer("pollingInterval"),
-		lastPolledAt: timestamp("lastPolledAt"),
-		expiresAt: timestamp("expiresAt").notNull(),
-	},
-	(table) => [
-		uniqueIndex("deviceCode_deviceCode_unique").on(table.deviceCode),
-		uniqueIndex("deviceCode_userCode_unique").on(table.userCode),
-	],
-);

@@ -1,18 +1,30 @@
 /**
- * Provisioning for agent identities.
+ * Provisioning for agents.
  *
  * A bot is an identity, not a credential: it has a `user` row so its writes
- * have a name of their own, a `workspace_member` row so every existing
- * membership check works on it unchanged, and no `account` row, so it can never
- * sign in. What authenticates is the OAuth token a human was issued, and the
+ * have a name of their own, and no `account` row, so it can never sign in.
+ * What authenticates is the OAuth token a person was issued, and the
  * `agent_grant` behind it is what says how far that token reaches.
+ *
+ * There is exactly one bot per harness, app-wide — "Claude Code" is the same
+ * account in every workspace. It joins a workspace the first time it acts
+ * there, on behalf of someone who is already a member, which is what lets one
+ * authorization cover every workspace that person can reach.
  */
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { nanoid } from "nanoid";
-import { agentDisplayName, type HarnessKind } from "@/lib/domain/agents";
+import { harnessLabel, type HarnessKind } from "@/lib/domain/agents";
 import { db } from "./db.server";
-import { agentGrant, agentIdentity, oauthClient, user, workspaceMember } from "./schema.server";
+import {
+	agentGrant,
+	oauthAccessToken,
+	oauthClient,
+	oauthRefreshToken,
+	user,
+	workspace,
+	workspaceMember,
+} from "./schema.server";
 
 const installerUser = alias(user, "installer_user");
 
@@ -25,7 +37,7 @@ export interface AgentClient {
 	trusted: boolean;
 }
 
-/** The registered client behind a device code, for the consent screen. */
+/** The registered client behind an authorization request, for the consent screen. */
 export async function getAgentClient(clientId: string): Promise<AgentClient | null> {
 	const rows = await db
 		.select()
@@ -54,64 +66,57 @@ export async function getAgentClient(clientId: string): Promise<AgentClient | nu
  * reserved by RFC 2606 and guaranteed never to resolve, so this address cannot
  * receive mail or collide with a real person's.
  */
-function botEmail(clientId: string, workspaceId: string): string {
-	return `${clientId}.${workspaceId}@agents.invalid`;
+function botEmail(harness: HarnessKind): string {
+	return `${harness}@agents.invalid`;
 }
 
 /**
- * Records that `installerUserId` authorized `client` to act in `workspaceId`,
- * creating the bot member the first time anyone does.
+ * The bot for a harness, created the first time anyone connects it.
  *
- * Idempotent: authorizing again re-uses the same bot and updates the scopes on
- * that person's grant, which is also how a previously revoked grant comes back.
- *
- * `name` and `harness` are what the person chose on the consent screen, and
- * they apply only when the bot is *created*. A second person authorizing the
- * same agent joins the existing one rather than renaming it out from under the
- * workspace — correcting a name is `renameAgent`, from Settings.
+ * One row app-wide. Two people connecting Claude Code, on four machines, across
+ * six workspaces all resolve here — which is the whole reason the members list
+ * shows one "Claude Code" rather than one per install.
  */
-export async function grantAgentAccess(input: {
-	client: AgentClient;
-	workspaceId: string;
-	installerUserId: string;
-	scopes: string[];
-	name: string;
-	harness: HarnessKind;
-}): Promise<{ agentIdentityId: string; botUserId: string }> {
-	const { client, workspaceId, installerUserId, scopes, name, harness } = input;
-
+export async function ensureAgentUser(harness: HarnessKind): Promise<string> {
 	const existing = await db
-		.select()
-		.from(agentIdentity)
-		.where(
-			and(eq(agentIdentity.clientId, client.clientId), eq(agentIdentity.workspaceId, workspaceId)),
-		)
+		.select({ id: user.id })
+		.from(user)
+		.where(and(eq(user.type, "agent"), eq(user.harness, harness)))
 		.limit(1);
 
-	let identity = existing[0];
+	const found = existing[0];
+	if (found !== undefined) return found.id;
 
-	if (identity === undefined) {
-		const botUserId = nanoid();
-		const now = new Date();
+	const id = nanoid();
+	const now = new Date();
+	await db.insert(user).values({
+		id,
+		name: harnessLabel(harness),
+		harness,
+		email: botEmail(harness),
+		emailVerified: false,
+		// Deliberately not the client's `logo_uri`: that is a URL the client
+		// chose, and this app never renders one. The mark comes from `harness`.
+		image: null,
+		type: "agent",
+		createdAt: now,
+		updatedAt: now,
+	});
+	return id;
+}
 
-		await db.insert(user).values({
-			id: botUserId,
-			name: agentDisplayName(harness, name),
-			harness,
-			email: botEmail(client.clientId, workspaceId),
-			emailVerified: false,
-			// Deliberately not `client.icon`: a registered `logo_uri` is a URL the
-			// client chose, and this app never renders one. The mark comes from
-			// `harness` instead, which a person picked.
-			image: null,
-			type: "agent",
-			createdAt: now,
-			updatedAt: now,
-		});
-
-		// A plain member row. Agents are capped below admin in guards.server.ts,
-		// so the role here is the floor rather than the ceiling.
-		await db.insert(workspaceMember).values({
+/**
+ * Makes sure the bot is a member of a workspace it is about to act in.
+ *
+ * Called from `requireMembership` once the grant behind the request has been
+ * checked, so by that point someone with a live grant is already a member here.
+ * Idempotent, and a plain `member` row — agents are capped below admin in
+ * guards.server.ts, so the role is the floor rather than the ceiling.
+ */
+export async function ensureAgentMembership(workspaceId: string, botUserId: string): Promise<void> {
+	await db
+		.insert(workspaceMember)
+		.values({
 			id: nanoid(),
 			workspaceId,
 			userId: botUserId,
@@ -120,122 +125,158 @@ export async function grantAgentAccess(input: {
 			// file that renders nothing.
 			// oxlint-disable-next-line implementjs/valid-role
 			role: "member",
-		});
+		})
+		.onConflictDoNothing();
+}
 
-		const inserted = await db
-			.insert(agentIdentity)
-			.values({ id: nanoid(), userId: botUserId, clientId: client.clientId, workspaceId })
-			.returning();
+/**
+ * Records that someone authorized an agent install.
+ *
+ * Idempotent: authorizing again updates the scopes and harness on that person's
+ * grant, which is also how a previously revoked grant comes back.
+ */
+export async function grantAgentAccess(input: {
+	clientId: string;
+	installerUserId: string;
+	scopes: string[];
+	harness: HarnessKind;
+}): Promise<void> {
+	const { clientId, installerUserId, scopes, harness } = input;
 
-		identity = inserted[0];
-		if (identity === undefined) throw new Error("could not create the agent identity");
-	}
+	// Created eagerly so the bot exists — and shows up in settings — before it
+	// has done anything, rather than appearing out of nowhere on first use.
+	await ensureAgentUser(harness);
 
 	await db
 		.insert(agentGrant)
-		.values({
-			id: nanoid(),
-			agentIdentityId: identity.id,
-			installedByUserId: installerUserId,
-			scopes,
-		})
+		.values({ id: nanoid(), installedByUserId: installerUserId, clientId, harness, scopes })
 		.onConflictDoUpdate({
-			target: [agentGrant.agentIdentityId, agentGrant.installedByUserId],
-			set: { scopes, revokedAt: null },
+			target: [agentGrant.clientId, agentGrant.installedByUserId],
+			set: { harness, scopes, revokedAt: null },
 		});
-
-	return { agentIdentityId: identity.id, botUserId: identity.userId };
 }
 
-export interface InstalledAgent {
+export interface ConnectedAgent {
 	grantId: string;
-	agentId: string;
 	clientId: string;
 	name: string;
 	harness: HarnessKind;
 	scopes: string[];
-	installedBy: { id: string; name: string };
 	lastUsedAt: Date | null;
 	createdAt: Date;
 }
 
-/** Every live grant in a workspace, for the Settings list. */
-export async function listInstalledAgents(workspaceId: string): Promise<InstalledAgent[]> {
+/** The agents one person has connected, for their account settings. */
+export async function listConnectedAgents(userId: string): Promise<ConnectedAgent[]> {
 	const rows = await db
-		.select({ grant: agentGrant, identity: agentIdentity, bot: user, installer: installerUser })
+		.select({ grant: agentGrant })
 		.from(agentGrant)
-		.innerJoin(agentIdentity, eq(agentIdentity.id, agentGrant.agentIdentityId))
-		.innerJoin(user, eq(user.id, agentIdentity.userId))
-		.innerJoin(installerUser, eq(installerUser.id, agentGrant.installedByUserId))
-		.where(and(eq(agentIdentity.workspaceId, workspaceId), isNull(agentGrant.revokedAt)));
+		.where(and(eq(agentGrant.installedByUserId, userId), isNull(agentGrant.revokedAt)))
+		.orderBy(desc(agentGrant.createdAt));
 
 	return rows.map((row) => ({
 		grantId: row.grant.id,
-		agentId: row.identity.id,
-		clientId: row.identity.clientId,
-		name: row.bot.name,
-		harness: row.bot.harness ?? "other",
+		clientId: row.grant.clientId,
+		name: harnessLabel(row.grant.harness),
+		harness: row.grant.harness,
 		scopes: row.grant.scopes,
-		installedBy: { id: row.installer.id, name: row.installer.name },
 		lastUsedAt: row.grant.lastUsedAt,
 		createdAt: row.grant.createdAt,
 	}));
 }
 
+export interface WorkspaceAgent {
+	harness: HarnessKind;
+	name: string;
+	/** The people whose grants let this agent act here. */
+	connectedBy: { id: string; name: string }[];
+}
+
 /**
- * Renames an agent and re-badges which harness it is.
+ * The agents that can act in one workspace, derived rather than stored.
  *
- * Scoped to the workspace, and keyed by a grant so it works straight off a row
- * in Settings. The change lands on the shared bot, so everyone sees it: a bot
- * is one identity per workspace, and its name is workspace-wide by design.
+ * An agent reaches a workspace through a member's grant, so this is "which
+ * harnesses have this workspace's members connected" — the honest answer to
+ * "who can act here", and it changes the moment someone revokes or leaves.
  */
-export async function renameAgent(
-	workspaceId: string,
-	grantId: string,
-	changes: { name?: string; harness?: HarnessKind },
-): Promise<boolean> {
+export async function listWorkspaceAgents(workspaceId: string): Promise<WorkspaceAgent[]> {
 	const rows = await db
-		.select({ identity: agentIdentity, bot: user })
+		.select({ harness: agentGrant.harness, installer: installerUser })
 		.from(agentGrant)
-		.innerJoin(agentIdentity, eq(agentIdentity.id, agentGrant.agentIdentityId))
-		.innerJoin(user, eq(user.id, agentIdentity.userId))
-		.where(and(eq(agentGrant.id, grantId), eq(agentIdentity.workspaceId, workspaceId)))
+		.innerJoin(installerUser, eq(installerUser.id, agentGrant.installedByUserId))
+		.innerJoin(
+			workspaceMember,
+			and(
+				eq(workspaceMember.userId, agentGrant.installedByUserId),
+				eq(workspaceMember.workspaceId, workspaceId),
+			),
+		)
+		.where(isNull(agentGrant.revokedAt));
+
+	const byHarness = new Map<HarnessKind, WorkspaceAgent>();
+	for (const row of rows) {
+		const entry = byHarness.get(row.harness) ?? {
+			harness: row.harness,
+			name: harnessLabel(row.harness),
+			connectedBy: [],
+		};
+		// One person can have several installs of one harness; they are one line
+		// here, because the question is who it acts for, not on which machine.
+		if (!entry.connectedBy.some((person) => person.id === row.installer.id)) {
+			entry.connectedBy.push({ id: row.installer.id, name: row.installer.name });
+		}
+		byHarness.set(row.harness, entry);
+	}
+	return [...byHarness.values()];
+}
+
+/**
+ * Revokes one grant, cutting that install off everywhere it reached.
+ *
+ * Marking `revokedAt` alone already blocks every API call, because
+ * `resolveAgentToken` checks it — but the agent holds an `offline_access`
+ * refresh token, and better-auth's token endpoint knows nothing about
+ * `agent_grant`, so it would keep minting access tokens that then fail.
+ * Revoking at the source is what makes "revoke" mean the credential is dead
+ * rather than merely useless.
+ *
+ * The bot `user` stays: its name is on comments and issues that must keep
+ * rendering, and other people's grants of the same harness are untouched.
+ */
+export async function revokeAgentGrant(userId: string, grantId: string): Promise<boolean> {
+	const rows = await db
+		.select({ grant: agentGrant })
+		.from(agentGrant)
+		.where(and(eq(agentGrant.id, grantId), eq(agentGrant.installedByUserId, userId)))
 		.limit(1);
 
 	const row = rows[0];
 	if (row === undefined) return false;
 
-	const harness = changes.harness ?? row.bot.harness ?? "other";
-	// An empty name falls back to the harness label rather than leaving a bot
-	// with a blank byline on every comment it has written.
-	const name = agentDisplayName(harness, changes.name);
+	const revokedAt = new Date();
+	await db.update(agentGrant).set({ revokedAt }).where(eq(agentGrant.id, grantId));
 
-	await db
-		.update(user)
-		.set({ name, harness, updatedAt: new Date() })
-		.where(eq(user.id, row.identity.userId));
+	// Scoped to this client *and* this person: another person's grant of the
+	// same agent is untouched.
+	const owned = (table: typeof oauthAccessToken | typeof oauthRefreshToken) =>
+		and(
+			eq(table.clientId, row.grant.clientId),
+			eq(table.userId, row.grant.installedByUserId),
+			isNull(table.revoked),
+		);
+
+	await db.update(oauthRefreshToken).set({ revoked: revokedAt }).where(owned(oauthRefreshToken));
+	await db.update(oauthAccessToken).set({ revoked: revokedAt }).where(owned(oauthAccessToken));
 
 	return true;
 }
 
-/**
- * Revokes one grant, scoped to the workspace so a caller cannot reach into
- * another one by guessing an id.
- *
- * The bot member stays put: its name is on comments and issues that should keep
- * rendering, and removing it would orphan them. It simply has no live grant, so
- * nothing can act as it until someone authorizes the client again.
- */
-export async function revokeAgentGrant(workspaceId: string, grantId: string): Promise<boolean> {
-	const rows = await db
-		.select({ id: agentGrant.id })
-		.from(agentGrant)
-		.innerJoin(agentIdentity, eq(agentIdentity.id, agentGrant.agentIdentityId))
-		.where(and(eq(agentGrant.id, grantId), eq(agentIdentity.workspaceId, workspaceId)))
-		.limit(1);
-
-	if (rows[0] === undefined) return false;
-
-	await db.update(agentGrant).set({ revokedAt: new Date() }).where(eq(agentGrant.id, grantId));
-	return true;
+/** Every workspace a person belongs to, for the consent screen's summary. */
+export async function workspacesFor(userId: string): Promise<{ slug: string; name: string }[]> {
+	return await db
+		.select({ slug: workspace.slug, name: workspace.name })
+		.from(workspaceMember)
+		.innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
+		.where(eq(workspaceMember.userId, userId))
+		.orderBy(workspace.name);
 }

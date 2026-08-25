@@ -507,30 +507,39 @@ export const MarkNotificationsBody = v.object({
 	ids: v.optional(v.array(v.string())),
 });
 
-export const InstalledAgentSchema = v.object({
+/** One agent install you have connected. */
+export const ConnectedAgentSchema = v.object({
 	grantId: v.string(),
-	agentId: v.string(),
 	clientId: v.string(),
 	name: v.string(),
 	harness: v.picklist(AGENT_HARNESSES),
 	scopes: v.array(v.string()),
-	installedBy: v.object({ id: v.string(), name: v.string() }),
 	lastUsedAt: v.nullable(v.string()),
 	createdAt: v.string(),
 });
-export type InstalledAgent = v.InferOutput<typeof InstalledAgentSchema>;
+export type ConnectedAgent = v.InferOutput<typeof ConnectedAgentSchema>;
 
-/** What the `/device` consent screen posts once someone approves. */
-export const ApproveDeviceBody = v.object({
-	userCode: v.pipe(v.string(), v.trim(), v.minLength(1)),
-	/** Which workspace the agent is being let into. */
-	slug: v.pipe(v.string(), v.trim(), v.minLength(1)),
-	scopes: v.pipe(v.array(v.string()), v.minLength(1, "choose at least one permission")),
+/** An agent that can act in a workspace, and the members it acts for. */
+export const WorkspaceAgentSchema = v.object({
+	harness: v.picklist(AGENT_HARNESSES),
+	name: v.string(),
+	connectedBy: v.array(v.object({ id: v.string(), name: v.string() })),
+});
+export type WorkspaceAgent = v.InferOutput<typeof WorkspaceAgentSchema>;
+
+/** What the consent screen posts once someone answers an authorization request. */
+export const OAuthConsentBody = v.object({
+	/** The provider's signed authorization query, handed back verbatim. */
+	oauthQuery: v.pipe(v.string(), v.minLength(1)),
+	accept: v.boolean(),
+	/** Which workspace the agent is being let into. Ignored when denying. */
+	slug: v.optional(v.pipe(v.string(), v.trim()), ""),
+	scopes: v.optional(v.array(v.string()), []),
 	/**
 	 * What this agent is, as the person authorizing it says — never read off
 	 * the client's own registration, which anyone can write.
 	 */
-	harness: v.picklist(AGENT_HARNESSES),
+	harness: v.optional(v.picklist(AGENT_HARNESSES), "other"),
 	/** Overrides the harness's catalog name. Blank means "use the catalog name". */
 	name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 });
@@ -541,7 +550,3 @@ export const UpdateAgentBody = v.partial(
 		harness: v.picklist(AGENT_HARNESSES),
 	}),
 );
-
-export const DenyDeviceBody = v.object({
-	userCode: v.pipe(v.string(), v.trim(), v.minLength(1)),
-});

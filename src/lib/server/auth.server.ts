@@ -1,9 +1,14 @@
 import { apiKey } from "@better-auth/api-key";
-import { oauthDeviceAuthorization, oauthProvider } from "@better-auth/oauth-provider";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { jwt } from "better-auth/plugins";
-import { AGENT_GRANTABLE_SCOPES, AGENT_SCOPES, OPENID_SCOPES } from "@/lib/domain/agents";
+import {
+	AGENT_GRANTABLE_SCOPES,
+	AGENT_REGISTRABLE_SCOPES,
+	AGENT_SCOPES,
+	OPENID_SCOPES,
+} from "@/lib/domain/agents";
 import { env } from "@/lib/env.server";
 import { API_KEY_PREFIX } from "./api-key.server";
 import { db } from "./db.server";
@@ -32,6 +37,24 @@ function githubSignIn() {
 /** Whether the "Sign in with GitHub" button has anything behind it. */
 export const githubSignInConfigured = (): boolean =>
 	env.GITHUB_CLIENT_ID !== "" && env.GITHUB_CLIENT_SECRET !== "";
+
+/**
+ * The canonical URI of the MCP server, as RFC 8707 defines it.
+ *
+ * MCP clients MUST send this as the `resource` parameter on both the
+ * authorization and token requests, and the provider rejects a `resource` it
+ * does not know with `invalid_target` — so the endpoint has to be registered
+ * here, and this string has to match what `/.well-known/oauth-protected-resource`
+ * advertises exactly. No trailing slash, per the spec's canonical form.
+ */
+export const MCP_RESOURCE = `${env.BETTER_AUTH_URL.replace(/\/$/, "")}/api/mcp`;
+
+/**
+ * The `iss` on every token this app issues, and what a verifier must be told to
+ * expect. Leaving it out makes verification fail as a flat "invalid access
+ * token", which looks like a bad token rather than a missing option.
+ */
+export const OAUTH_ISSUER = `${env.BETTER_AUTH_URL.replace(/\/$/, "")}/api/auth`;
 
 export const auth = betterAuth({
 	appName: "tracker",
@@ -92,20 +115,48 @@ export const auth = betterAuth({
 			// Open registration (RFC 7591) is what MCP and CLI clients expect. It
 			// is safe only because consent is never skipped: nothing here marks a
 			// registered client trusted, so every grant passes a human first.
+			//
+			// Those clients omit `application_type` and send a custom-scheme
+			// redirect (Cursor: `cursor://anysphere.cursor-mcp/oauth/callback`).
+			// Stock @better-auth/oauth-provider defaults them to "web" and rejects
+			// the URI; we patch it so DCR is native and schemes with a host pass.
 			allowDynamicClientRegistration: true,
 			allowUnauthenticatedClientRegistration: true,
-			clientRegistrationDefaultScopes: ["issues:read"],
+			// A client that asks for nothing in particular gets the whole non-admin
+			// set, because the tools are not independently useful: creating an
+			// issue needs a team key, and finding one needs `workspace:read`. The
+			// human still sees exactly what is being granted on the consent screen,
+			// and admin scopes are excluded here regardless.
+			clientRegistrationDefaultScopes: AGENT_GRANTABLE_SCOPES,
 			// Admin-only scopes are withheld at registration. Agents are capped
 			// below admin in guards.server.ts regardless — this just turns a
 			// certain 403 into a clear error at the point of registration.
-			clientRegistrationAllowedScopes: AGENT_GRANTABLE_SCOPES,
-		}),
-		// The OAuth-aware build of better-auth's `deviceAuthorization` plugin: it
-		// registers the same /device/* endpoints but redeems a device code for an
-		// OAuth access token rather than a first-party session, so an agent never
-		// holds a browser session. Use it *instead of* `deviceAuthorization`.
-		oauthDeviceAuthorization({
-			verificationUri: "/device",
+			clientRegistrationAllowedScopes: AGENT_REGISTRABLE_SCOPES,
+			// Registering the MCP endpoint binds its tokens to it as an audience,
+			// which is what lets the server reject a token minted for anything else.
+			resources: [
+				{
+					identifier: MCP_RESOURCE,
+					allowedScopes: AGENT_REGISTRABLE_SCOPES,
+				},
+			],
+			// An MCP client registers with plain RFC 7591 metadata and has no way to
+			// ask to be linked to our resource, but the provider rejects a `resource`
+			// its client is not linked to. Linking every registration to the MCP
+			// endpoint is what makes an out-of-the-box client work at all.
+			clientRegistrationDefaultResources: [MCP_RESOURCE],
+			clientRegistrationAllowedResources: [MCP_RESOURCE],
+			/**
+			 * A year, against a 30-day default.
+			 *
+			 * Refresh tokens rotate on every use and each rotation starts the clock
+			 * again, so an agent that runs even occasionally never has to be
+			 * authorized twice — this window only governs how long an *idle* one
+			 * stays valid. Thirty days is short enough that a paused project means
+			 * setting every agent up again; a year matches the promise that a grant
+			 * lasts until someone revokes it in Settings.
+			 */
+			refreshTokenExpiresIn: 365 * 24 * 60 * 60,
 		}),
 	],
 });

@@ -26,10 +26,11 @@ declare global {
 		 * everything about the grant behind it that the guards need.
 		 */
 		interface AgentContext {
-			agentIdentityId: string;
-			/** The single workspace this token may act in. */
-			workspaceId: string;
-			/** The human who authorized it, and whose access caps the agent's. */
+			grantId: string;
+			/**
+			 * The person who authorized it. Their memberships are the agent's
+			 * reach, and their role in each is its ceiling.
+			 */
 			installedByUserId: string;
 			clientId: string;
 		}

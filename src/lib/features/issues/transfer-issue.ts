@@ -284,7 +284,7 @@ export function TransferIssueDialog({
 								chosenTeam.set({ id: picked.id, name: picked.name, key: picked.key });
 							}
 						},
-						{ showLabel: true, class: "h-9 border border-border" },
+						{ showLabel: true, select: true },
 					),
 				),
 			),

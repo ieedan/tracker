@@ -3,7 +3,19 @@ import { kit } from "@implementjs/kit";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
+/**
+ * Vite 7 only reflects `http(s)://localhost` (and loopback) on CORS. Cursor's
+ * MCP client is Chromium and sends `Origin: vscode-file://vscode-app`, so the
+ * preflight gets no `Access-Control-Allow-Origin` and fails as `net::ERR_FAILED`
+ * — which is why the server showed as connected with zero tools and no login.
+ * Reflecting any origin is safe here: `/api/mcp` still rejects foreign http(s)
+ * Origins, and this only applies to the dev / preview server.
+ */
+const mcpClientCors = { origin: true as const };
+
 export default defineConfig({
+	server: { cors: mcpClientCors },
+	preview: { cors: mcpClientCors },
 	plugins: [
 		tailwindcss(),
 		kit({

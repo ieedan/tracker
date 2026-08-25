@@ -7,7 +7,9 @@ import {
 	IssueSchema,
 	IssueStatusSchema,
 } from "@/lib/domain/schemas";
+import { adoptDraftAttachments } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
+import { emitIssueEvent } from "@/lib/server/events.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import {
 	assertMember,
@@ -17,7 +19,6 @@ import {
 	setIssueLabels,
 	validLabelIds,
 } from "@/lib/server/issues.server";
-import { emitIssueEvent } from "@/lib/server/events.server";
 import { requireRepository } from "@/lib/server/repositories.server";
 import { notify } from "@/lib/server/notifications.server";
 import { issue } from "@/lib/server/schema.server";
@@ -103,6 +104,14 @@ export const POST = handler({
 		});
 
 		await setIssueLabels(id, labelIds);
+
+		// Files uploaded in the composer have no parent yet; claim them now.
+		await adoptDraftAttachments({
+			ids: body.attachmentIds ?? [],
+			issueId: id,
+			workspaceId: workspace.id,
+			userId: user.id,
+		});
 
 		await notify({
 			userId: body.assigneeId,

@@ -5,6 +5,7 @@ import {
 	derived,
 	Div,
 	If,
+	ImplementDocument,
 	ImplementEffect,
 	Input,
 	Span,
@@ -54,7 +55,7 @@ import {
 	type IssueDraft,
 } from "./issue-draft";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
-import { RepositoryPicker, type RepositoryRef } from "./repository-picker";
+import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
 import { MentionMenu, fileMentions } from "./file-mentions";
 
 const open = signal(false);
@@ -95,6 +96,19 @@ export function CreateIssueDialog() {
 	const chosenRepository = signal<RepositoryRef | null>(null);
 	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
 	const hasDraft = signal(false);
+	const statusOpen = signal(false);
+	const priorityOpen = signal(false);
+	const assigneeOpen = signal(false);
+	const repositoryOpen = signal(false);
+	const labelOpen = signal(false);
+
+	const openMenu = (which: "status" | "priority" | "assignee" | "repository" | "label") => {
+		statusOpen.set(which === "status");
+		priorityOpen.set(which === "priority");
+		assigneeOpen.set(which === "assignee");
+		repositoryOpen.set(which === "repository");
+		labelOpen.set(which === "label");
+	};
 
 	// `@` in the description searches the linked repositories' file index.
 	const mentions = fileMentions({
@@ -120,10 +134,13 @@ export function CreateIssueDialog() {
 		labelIds: chosenLabels.get().map((label) => label.id),
 		teamKey: chosenTeam.get()?.key ?? null,
 		repositoryId: chosenRepository.get()?.id ?? null,
+		attachments: attachments.get(),
 	});
 
 	const persist = () => {
-		if (hydrating || !open.get()) return;
+		// Open is not required: a close flushes after `open` is already false,
+		// and an upload can finish after the dialog is dismissed.
+		if (hydrating) return;
 		const workspaceSlug = slug.get();
 		if (workspaceSlug === "") return;
 
@@ -171,8 +188,10 @@ export function CreateIssueDialog() {
 			clearTimeout(persistTimer);
 			persistTimer = undefined;
 		}
+		const leftover = attachments.get();
+		const workspaceSlug = slug.get();
 		hydrating = true;
-		clearIssueDraft(slug.get());
+		clearIssueDraft(workspaceSlug);
 		hasDraft.set(false);
 		reset();
 		const fallback = preferDefaultTeam(teams.get());
@@ -180,6 +199,11 @@ export function CreateIssueDialog() {
 			fallback === undefined ? null : { id: fallback.id, name: fallback.name, key: fallback.key },
 		);
 		hydrating = false;
+		for (const file of leftover) {
+			void api.DELETE("/api/v1/workspaces/[slug]/attachments/[id]", {
+				params: { slug: workspaceSlug, id: file.id },
+			});
+		}
 	};
 
 	const loadContext = async (workspaceSlug: string) => {
@@ -195,6 +219,8 @@ export function CreateIssueDialog() {
 				description.set(draft.description);
 				status.set(draft.status);
 				priority.set(draft.priority);
+				attachments.set(draft.attachments);
+				uploads.set([]);
 			}
 
 			const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
@@ -211,7 +237,7 @@ export function CreateIssueDialog() {
 					chosenRepository.set(
 						repoResult.data
 							.filter((repo) => repo.id === draft.repositoryId)
-							.map((repo) => ({ id: repo.id, fullName: repo.fullName }))[0] ?? null,
+							.map(toRepositoryRef)[0] ?? null,
 					);
 				}
 			}
@@ -303,13 +329,46 @@ export function CreateIssueDialog() {
 			files,
 			slug: slug.get(),
 			uploads,
-			onUploaded: (attachment) => attachments.push(attachment),
+			onUploaded: (attachment) => {
+				attachments.push(attachment);
+				persist();
+			},
 		});
 	};
 
 	return Div(
 		{ class: "contents" },
 		FileDragOverlay({ enabled: open, onFiles: attach }),
+		ImplementDocument({
+			onKeydownCapture: (event) => {
+				if (!open.get()) return;
+				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				if (event.isComposing) return;
+				const target = event.target;
+				// Description keeps the letters. An empty title still lets s/p/a/r/l
+				// open the property menus, matching Linear on a fresh composer.
+				if (target instanceof HTMLTextAreaElement) return;
+				if (target instanceof HTMLElement && target.isContentEditable) return;
+				if (target instanceof HTMLInputElement && target.value !== "") return;
+				const key = event.key.toLowerCase();
+				const which =
+					key === "s"
+						? "status"
+						: key === "p"
+							? "priority"
+							: key === "a"
+								? "assignee"
+								: key === "r"
+									? "repository"
+									: key === "l"
+										? "label"
+										: null;
+				if (which === null) return;
+				event.preventDefault();
+				event.stopPropagation();
+				openMenu(which);
+			},
+		}),
 		Dialog(
 			{ open },
 			ImplementEffect([open], (isOpen) => {
@@ -339,12 +398,13 @@ export function CreateIssueDialog() {
 					chosenLabels,
 					chosenTeam,
 					chosenRepository,
+					attachments,
 				],
 				() => schedulePersist(),
 				{ immediate: false },
 			),
 			DialogContent(
-				{ class: "max-w-xl gap-0 p-0", showCloseButton: false },
+				{ class: "max-w-3xl gap-0 p-0 sm:max-w-3xl", showCloseButton: false },
 				Div(
 					{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
 					Breadcrumb(
@@ -438,10 +498,12 @@ export function CreateIssueDialog() {
 					StatusPicker(status, (value) => status.set(value), {
 						showLabel: true,
 						class: "border border-border",
+						open: statusOpen,
 					}),
 					PriorityPicker(priority, (value) => priority.set(value), {
 						showLabel: true,
 						class: "border border-border",
+						open: priorityOpen,
 					}),
 					AssigneePicker(
 						assignee,
@@ -452,7 +514,7 @@ export function CreateIssueDialog() {
 									? null
 									: (members.get().find((member) => member.user.id === userId)?.user ?? null),
 							),
-						{ showLabel: true, class: "border border-border" },
+						{ showLabel: true, class: "border border-border", open: assigneeOpen },
 					),
 					RepositoryPicker(
 						chosenRepository,
@@ -464,9 +526,9 @@ export function CreateIssueDialog() {
 									: (repositories
 											.get()
 											.filter((repo) => repo.id === repositoryId)
-											.map((repo) => ({ id: repo.id, fullName: repo.fullName }))[0] ?? null),
+											.map(toRepositoryRef)[0] ?? null),
 							),
-						{ class: "border border-border" },
+						{ class: "border border-border", open: repositoryOpen },
 					),
 					LabelPicker(
 						chosenLabels,
@@ -477,7 +539,7 @@ export function CreateIssueDialog() {
 									? current.filter((label) => label.id !== labelId)
 									: [...current, labels.get().find((label) => label.id === labelId)!],
 							),
-						{ class: "border border-border" },
+						{ class: "border border-border", open: labelOpen },
 					),
 				),
 

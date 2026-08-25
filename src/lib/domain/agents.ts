@@ -32,19 +32,18 @@ export const AGENT_SCOPES: AgentScope[] = API_KEY_RESOURCES.flatMap((resource) =
 export const OPENID_SCOPES = ["openid", "profile", "email", "offline_access"] as const;
 
 /**
- * Resources whose routes are all behind `requireAdmin`, plus the write half of
- * `workspace` (settings, and creating teams).
+ * Scopes whose every route is behind `requireAdmin`.
  *
  * Agents are capped below admin, so these can never be satisfied. Excluding
  * them from what a client may even register for turns a guaranteed 403 into an
  * upfront registration error, which is a much clearer failure.
+ *
+ * `workspace:write` is deliberately *not* here even though it covers admin
+ * routes: it also covers creating a label and uploading an image, which any
+ * member can do. `requireAdmin` is what closes the admin half, so excluding the
+ * whole scope would only break the parts that were always allowed.
  */
-const ADMIN_ONLY_SCOPES = new Set<AgentScope>([
-	"members:write",
-	"webhooks:read",
-	"webhooks:write",
-	"workspace:write",
-]);
+const ADMIN_ONLY_SCOPES = new Set<AgentScope>(["members:write", "webhooks:read", "webhooks:write"]);
 
 export function isAgentGrantableScope(scope: AgentScope): boolean {
 	return !ADMIN_ONLY_SCOPES.has(scope);
@@ -52,6 +51,16 @@ export function isAgentGrantableScope(scope: AgentScope): boolean {
 
 /** The scopes a dynamically-registered client is allowed to ask for. */
 export const AGENT_GRANTABLE_SCOPES: AgentScope[] = AGENT_SCOPES.filter(isAgentGrantableScope);
+
+/**
+ * What an agent client may register for, including `offline_access`.
+ *
+ * Without `offline_access` a grant dies with the browser session that approved
+ * it and the agent has to run the device flow again every time it starts. With
+ * it, the agent holds a refresh token that outlives the session — which is the
+ * whole difference between authorizing once and authorizing every morning.
+ */
+export const AGENT_REGISTRABLE_SCOPES: string[] = ["offline_access", ...AGENT_GRANTABLE_SCOPES];
 
 function isAgentScope(value: string): value is AgentScope {
 	return (AGENT_SCOPES as string[]).includes(value);

@@ -19,7 +19,7 @@ import { Button } from "@/lib/components/ui/button";
 import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
-import { AgentsSection } from "./agents-section";
+import { WorkspaceAgentsSection } from "./workspace-agents-section";
 import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
 import { RepositoriesSection } from "./repositories-section";
@@ -56,7 +56,7 @@ export function SettingsPage({
 					data.bind((value) => value.workspace),
 					params,
 				),
-				AgentsSection(params.slug, copy),
+				WorkspaceAgentsSection(params.slug),
 				WebhooksSection(params.slug, copy),
 				ApiKeysSection(copy),
 			),

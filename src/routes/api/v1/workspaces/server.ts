@@ -1,3 +1,4 @@
+import { error } from "@implementjs/kit/server";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as v from "valibot";
@@ -16,11 +17,17 @@ export const GET = handler({
 	async handle({ locals }) {
 		const user = requireUser(locals);
 		requirePermission(locals, "workspace", "read");
+
+		// For an agent this is its *reach*, not where it already has a member row:
+		// a bot only joins a workspace once it acts there, so listing its own
+		// memberships would hide everywhere it could act but has not yet.
+		const subject = locals.agent?.installedByUserId ?? user.id;
+
 		const rows = await db
 			.select({ workspace, role: workspaceMember.role })
 			.from(workspaceMember)
 			.innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
-			.where(eq(workspaceMember.userId, user.id))
+			.where(eq(workspaceMember.userId, subject))
 			.orderBy(workspace.createdAt);
 
 		return rows.map((row) => toWorkspace(row.workspace, row.role));
@@ -33,6 +40,11 @@ export const POST = handler({
 	async handle({ locals, body }) {
 		const user = requireUser(locals);
 		requirePermission(locals, "workspace", "write");
+
+		// Creating a workspace makes the creator its admin, which is the one thing
+		// under `workspace:write` that would hand an agent a role it must never
+		// hold. Everything else that scope covers — labels, images — is member-level.
+		if (locals.agent !== null) error(403, "an agent cannot create a workspace");
 
 		// Claimed before the insert: if the key is not this user's, or nothing was
 		// ever uploaded to it, the workspace should not come into existence at all

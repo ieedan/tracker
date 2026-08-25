@@ -2,6 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { hasPermission, type ApiKeyAction, type ApiKeyResource } from "@/lib/domain/api-keys";
 import type { WorkspaceRole } from "@/lib/domain/issues";
+import { ensureAgentMembership } from "./agents.server";
 import { db } from "./db.server";
 import { workspace, workspaceMember } from "./schema.server";
 
@@ -31,6 +32,11 @@ export function requireUser(locals: App.Locals): App.SessionUser {
 export async function requireMembership(locals: App.Locals, slug: string): Promise<Membership> {
 	const user = requireUser(locals);
 
+	// An agent is admitted through the person who authorized it, so its own
+	// member row may not exist yet — the workspace is looked up by slug and the
+	// grant decides, rather than requiring a row that only acting here creates.
+	if (locals.agent !== null) return await agentMembership(locals.agent, user, slug);
+
 	const rows = await db
 		.select({ workspace, role: workspaceMember.role })
 		.from(workspaceMember)
@@ -41,46 +47,46 @@ export async function requireMembership(locals: App.Locals, slug: string): Promi
 	const row = rows[0];
 	if (row === undefined) error(404, `no workspace "${slug}"`);
 
-	const membership: Membership = { user, workspace: row.workspace, role: row.role };
-	if (locals.agent === null) return membership;
-	return await agentMembership(membership, locals.agent, slug);
+	return { user, workspace: row.workspace, role: row.role };
 }
 
 /**
- * Caps an agent's membership at what its grant actually allows.
+ * Admits an agent to a workspace, on the terms its grant allows.
  *
- * An agent can never be more capable than the person who set it up, and never
- * an admin. Returning `member` here is what enforces the second half for every
- * admin-gated route at once, since `requireAdmin` reads this role.
+ * A grant is not scoped to a workspace: it says "this install may act as me",
+ * and the reach is whatever the approver can still reach. So the check is on
+ * *their* membership, not the bot's — which is what lets one authorization
+ * cover every workspace that person belongs to, including ones they join later.
+ *
+ * Two caps hold regardless. An agent can never be more capable than the person
+ * who set it up, and it is never an admin: returning `member` enforces the
+ * second for every admin-gated route at once, since `requireAdmin` reads this.
  */
 async function agentMembership(
-	membership: Membership,
 	agent: App.AgentContext,
+	bot: App.SessionUser,
 	slug: string,
 ): Promise<Membership> {
-	// A grant covers one workspace. Without this, a bot that is a member of two
-	// workspaces could act in either — which `transfer` would happily use to
-	// move issues into a workspace nobody granted access to.
-	if (agent.workspaceId !== membership.workspace.id) error(404, `no workspace "${slug}"`);
-
-	// The grant is delegated access, so it dies when the delegation does.
-	const installer = await db
-		.select({ role: workspaceMember.role })
+	// The grant is delegated access, so it reaches exactly as far as the
+	// delegation does — and dies with it.
+	const rows = await db
+		.select({ workspace, role: workspaceMember.role })
 		.from(workspaceMember)
-		.where(
-			and(
-				eq(workspaceMember.workspaceId, membership.workspace.id),
-				eq(workspaceMember.userId, agent.installedByUserId),
-			),
-		)
+		.innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
+		.where(and(eq(workspace.slug, slug), eq(workspaceMember.userId, agent.installedByUserId)))
 		.limit(1);
 
-	if (installer[0] === undefined) error(404, `no workspace "${slug}"`);
+	const row = rows[0];
+	if (row === undefined) error(404, `no workspace "${slug}"`);
+
+	// The bot needs a member row of its own before it can be an assignee or the
+	// author of anything, and this is the first moment we know it acts here.
+	await ensureAgentMembership(row.workspace.id, bot.id);
 
 	// implement:bug:#2: `valid-role` treats any object property named `role` as
 	// an ARIA role, including a workspace role in a server-only file.
 	// oxlint-disable-next-line implementjs/valid-role
-	return { ...membership, role: "member" };
+	return { user: bot, workspace: row.workspace, role: "member" };
 }
 
 /** Admin-only actions: managing members, invites and workspace settings. */

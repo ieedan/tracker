@@ -20,6 +20,7 @@ import type {
 	WorkspaceRole,
 } from "@/lib/domain/issues";
 import type { GitProviderId, IndexState, PullRequestState } from "@/lib/domain/providers";
+import type { HarnessKind } from "@/lib/domain/agents";
 import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
@@ -700,52 +701,33 @@ export const commentRelations = relations(comment, ({ one }) => ({
 }));
 
 /**
- * A bot member: one row per (OAuth client, workspace).
+ * One person's authorization of one agent install.
  *
- * Everyone who authorizes the same client into the same workspace acts as this
- * one identity — a bot is an identity, not a credential, so it does not need to
- * be per-person. Which human authorized a given token is recorded on
- * `agentGrant` instead, and that is what carries the permission ceiling.
- */
-export const agentIdentity = sqliteTable(
-	"agent_identity",
-	{
-		id: text("id").primaryKey(),
-		/** The bot's own `user` row — this is what lands on `comment.authorId`. */
-		userId: text("userId")
-			.notNull()
-			.unique()
-			.references(() => user.id, { onDelete: "cascade" }),
-		clientId: text("clientId").notNull(),
-		workspaceId: text("workspaceId")
-			.notNull()
-			.references(() => workspace.id, { onDelete: "cascade" }),
-		createdAt: now(),
-	},
-	(table) => [
-		uniqueIndex("agent_identity_unique").on(table.clientId, table.workspaceId),
-		index("agent_identity_workspace").on(table.workspaceId),
-	],
-);
-
-/**
- * One human's authorization of one client into one workspace.
+ * Deliberately *not* scoped to a workspace. An MCP client registers once per
+ * install and the provider remembers consent per (client, person), so a
+ * workspace-scoped grant could never be extended to a second workspace — there
+ * would be no second consent screen to ask on. A grant therefore carries what
+ * the person can reach, and the per-request membership check is what narrows it.
  *
- * An agent's effective access is its scopes intersected with what this person
- * can still do, so the grant is what a token is checked against on every
- * request: revoke it, or remove the person from the workspace, and the tokens
- * it backs stop working.
+ * `harness` is what the person said this client is. The bot it acts as is
+ * derived from it: one `user` row per harness, app-wide.
  */
 export const agentGrant = sqliteTable(
 	"agent_grant",
 	{
 		id: text("id").primaryKey(),
-		agentIdentityId: text("agentIdentityId")
-			.notNull()
-			.references(() => agentIdentity.id, { onDelete: "cascade" }),
 		installedByUserId: text("installedByUserId")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
+		/**
+		 * The OAuth client this grant was issued to — one install of one harness.
+		 *
+		 * A token carries `client_id` and the approver's `sub`, and that pair is
+		 * what resolves back to a grant. It is also what lets one machine be
+		 * revoked without touching another.
+		 */
+		clientId: text("clientId").notNull(),
+		harness: text("harness").$type<HarnessKind>().notNull(),
 		/** JSON array of the scopes consented to, for display and revocation. */
 		scopes: text("scopes", { mode: "json" }).$type<string[]>().notNull(),
 		lastUsedAt: timestamp("lastUsedAt"),
@@ -753,25 +735,14 @@ export const agentGrant = sqliteTable(
 		createdAt: now(),
 	},
 	(table) => [
-		uniqueIndex("agent_grant_unique").on(table.agentIdentityId, table.installedByUserId),
+		// One grant per install per person, and what a token resolves through, so
+		// it has to be unique for the lookup to be unambiguous.
+		uniqueIndex("agent_grant_unique").on(table.clientId, table.installedByUserId),
 		index("agent_grant_installer").on(table.installedByUserId),
 	],
 );
 
-export const agentIdentityRelations = relations(agentIdentity, ({ one, many }) => ({
-	user: one(user, { fields: [agentIdentity.userId], references: [user.id] }),
-	workspace: one(workspace, {
-		fields: [agentIdentity.workspaceId],
-		references: [workspace.id],
-	}),
-	grants: many(agentGrant),
-}));
-
 export const agentGrantRelations = relations(agentGrant, ({ one }) => ({
-	identity: one(agentIdentity, {
-		fields: [agentGrant.agentIdentityId],
-		references: [agentIdentity.id],
-	}),
 	installedBy: one(user, {
 		fields: [agentGrant.installedByUserId],
 		references: [user.id],

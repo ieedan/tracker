@@ -2,16 +2,16 @@
 // and labels. The list rows and the detail page share them, which is what keeps
 // "click the status glyph and pick a new one" identical in both places.
 import {
-	Div,
+	Dynamic,
 	ForEach,
-	If,
+	Fragment,
 	ImplementEffect,
 	Span,
 	signal,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Tag, Users } from "@implementjs/lucide";
+import { ChevronDownIcon, Tag, Users } from "@implementjs/lucide";
 import { MenuCheckbox, applyIdDiff } from "@/lib/components/ui/menu-checkbox";
 import {
 	DropdownMenu,
@@ -23,7 +23,13 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
-import { PriorityIcon, StatusIcon, UnassignedAvatar, UserAvatar } from "@/lib/components/glyphs";
+import {
+	CHIP_GLYPH,
+	PriorityIcon,
+	StatusIcon,
+	UnassignedAvatar,
+	UserAvatar,
+} from "@/lib/components/glyphs";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -45,6 +51,8 @@ type PickerOptions = {
 	showLabel?: boolean;
 	class?: string;
 	open?: Signal<boolean>;
+	/** Full-width select trigger: left-aligned value, trailing chevron. */
+	select?: boolean;
 };
 
 /**
@@ -78,7 +86,12 @@ export function StatusPicker(
 		{ open: options.open },
 		syncRadio(current, value, (status) => status),
 		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Status" },
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(triggerClass, options.class),
+				title: "Status (S)",
+			},
 			StatusIcon(current),
 			options.showLabel === true
 				? Span(
@@ -120,7 +133,12 @@ export function PriorityPicker(
 		{ open: options.open },
 		syncRadio(current, value, (priority) => priority),
 		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Priority" },
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(triggerClass, options.class),
+				title: "Priority (P)",
+			},
 			PriorityIcon(current),
 			options.showLabel === true
 				? Span(
@@ -163,8 +181,13 @@ export function AssigneePicker(
 		{ open: options.open },
 		syncRadio(current, value, (user) => user?.id ?? UNASSIGNED),
 		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Assignee" },
-			AssigneeAvatar(current),
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(triggerClass, options.class),
+				title: "Assignee (A)",
+			},
+			AssigneeAvatar(current, CHIP_GLYPH.avatar),
 			options.showLabel === true
 				? Span(
 						{},
@@ -218,14 +241,13 @@ export function LabelPicker(
 		{ open: options.open },
 		ImplementEffect([selected], (labels) => selectedIds.set(labels.map((label) => label.id))),
 		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Labels" },
-			Tag({ class: "size-3.5" }),
-			Span(
-				{},
-				selected.bind((labels) =>
-					labels.length === 0 ? "Label" : `${labels.length} label${labels.length > 1 ? "s" : ""}`,
-				),
-			),
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(triggerClass, options.class),
+				title: "Labels (L)",
+			},
+			LabelTrigger(selected),
 		),
 		DropdownMenuContent(
 			{ class: "w-56", align: "start" },
@@ -263,25 +285,45 @@ export function LabelPicker(
 }
 
 /** The assignee's avatar, or the dashed placeholder when there is none. */
-export function AssigneeAvatar(current: Readable<UserSummary | null>) {
-	return Div(
-		{ class: "flex items-center" },
-		If(current.bind((user) => user !== null))
-			.Then(
-				Div(
-					{ class: "contents" },
-					// `current` is non-null inside this branch; bind reads it safely.
-					UserAvatarOf(current),
-				),
-			)
-			.Else(UnassignedAvatar()),
+export function AssigneeAvatar(current: Readable<UserSummary | null>, className?: string) {
+	return Dynamic([current], (user) =>
+		user === null ? UnassignedAvatar(className) : UserAvatar(user, className),
 	);
 }
 
-function UserAvatarOf(current: Readable<UserSummary | null>) {
-	const user = current.get();
-	if (user === null) return UnassignedAvatar();
-	return UserAvatar(user);
+/**
+ * Linear's label chip: empty is a tag, one label is color + name, several
+ * are overlapping dots.
+ */
+function LabelTrigger(selected: Readable<Label[]>) {
+	return Dynamic([selected], (labels) => {
+		if (labels.length === 0) {
+			return Fragment(Tag({ class: "size-3.5" }), Span({}, "Label"));
+		}
+		if (labels.length === 1) {
+			const label = labels[0]!;
+			return Fragment(
+				Span({
+					class: "size-2.5 shrink-0 rounded-full",
+					style: { backgroundColor: label.color },
+				}),
+				Span({ class: "max-w-28 truncate" }, label.name),
+			);
+		}
+		return Span(
+			{ class: "flex items-center" },
+			...labels.slice(0, 4).map((label, index) =>
+				Span({
+					class: cn(
+						"inline-block size-2.5 shrink-0 rounded-full border-2 border-background",
+						index > 0 && "-ml-1.5",
+					),
+					style: { backgroundColor: label.color },
+					title: label.name,
+				}),
+			),
+		);
+	});
 }
 
 /** The colored pills shown on a row and on the detail page. */
@@ -332,9 +374,14 @@ export function TeamPicker(
 				)
 			: DropdownMenuTrigger(
 					{
-						variant: "ghost",
+						variant: options.select === true ? "outline" : "ghost",
 						size: "sm",
-						class: cn(triggerClass, options.class),
+						class: cn(
+							options.select === true
+								? "h-9 w-full justify-start px-3 text-[13px] font-normal"
+								: triggerClass,
+							options.class,
+						),
 						title: "Team",
 					},
 					Users({ class: "size-3.5" }),
@@ -344,9 +391,15 @@ export function TeamPicker(
 					),
 					options.showLabel === true
 						? Span(
-								{ class: "text-muted-foreground" },
+								{ class: "min-w-0 truncate text-muted-foreground" },
 								current.bind((team) => team?.name ?? ""),
 							)
+						: null,
+					options.select === true
+						? ChevronDownIcon({
+								"aria-hidden": true,
+								class: "ml-auto size-4 shrink-0 opacity-50",
+							})
 						: null,
 				);
 
