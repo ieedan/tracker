@@ -468,6 +468,119 @@
 				}
 			}
 		},
+		"/api/v1/device/approve": {
+			"post": {
+				"operationId": "postApiV1DeviceApprove",
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"userCode": {
+										"type": "string",
+										"minLength": 1
+									},
+									"slug": {
+										"type": "string",
+										"minLength": 1
+									},
+									"scopes": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										},
+										"minItems": 1
+									}
+								},
+								"required": [
+									"userCode",
+									"slug",
+									"scopes"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"ok": {
+											"const": true
+										}
+									},
+									"required": [
+										"ok"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/device/deny": {
+			"post": {
+				"operationId": "postApiV1DeviceDeny",
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"userCode": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
+								"required": [
+									"userCode"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"ok": {
+											"const": true
+										}
+									},
+									"required": [
+										"ok"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/invites/{token}/accept": {
 			"post": {
 				"operationId": "postApiV1InvitesByTokenAccept",
@@ -585,26 +698,84 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
+												},
+												"onBehalfOf": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																}
+															},
+															"required": [
+																"id",
+																"name"
+															]
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"authVia": {
 											"enum": [
 												"session",
-												"api-key"
+												"api-key",
+												"oauth"
 											],
 											"type": "string"
+										},
+										"agent": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"clientId": {
+															"type": "string"
+														},
+														"workspaceId": {
+															"type": "string"
+														},
+														"installedBy": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"clientId",
+														"workspaceId",
+														"installedBy"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
 										}
 									},
 									"required": [
 										"user",
-										"authVia"
+										"authVia",
+										"agent"
 									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -677,13 +848,21 @@
 																"type": "null"
 															}
 														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
 													}
 												},
 												"required": [
 													"id",
 													"name",
 													"email",
-													"image"
+													"image",
+													"type"
 												]
 											},
 											"workspaceSlug": {
@@ -1277,6 +1456,146 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/agents": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugAgents",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"grantId": {
+												"type": "string"
+											},
+											"clientId": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"image": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"scopes": {
+												"type": "array",
+												"items": {
+													"type": "string"
+												}
+											},
+											"installedBy": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name"
+												]
+											},
+											"lastUsedAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"grantId",
+											"clientId",
+											"name",
+											"image",
+											"scopes",
+											"installedBy",
+											"lastUsedAt",
+											"createdAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/agents/{grantId}": {
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugAgentsByGrantId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "grantId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"ok": {
+											"const": true
+										}
+									},
+									"required": [
+										"ok"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/attachments": {
 			"post": {
 				"operationId": "postApiV1WorkspacesBySlugAttachments",
@@ -1375,13 +1694,21 @@
 																	"type": "null"
 																}
 															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
 														}
 													},
 													"required": [
 														"id",
 														"name",
 														"email",
-														"image"
+														"image",
+														"type"
 													]
 												},
 												"createdAt": {
@@ -1486,13 +1813,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"createdAt": {
@@ -1964,13 +2299,21 @@
 																		"type": "null"
 																	}
 																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
 															}
 														},
 														"required": [
 															"id",
 															"name",
 															"email",
-															"image"
+															"image",
+															"type"
 														]
 													},
 													{
@@ -1999,13 +2342,21 @@
 																"type": "null"
 															}
 														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
 													}
 												},
 												"required": [
 													"id",
 													"name",
 													"email",
-													"image"
+													"image",
+													"type"
 												]
 											},
 											"labels": {
@@ -2249,6 +2600,12 @@
 										"items": {
 											"type": "string"
 										}
+									},
+									"attachmentIds": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
 									}
 								},
 								"required": [
@@ -2345,13 +2702,21 @@
 																	"type": "null"
 																}
 															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
 														}
 													},
 													"required": [
 														"id",
 														"name",
 														"email",
-														"image"
+														"image",
+														"type"
 													]
 												},
 												{
@@ -2380,13 +2745,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"labels": {
@@ -2656,13 +3029,21 @@
 																	"type": "null"
 																}
 															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
 														}
 													},
 													"required": [
 														"id",
 														"name",
 														"email",
-														"image"
+														"image",
+														"type"
 													]
 												},
 												{
@@ -2691,13 +3072,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"labels": {
@@ -3038,13 +3427,21 @@
 																	"type": "null"
 																}
 															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
 														}
 													},
 													"required": [
 														"id",
 														"name",
 														"email",
-														"image"
+														"image",
+														"type"
 													]
 												},
 												{
@@ -3073,13 +3470,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"labels": {
@@ -3335,13 +3740,21 @@
 																"type": "null"
 															}
 														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
 													}
 												},
 												"required": [
 													"id",
 													"name",
 													"email",
-													"image"
+													"image",
+													"type"
 												]
 											},
 											"attachments": {
@@ -3385,13 +3798,21 @@
 																			"type": "null"
 																		}
 																	]
+																},
+																"type": {
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
+																	"type": "string"
 																}
 															},
 															"required": [
 																"id",
 																"name",
 																"email",
-																"image"
+																"image",
+																"type"
 															]
 														},
 														"createdAt": {
@@ -3517,13 +3938,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"attachments": {
@@ -3567,13 +3996,21 @@
 																		"type": "null"
 																	}
 																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
 															}
 														},
 														"required": [
 															"id",
 															"name",
 															"email",
-															"image"
+															"image",
+															"type"
 														]
 													},
 													"createdAt": {
@@ -3896,6 +4333,359 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/issues/{identifier}/transfer": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugIssuesByIdentifierTransfer",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"workspaceSlug": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 60
+									},
+									"teamKey": {
+										"type": "string",
+										"maxLength": 6
+									}
+								},
+								"required": [
+									"workspaceSlug",
+									"teamKey"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"identifier": {
+											"type": "string"
+										},
+										"team": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"key": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
+											"type": "string"
+										},
+										"priority": {
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
+											"type": "string"
+										},
+										"assignee": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"email": {
+															"type": "string"
+														},
+														"image": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"creator": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type"
+											]
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"commentCount": {
+											"type": "number"
+										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": [
+																"github"
+															],
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"pullRequest": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"title": {
+															"type": "string"
+														},
+														"state": {
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
+															"type": "string"
+														},
+														"url": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"feedback": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"identifier",
+										"team",
+										"title",
+										"description",
+										"status",
+										"priority",
+										"assignee",
+										"creator",
+										"labels",
+										"commentCount",
+										"repository",
+										"pullRequest",
+										"feedback",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/labels": {
 			"get": {
 				"operationId": "getApiV1WorkspacesBySlugLabels",
@@ -4068,13 +4858,21 @@
 																"type": "null"
 															}
 														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
 													}
 												},
 												"required": [
 													"id",
 													"name",
 													"email",
-													"image"
+													"image",
+													"type"
 												]
 											},
 											"createdAt": {
@@ -4174,13 +4972,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"createdAt": {
@@ -5369,13 +6175,21 @@
 																				"type": "null"
 																			}
 																		]
+																	},
+																	"type": {
+																		"enum": [
+																			"human",
+																			"agent"
+																		],
+																		"type": "string"
 																	}
 																},
 																"required": [
 																	"id",
 																	"name",
 																	"email",
-																	"image"
+																	"image",
+																	"type"
 																]
 															},
 															{
@@ -5633,13 +6447,21 @@
 																			"type": "null"
 																		}
 																	]
+																},
+																"type": {
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
+																	"type": "string"
 																}
 															},
 															"required": [
 																"id",
 																"name",
 																"email",
-																"image"
+																"image",
+																"type"
 															]
 														},
 														{
@@ -5860,13 +6682,21 @@
 																			"type": "null"
 																		}
 																	]
+																},
+																"type": {
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
+																	"type": "string"
 																}
 															},
 															"required": [
 																"id",
 																"name",
 																"email",
-																"image"
+																"image",
+																"type"
 															]
 														},
 														{
@@ -6131,13 +6961,21 @@
 																			"type": "null"
 																		}
 																	]
+																},
+																"type": {
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
+																	"type": "string"
 																}
 															},
 															"required": [
 																"id",
 																"name",
 																"email",
-																"image"
+																"image",
+																"type"
 															]
 														},
 														{
@@ -6332,13 +7170,21 @@
 																"type": "null"
 															}
 														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
 													}
 												},
 												"required": [
 													"id",
 													"name",
 													"email",
-													"image"
+													"image",
+													"type"
 												]
 											},
 											"internal": {
@@ -6450,13 +7296,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"internal": {
@@ -6649,13 +7503,21 @@
 																	"type": "null"
 																}
 															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
 														}
 													},
 													"required": [
 														"id",
 														"name",
 														"email",
-														"image"
+														"image",
+														"type"
 													]
 												},
 												{
@@ -6684,13 +7546,21 @@
 															"type": "null"
 														}
 													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
 												}
 											},
 											"required": [
 												"id",
 												"name",
 												"email",
-												"image"
+												"image",
+												"type"
 											]
 										},
 										"labels": {

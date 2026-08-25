@@ -16,6 +16,8 @@ export type IssueDraft = {
 	assigneeId: string | null;
 	labelIds: string[];
 	teamKey: string | null;
+	/** The repository the issue was scoped to, if any. */
+	repositoryId: string | null;
 };
 
 export function issueDraftKey(slug: string): string {
@@ -47,11 +49,17 @@ function parseDraft(raw: string): IssueDraft | null {
 		const assigneeId = typeof record.assigneeId === "string" ? record.assigneeId : null;
 		const teamKey =
 			typeof record.teamKey === "string" && record.teamKey !== "" ? record.teamKey : null;
+		// Read leniently: a draft written before repositories existed simply has
+		// no scope, which is the same as not choosing one.
+		const repositoryId =
+			typeof record.repositoryId === "string" && record.repositoryId !== ""
+				? record.repositoryId
+				: null;
 		const labelIds = Array.isArray(record.labelIds)
 			? record.labelIds.filter((id): id is string => typeof id === "string")
 			: [];
 
-		return { title, description, status, priority, assigneeId, labelIds, teamKey };
+		return { title, description, status, priority, assigneeId, labelIds, teamKey, repositoryId };
 	} catch {
 		return null;
 	}
@@ -65,7 +73,10 @@ export function isBlankIssueDraft(draft: IssueDraft): boolean {
 		draft.status === "backlog" &&
 		draft.priority === "none" &&
 		draft.assigneeId === null &&
-		draft.labelIds.length === 0
+		draft.labelIds.length === 0 &&
+		// Unlike the team, which is chosen for you, a repository scope is only
+		// ever there because somebody picked it.
+		draft.repositoryId === null
 	);
 }
 

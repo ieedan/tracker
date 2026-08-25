@@ -29,7 +29,15 @@ import {
 	DialogTitle,
 } from "@/lib/components/ui/dialog";
 import { preferDefaultTeam, type IssuePriority, type IssueStatus } from "@/lib/domain/issues";
-import type { Attachment, Issue, Label, Member, Team, TeamRef } from "@/lib/domain/schemas";
+import type {
+	Attachment,
+	Issue,
+	Label,
+	Member,
+	Repository,
+	Team,
+	TeamRef,
+} from "@/lib/domain/schemas";
 import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
 import {
 	AttachTrigger,
@@ -46,6 +54,8 @@ import {
 	type IssueDraft,
 } from "./issue-draft";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
+import { RepositoryPicker, type RepositoryRef } from "./repository-picker";
+import { MentionMenu, fileMentions } from "./file-mentions";
 
 const open = signal(false);
 const slug = signal("");
@@ -79,7 +89,18 @@ export function CreateIssueDialog() {
 	const labels = signal<Label[]>([]);
 	const teams = signal<Team[]>([]);
 	const chosenTeam = signal<TeamRef | null>(null);
+	const repositories = signal<Repository[]>([]);
+	const chosenRepository = signal<RepositoryRef | null>(null);
+	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
 	const hasDraft = signal(false);
+
+	// `@` in the description searches the linked repositories' file index.
+	const mentions = fileMentions({
+		value: description,
+		slug: () => slug.get(),
+		repository: () => chosenRepository.get()?.id,
+		element: descriptionRef,
+	});
 	const titleInput = signal<HTMLInputElement | null>(null);
 	let focusFrame: number | undefined;
 
@@ -96,6 +117,7 @@ export function CreateIssueDialog() {
 		assigneeId: assignee.get()?.id ?? null,
 		labelIds: chosenLabels.get().map((label) => label.id),
 		teamKey: chosenTeam.get()?.key ?? null,
+		repositoryId: chosenRepository.get()?.id ?? null,
 	});
 
 	const persist = () => {
@@ -137,6 +159,7 @@ export function CreateIssueDialog() {
 		priority.set("none");
 		assignee.set(null);
 		chosenLabels.set([]);
+		chosenRepository.set(null);
 		attachments.set([]);
 		uploads.set([]);
 	};
@@ -172,11 +195,24 @@ export function CreateIssueDialog() {
 				priority.set(draft.priority);
 			}
 
-			const [memberResult, labelResult, teamResult] = await Promise.all([
+			const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
 				api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
 				api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
 				api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
+				api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
 			]);
+			if (repoResult.error === undefined) {
+				repositories.set(repoResult.data);
+				if (draft !== null) {
+					// A repository that has since been unlinked is dropped rather than
+					// restored as a scope pointing at nothing.
+					chosenRepository.set(
+						repoResult.data
+							.filter((repo) => repo.id === draft.repositoryId)
+							.map((repo) => ({ id: repo.id, fullName: repo.fullName }))[0] ?? null,
+					);
+				}
+			}
 			if (memberResult.error === undefined) {
 				members.set(memberResult.data);
 				if (draft !== null) {
@@ -238,6 +274,7 @@ export function CreateIssueDialog() {
 				status: status.get(),
 				priority: priority.get(),
 				assigneeId: assignee.get()?.id ?? null,
+				repositoryId: chosenRepository.get()?.id ?? null,
 				labelIds: chosenLabels.get().map((label) => label.id),
 				attachmentIds: attachments.get().map((attachment) => attachment.id),
 			},
@@ -291,7 +328,16 @@ export function CreateIssueDialog() {
 				flushPersist();
 			}),
 			ImplementEffect(
-				[title, description, status, priority, assignee, chosenLabels, chosenTeam],
+				[
+					title,
+					description,
+					status,
+					priority,
+					assignee,
+					chosenLabels,
+					chosenTeam,
+					chosenRepository,
+				],
 				() => schedulePersist(),
 				{ immediate: false },
 			),
@@ -356,16 +402,26 @@ export function CreateIssueDialog() {
 							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
 						},
 					}),
-					Textarea({
-						value: description,
-						placeholder: "Add description…",
-						rows: 4,
-						class:
-							"resize-none border-0 bg-transparent p-0 text-[13px] outline-none placeholder:text-muted-foreground",
-						onKeydown: (event) => {
-							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
-						},
-					}),
+					Div(
+						{ class: "relative" },
+						Textarea({
+							this: descriptionRef,
+							value: description,
+							placeholder: "Add description… @ to reference a file",
+							rows: 4,
+							class:
+								"w-full resize-none border-0 bg-transparent p-0 text-[13px] outline-none placeholder:text-muted-foreground",
+							onInput: mentions.onInput,
+							onKeydown: (event) => {
+								// The mention menu claims the arrows, Enter and Escape while
+								// it is open, so it gets the event first.
+								mentions.onKeydown(event);
+								if (event.defaultPrevented) return;
+								if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
+							},
+						}),
+						MentionMenu(mentions),
+					),
 					AttachmentGrid({
 						attachments,
 						uploads,
@@ -395,6 +451,20 @@ export function CreateIssueDialog() {
 									: (members.get().find((member) => member.user.id === userId)?.user ?? null),
 							),
 						{ showLabel: true, class: "border border-border" },
+					),
+					RepositoryPicker(
+						chosenRepository,
+						repositories,
+						(repositoryId) =>
+							chosenRepository.set(
+								repositoryId === null
+									? null
+									: (repositories
+											.get()
+											.filter((repo) => repo.id === repositoryId)
+											.map((repo) => ({ id: repo.id, fullName: repo.fullName }))[0] ?? null),
+							),
+						{ class: "border border-border" },
 					),
 					LabelPicker(
 						chosenLabels,
