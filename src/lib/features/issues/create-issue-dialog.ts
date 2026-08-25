@@ -7,8 +7,10 @@ import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Button } from "@/lib/components/ui/button";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
-import type { Issue, Label, Member, Team, TeamRef } from "@/lib/domain/schemas";
+import type { Issue, Label, Member, Repository, Team, TeamRef } from "@/lib/domain/schemas";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
+import { RepositoryPicker, type RepositoryRef } from "./repository-picker";
+import { MentionMenu, fileMentions } from "./file-mentions";
 
 const open = signal(false);
 const slug = signal("");
@@ -40,6 +42,17 @@ export function CreateIssueDialog() {
 	const labels = signal<Label[]>([]);
 	const teams = signal<Team[]>([]);
 	const chosenTeam = signal<TeamRef | null>(null);
+	const repositories = signal<Repository[]>([]);
+	const chosenRepository = signal<RepositoryRef | null>(null);
+	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
+
+	// `@` in the description searches the linked repositories' file index.
+	const mentions = fileMentions({
+		value: description,
+		slug: () => slug.get(),
+		repository: () => chosenRepository.get()?.id,
+		element: descriptionRef,
+	});
 
 	const reset = () => {
 		title.set("");
@@ -48,16 +61,19 @@ export function CreateIssueDialog() {
 		priority.set("none");
 		assignee.set(null);
 		chosenLabels.set([]);
+		chosenRepository.set(null);
 	};
 
 	const loadContext = async (workspaceSlug: string) => {
-		const [memberResult, labelResult, teamResult] = await Promise.all([
+		const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
 			api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
+			api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
 		]);
 		if (memberResult.error === undefined) members.set(memberResult.data);
 		if (labelResult.error === undefined) labels.set(labelResult.data);
+		if (repoResult.error === undefined) repositories.set(repoResult.data);
 
 		if (teamResult.error !== undefined) return;
 		teams.set(teamResult.data);
@@ -86,6 +102,7 @@ export function CreateIssueDialog() {
 				status: status.get(),
 				priority: priority.get(),
 				assigneeId: assignee.get()?.id ?? null,
+				repositoryId: chosenRepository.get()?.id ?? null,
 				labelIds: chosenLabels.get().map((label) => label.id),
 			},
 		});
@@ -133,16 +150,26 @@ export function CreateIssueDialog() {
 						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
 					},
 				}),
-				Textarea({
-					value: description,
-					placeholder: "Add description…",
-					rows: 4,
-					class:
-						"resize-none border-0 bg-transparent p-0 text-[13px] outline-none placeholder:text-muted-foreground",
-					onKeydown: (event) => {
-						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
-					},
-				}),
+				Div(
+					{ class: "relative" },
+					Textarea({
+						this: descriptionRef,
+						value: description,
+						placeholder: "Add description… @ to reference a file",
+						rows: 4,
+						class:
+							"w-full resize-none border-0 bg-transparent p-0 text-[13px] outline-none placeholder:text-muted-foreground",
+						onInput: mentions.onInput,
+						onKeydown: (event) => {
+							// The mention menu claims the arrows, Enter and Escape while
+							// it is open, so it gets the event first.
+							mentions.onKeydown(event);
+							if (event.defaultPrevented) return;
+							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
+						},
+					}),
+					MentionMenu(mentions),
+				),
 			),
 
 			Div(
@@ -176,6 +203,20 @@ export function CreateIssueDialog() {
 								: (members.get().find((member) => member.user.id === userId)?.user ?? null),
 						),
 					{ showLabel: true, class: "border border-border" },
+				),
+				RepositoryPicker(
+					chosenRepository,
+					repositories,
+					(repositoryId) =>
+						chosenRepository.set(
+							repositoryId === null
+								? null
+								: (repositories
+										.get()
+										.filter((repo) => repo.id === repositoryId)
+										.map((repo) => ({ id: repo.id, fullName: repo.fullName }))[0] ?? null),
+						),
+					{ class: "border border-border" },
 				),
 				LabelPicker(
 					chosenLabels,

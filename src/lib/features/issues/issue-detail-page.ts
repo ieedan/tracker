@@ -23,6 +23,7 @@ import type {
 	Issue,
 	Label,
 	Member,
+	Repository,
 	Team,
 	Workspace,
 } from "@/lib/domain/schemas";
@@ -42,9 +43,13 @@ import {
 	TeamPicker,
 } from "./pickers";
 import { patchIssue } from "./issue-store";
+import { RepositoryPicker } from "./repository-picker";
+import { PullRequestLink } from "./pull-request-link";
+import { MentionMenu, MentionText, fileMentions } from "./file-mentions";
 
 interface PageData {
 	issue: Issue;
+	repositories: Repository[];
 	attachments: Attachment[];
 	comments: Comment[];
 	workspace: Workspace;
@@ -71,6 +76,10 @@ export function IssueDetailPage({
 	const attachments = signal(data.get().attachments);
 	data.onChange((next) => attachments.set(next.attachments));
 	const uploads = signal<Upload[]>([]);
+
+	const repositories = data.bind((value) => value.repositories);
+	const linkedPull = signal(data.get().issue.pullRequest);
+	data.onChange((next) => linkedPull.set(next.issue.pullRequest));
 
 	const update = (patch: Parameters<typeof patchIssue>[4], apply: (value: Issue) => Issue) =>
 		void patchIssue(
@@ -147,7 +156,11 @@ export function IssueDetailPage({
 						}),
 					}),
 
-					CommentThread(comments, params),
+					CommentThread(
+						comments,
+						params,
+						issue.bind((value) => value.repository?.id),
+					),
 				),
 			),
 		),
@@ -196,6 +209,38 @@ export function IssueDetailPage({
 						})),
 					{ showLabel: true },
 				),
+			),
+			PropertyRow(
+				"Repository",
+				RepositoryPicker(
+					issue.bind((value) => value.repository),
+					repositories,
+					(repositoryId) =>
+						update({ repositoryId }, (value) => ({
+							...value,
+							repository:
+								repositoryId === null
+									? null
+									: (data
+											.get()
+											.repositories.filter((repo) => repo.id === repositoryId)
+											.map((repo) => ({
+												id: repo.id,
+												fullName: repo.fullName,
+												provider: repo.provider,
+											}))[0] ?? value.repository),
+						})),
+					{ showLabel: true },
+				),
+			),
+			PropertyRow(
+				"Pull request",
+				PullRequestLink({
+					slug: params.slug,
+					identifier: issue.bind("identifier"),
+					current: linkedPull,
+					enabled: repositories.bind((list) => list.length > 0),
+				}),
 			),
 			PropertyRow(
 				"Labels",
@@ -335,8 +380,10 @@ function EditableDescription(
 						editing.set(true);
 					},
 				},
-				issue.bind((value) =>
-					value.description.trim() === "" ? "Add a description…" : value.description,
+				MentionText(
+					issue.bind((value) =>
+						value.description.trim() === "" ? "Add a description…" : value.description,
+					),
 				),
 			),
 		);
@@ -345,9 +392,19 @@ function EditableDescription(
 function CommentThread(
 	comments: ReturnType<typeof signal<Comment[]>>,
 	params: { slug: Readable<string>; identifier: Readable<string> },
+	repositoryId: Readable<string | undefined>,
 ) {
 	const draft = signal("");
 	const posting = signal(false);
+	const draftRef = signal<HTMLTextAreaElement | null>(null);
+
+	// The same `@` as the description, narrowed to the issue's repository.
+	const mentions = fileMentions({
+		value: draft,
+		slug: () => params.slug.get(),
+		repository: () => repositoryId.get(),
+		element: draftRef,
+	});
 
 	const post = async () => {
 		const body = draft.get().trim();
@@ -395,23 +452,31 @@ function CommentThread(
 								comment.bind((c) => relativeTime(c.createdAt)),
 							),
 						),
-						P({ class: "text-[13px] leading-relaxed whitespace-pre-wrap" }, comment.bind("body")),
+						P(
+							{ class: "text-[13px] leading-relaxed whitespace-pre-wrap" },
+							MentionText(comment.bind("body")),
+						),
 					),
 				),
 		),
 
 		Div(
-			{ class: "flex flex-col gap-2 rounded-md border border-border p-3" },
+			{ class: "relative flex flex-col gap-2 rounded-md border border-border p-3" },
 			Textarea({
+				this: draftRef,
 				value: draft,
 				rows: 3,
-				placeholder: "Leave a comment…",
+				placeholder: "Leave a comment… @ to reference a file",
 				class:
 					"resize-none border-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground",
+				onInput: mentions.onInput,
 				onKeydown: (event) => {
+					mentions.onKeydown(event);
+					if (event.defaultPrevented) return;
 					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void post();
 				},
 			}),
+			MentionMenu(mentions, { class: "top-full left-0" }),
 			Div(
 				{ class: "flex items-center justify-end gap-2" },
 				Span({ class: "mr-auto text-[11px] text-muted-foreground" }, "⌘↵ to comment"),

@@ -60,6 +60,9 @@ at a workspace that does not exist.
   assignee's and reporter's inbox. You are never notified of your own actions.
 - **Attachments** — drag files onto an issue or pick them; images and video
   render in place, everything else becomes a chip. Up to 100MB each.
+- **Repositories** — link any number of GitHub repositories to a workspace,
+  scope issues to one, reference files with `@`, and attach a pull request to
+  an issue 1:1.
 - **User feedback** — an ingest endpoint anyone can point a widget or a support
   script at, a workspace tab to triage what arrives, one click to turn a piece
   of feedback into an issue, and an optional public board where the people who
@@ -150,6 +153,51 @@ function shared by the server render and the browser. That is the right trade
 while a workspace's issues fit in one response; the API already takes
 `?team=`/`?status=` server-side, and pushing the rest down to SQL is what to do
 when the list grows enough to need pagination.
+
+## Repositories
+
+Link repositories under **Settings → Repositories**. GitHub is the only
+implementation, but everything goes through a provider adapter
+(`src/lib/server/providers/`), so the routes never learn which host they are
+talking to and adding GitLab is one new file.
+
+### Two credentials, on purpose
+
+|                                            | What it is   | What it reaches                           |
+| ------------------------------------------ | ------------ | ----------------------------------------- |
+| `GITHUB_CLIENT_ID` / `_SECRET`             | An OAuth app | Someone's name and email, to sign them in |
+| `GITHUB_APP_ID` / `_SLUG` / `_PRIVATE_KEY` | A GitHub App | The repositories an org admin granted     |
+
+Signing in with GitHub never grants access to code. Repository access comes
+from an App _installation_: installed onto an organisation by somebody with
+authority over it, scoped to the repositories they picked, and still working
+when that person leaves the company. A user's OAuth token would give you none
+of those three.
+
+Installation tokens live an hour, so they are minted on demand and cached
+in-process — never stored.
+
+For development, `GITHUB_DEV_TOKEN` lets a personal access token stand in for
+an installation, so the feature can be tried without creating and installing a
+real App. It is ignored whenever `GITHUB_APP_ID` is set. `GITHUB_API_URL`
+points at GitHub Enterprise Server.
+
+### What linking gives you
+
+- **Scope** — an issue can belong to a repository. It shows on the row and in
+  the detail rail, and `?repository=<id>` filters the list.
+- **`@` file references** — linking indexes the repository's file tree (paths
+  only; contents would make it a clone). Typing `@` in a description or comment
+  searches that index and inserts a link to the file on the provider. Search
+  ranks a basename hit above one buried in a directory, because typing `schema`
+  means `schema.server.ts`.
+- **Pull requests** — one per issue, one issue per pull request, enforced by
+  unique indexes rather than by convention. Paste a URL, `owner/name#12`, or
+  bare `#12` when the issue is already scoped. Linking one scopes the issue,
+  since it says where the work is.
+
+Re-index from Settings when the tree has moved on; the row says how many files
+it holds, which ref they came from, and whether the provider capped the tree.
 
 ## User feedback
 
@@ -292,6 +340,7 @@ src/
 ├ lib/
 │  ├ domain/             schemas and constants shared by client and server
 │  ├ server/             *.server.ts — db, auth, guards, queries. Never bundled.
+│  │  └ providers/       git host adapters; github is the only one so far
 │  ├ features/           screens: issues, feedback, inbox, settings, shell
 │  ├ components/ui/      @implementjs/ui components, restyled
 │  └ client/             browser-side api, auth and toasts

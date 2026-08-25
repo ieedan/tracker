@@ -17,6 +17,8 @@ export interface IssuePatch {
 	status?: Issue["status"];
 	priority?: Issue["priority"];
 	assigneeId?: string | null;
+	/** `null` clears the scope. */
+	repositoryId?: string | null;
 	labelIds?: string[];
 }
 

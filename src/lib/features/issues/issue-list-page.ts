@@ -28,6 +28,8 @@ import { issueCreated, openCreateIssue } from "./create-issue-dialog";
 import { AddFilterButton, FilterBar, type FilterContext } from "./filter-bar";
 import { matchesFilters, parseFilters, serializeFilters, type Filter } from "./filters";
 import { AssigneePicker, LabelChips, PriorityPicker, StatusPicker, TeamBadge } from "./pickers";
+import { RepositoryBadge } from "./repository-picker";
+import { PullRequestBadge } from "./pull-request-link";
 import { patchIssue } from "./issue-store";
 
 interface PageData {
@@ -351,6 +353,8 @@ function IssueRow(
 				data.bind((value) => value.team === null),
 				TeamBadge(issue.bind("team")),
 			),
+			RepositoryBadge(issue.bind((value) => value.repository)),
+			PullRequestBadge(issue.bind((value) => value.pullRequest)),
 			LabelChips(issue.bind("labels")),
 		),
 

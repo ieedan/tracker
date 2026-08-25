@@ -1347,6 +1347,80 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/files": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugFiles",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "q",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"default": ""
+						}
+					},
+					{
+						"name": "repository",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "limit",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "number"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"repositoryId": {
+												"type": "string"
+											},
+											"fullName": {
+												"type": "string"
+											},
+											"path": {
+												"type": "string"
+											},
+											"url": {
+												"type": "string"
+											}
+										},
+										"required": ["repositoryId", "fullName", "path", "url"]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/invites": {
 			"get": {
 				"operationId": "getApiV1WorkspacesBySlugInvites",
@@ -1570,6 +1644,14 @@
 						"schema": {
 							"type": "string"
 						}
+					},
+					{
+						"name": "repository",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
 					}
 				],
 				"responses": {
@@ -1698,6 +1780,58 @@
 											"commentCount": {
 												"type": "number"
 											},
+											"repository": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"fullName": {
+																"type": "string"
+															},
+															"provider": {
+																"enum": ["github"],
+																"type": "string"
+															}
+														},
+														"required": ["id", "fullName", "provider"]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"pullRequest": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"number": {
+																"type": "number"
+															},
+															"title": {
+																"type": "string"
+															},
+															"state": {
+																"enum": ["open", "merged", "closed", "draft"],
+																"type": "string"
+															},
+															"url": {
+																"type": "string"
+															}
+														},
+														"required": ["id", "number", "title", "state", "url"]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"feedback": {
 												"anyOf": [
 													{
@@ -1743,6 +1877,8 @@
 											"creator",
 											"labels",
 											"commentCount",
+											"repository",
+											"pullRequest",
 											"feedback",
 											"createdAt",
 											"updatedAt"
@@ -1777,6 +1913,16 @@
 							"schema": {
 								"type": "object",
 								"properties": {
+									"repositoryId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
 									"teamKey": {
 										"type": "string",
 										"maxLength": 6
@@ -1948,6 +2094,58 @@
 										"commentCount": {
 											"type": "number"
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": ["github"],
+															"type": "string"
+														}
+													},
+													"required": ["id", "fullName", "provider"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"pullRequest": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"title": {
+															"type": "string"
+														},
+														"state": {
+															"enum": ["open", "merged", "closed", "draft"],
+															"type": "string"
+														},
+														"url": {
+															"type": "string"
+														}
+													},
+													"required": ["id", "number", "title", "state", "url"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedback": {
 											"anyOf": [
 												{
@@ -1993,6 +2191,8 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"repository",
+										"pullRequest",
 										"feedback",
 										"createdAt",
 										"updatedAt"
@@ -2153,6 +2353,58 @@
 										"commentCount": {
 											"type": "number"
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": ["github"],
+															"type": "string"
+														}
+													},
+													"required": ["id", "fullName", "provider"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"pullRequest": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"title": {
+															"type": "string"
+														},
+														"state": {
+															"enum": ["open", "merged", "closed", "draft"],
+															"type": "string"
+														},
+														"url": {
+															"type": "string"
+														}
+													},
+													"required": ["id", "number", "title", "state", "url"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedback": {
 											"anyOf": [
 												{
@@ -2198,6 +2450,8 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"repository",
+										"pullRequest",
 										"feedback",
 										"createdAt",
 										"updatedAt"
@@ -2239,6 +2493,16 @@
 							"schema": {
 								"type": "object",
 								"properties": {
+									"repositoryId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
 									"teamKey": {
 										"type": "string",
 										"maxLength": 6
@@ -2407,6 +2671,58 @@
 										"commentCount": {
 											"type": "number"
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": ["github"],
+															"type": "string"
+														}
+													},
+													"required": ["id", "fullName", "provider"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"pullRequest": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"title": {
+															"type": "string"
+														},
+														"state": {
+															"enum": ["open", "merged", "closed", "draft"],
+															"type": "string"
+														},
+														"url": {
+															"type": "string"
+														}
+													},
+													"required": ["id", "number", "title", "state", "url"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedback": {
 											"anyOf": [
 												{
@@ -2452,6 +2768,8 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"repository",
+										"pullRequest",
 										"feedback",
 										"createdAt",
 										"updatedAt"
@@ -2805,6 +3123,265 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/issues/{identifier}/pull-request": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifierPullRequest",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"anyOf": [
+										{
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"number": {
+													"type": "number"
+												},
+												"title": {
+													"type": "string"
+												},
+												"state": {
+													"enum": ["open", "merged", "closed", "draft"],
+													"type": "string"
+												},
+												"url": {
+													"type": "string"
+												},
+												"authorLogin": {
+													"type": "string"
+												},
+												"repository": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														}
+													},
+													"required": ["id", "fullName"]
+												},
+												"syncedAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"createdAt": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"number",
+												"title",
+												"state",
+												"url",
+												"authorLogin",
+												"repository",
+												"syncedAt",
+												"createdAt"
+											]
+										},
+										{
+											"type": "null"
+										}
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugIssuesByIdentifierPullRequest",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"reference": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 400
+									}
+								},
+								"required": ["reference"],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"title": {
+											"type": "string"
+										},
+										"state": {
+											"enum": ["open", "merged", "closed", "draft"],
+											"type": "string"
+										},
+										"url": {
+											"type": "string"
+										},
+										"authorLogin": {
+											"type": "string"
+										},
+										"repository": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"fullName": {
+													"type": "string"
+												}
+											},
+											"required": ["id", "fullName"]
+										},
+										"syncedAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"title",
+										"state",
+										"url",
+										"authorLogin",
+										"repository",
+										"syncedAt",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugIssuesByIdentifierPullRequest",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"unlinked": {
+											"type": "boolean"
+										}
+									},
+									"required": ["unlinked"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/labels": {
 			"get": {
 				"operationId": "getApiV1WorkspacesBySlugLabels",
@@ -3100,6 +3677,725 @@
 								"schema": {}
 							}
 						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/repositories": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugRepositories",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"provider": {
+												"enum": ["github"],
+												"type": "string"
+											},
+											"owner": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"fullName": {
+												"type": "string"
+											},
+											"defaultBranch": {
+												"type": "string"
+											},
+											"private": {
+												"type": "boolean"
+											},
+											"url": {
+												"type": "string"
+											},
+											"description": {
+												"type": "string"
+											},
+											"index": {
+												"type": "object",
+												"properties": {
+													"state": {
+														"enum": ["never", "indexing", "ready", "failed"],
+														"type": "string"
+													},
+													"ref": {
+														"type": "string"
+													},
+													"fileCount": {
+														"type": "number"
+													},
+													"truncated": {
+														"type": "boolean"
+													},
+													"indexedAt": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"error": {
+														"type": "string"
+													}
+												},
+												"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"provider",
+											"owner",
+											"name",
+											"fullName",
+											"defaultBranch",
+											"private",
+											"url",
+											"description",
+											"index",
+											"createdAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugRepositories",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"externalId": {
+										"type": "string"
+									},
+									"owner": {
+										"type": "string",
+										"maxLength": 100
+									},
+									"name": {
+										"type": "string",
+										"maxLength": 120
+									}
+								},
+								"required": [],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"provider": {
+											"enum": ["github"],
+											"type": "string"
+										},
+										"owner": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"fullName": {
+											"type": "string"
+										},
+										"defaultBranch": {
+											"type": "string"
+										},
+										"private": {
+											"type": "boolean"
+										},
+										"url": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"index": {
+											"type": "object",
+											"properties": {
+												"state": {
+													"enum": ["never", "indexing", "ready", "failed"],
+													"type": "string"
+												},
+												"ref": {
+													"type": "string"
+												},
+												"fileCount": {
+													"type": "number"
+												},
+												"truncated": {
+													"type": "boolean"
+												},
+												"indexedAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"error": {
+													"type": "string"
+												}
+											},
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"provider",
+										"owner",
+										"name",
+										"fullName",
+										"defaultBranch",
+										"private",
+										"url",
+										"description",
+										"index",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/repositories/{id}": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugRepositoriesById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"provider": {
+											"enum": ["github"],
+											"type": "string"
+										},
+										"owner": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"fullName": {
+											"type": "string"
+										},
+										"defaultBranch": {
+											"type": "string"
+										},
+										"private": {
+											"type": "boolean"
+										},
+										"url": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"index": {
+											"type": "object",
+											"properties": {
+												"state": {
+													"enum": ["never", "indexing", "ready", "failed"],
+													"type": "string"
+												},
+												"ref": {
+													"type": "string"
+												},
+												"fileCount": {
+													"type": "number"
+												},
+												"truncated": {
+													"type": "boolean"
+												},
+												"indexedAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"error": {
+													"type": "string"
+												}
+											},
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"provider",
+										"owner",
+										"name",
+										"fullName",
+										"defaultBranch",
+										"private",
+										"url",
+										"description",
+										"index",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugRepositoriesById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"unlinked": {
+											"type": "boolean"
+										}
+									},
+									"required": ["unlinked"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/repositories/{id}/reindex": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugRepositoriesByIdReindex",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"provider": {
+											"enum": ["github"],
+											"type": "string"
+										},
+										"owner": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"fullName": {
+											"type": "string"
+										},
+										"defaultBranch": {
+											"type": "string"
+										},
+										"private": {
+											"type": "boolean"
+										},
+										"url": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"index": {
+											"type": "object",
+											"properties": {
+												"state": {
+													"enum": ["never", "indexing", "ready", "failed"],
+													"type": "string"
+												},
+												"ref": {
+													"type": "string"
+												},
+												"fileCount": {
+													"type": "number"
+												},
+												"truncated": {
+													"type": "boolean"
+												},
+												"indexedAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"error": {
+													"type": "string"
+												}
+											},
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"provider",
+										"owner",
+										"name",
+										"fullName",
+										"defaultBranch",
+										"private",
+										"url",
+										"description",
+										"index",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/repositories/available": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugRepositoriesAvailable",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"externalId": {
+												"type": "string"
+											},
+											"owner": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"fullName": {
+												"type": "string"
+											},
+											"private": {
+												"type": "boolean"
+											},
+											"description": {
+												"type": "string"
+											},
+											"linked": {
+												"type": "boolean"
+											}
+										},
+										"required": [
+											"externalId",
+											"owner",
+											"name",
+											"fullName",
+											"private",
+											"description",
+											"linked"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/repositories/connect": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugRepositoriesConnect",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"provider": {
+											"anyOf": [
+												{
+													"enum": ["github"],
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"installUrl": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"connected": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"account": {
+															"type": "string"
+														},
+														"externalId": {
+															"type": "string"
+														}
+													},
+													"required": ["account", "externalId"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										}
+									},
+									"required": ["provider", "installUrl", "connected"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugRepositoriesConnect",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"provider": {
+										"enum": ["github"],
+										"type": "string",
+										"default": "github"
+									},
+									"externalId": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 100
+									},
+									"account": {
+										"type": "string",
+										"maxLength": 100,
+										"default": ""
+									}
+								},
+								"required": ["externalId"],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"connected": {
+											"type": "boolean"
+										},
+										"account": {
+											"type": "string"
+										}
+									},
+									"required": ["connected", "account"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
 					}
 				}
 			}
@@ -4556,6 +5852,58 @@
 										"commentCount": {
 											"type": "number"
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": ["github"],
+															"type": "string"
+														}
+													},
+													"required": ["id", "fullName", "provider"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"pullRequest": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"title": {
+															"type": "string"
+														},
+														"state": {
+															"enum": ["open", "merged", "closed", "draft"],
+															"type": "string"
+														},
+														"url": {
+															"type": "string"
+														}
+													},
+													"required": ["id", "number", "title", "state", "url"]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedback": {
 											"anyOf": [
 												{
@@ -4601,6 +5949,8 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"repository",
+										"pullRequest",
 										"feedback",
 										"createdAt",
 										"updatedAt"
