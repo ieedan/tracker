@@ -3,10 +3,14 @@
  *
  * Two moving parts:
  *
- *   - **Add menu** — a dropdown of dimensions. Hovering a field (or ArrowRight /
- *     Enter / Space) opens its values in a submenu. Values use the same
- *     checkbox-or-row pattern as the issue label picker: the box keeps the
- *     menu open so several can be ticked, the rest of the row toggles and closes.
+ *   - **Add menu** — a dropdown of dimensions in front of a single values
+ *     panel. Hovering a dimension opens its values beside it, the way the old
+ *     submenus did; every dimension is one more trigger on that same panel, so
+ *     hovering a second one re-anchors what is already open instead of tearing
+ *     a panel down and building another: nothing unmounts, nothing animates,
+ *     only the rows change. Values use the same checkbox-or-row pattern as the
+ *     issue label picker — the box keeps the panel open so several can be
+ *     ticked, the rest of the row toggles and closes.
  *   - **Chips** — one per active filter, reading `Status is Todo, In Progress`.
  *     The operator opens a small menu of `is` / `is not`, the values reopen the
  *     searchable picker with that same checkbox split, and the × removes the
@@ -22,6 +26,7 @@ import {
 	ForEach,
 	If,
 	ImplementEffect,
+	ImplementLifecycle,
 	Span,
 	derived,
 	signal,
@@ -29,7 +34,16 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Check, CircleUser, ListFilter, Tag, User, Users, X } from "@implementjs/lucide";
+import {
+	Check,
+	ChevronRight,
+	CircleUser,
+	ListFilter,
+	Tag,
+	User,
+	Users,
+	X,
+} from "@implementjs/lucide";
 import {
 	Command,
 	CommandEmpty,
@@ -41,14 +55,8 @@ import {
 } from "@/lib/components/ui/command";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxGroup,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuGroupHeading,
 	DropdownMenuItem,
-	DropdownMenuSub,
-	DropdownMenuSubContent,
-	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/lib/components/ui/popover";
@@ -206,32 +214,38 @@ function sameIds(left: string[], right: string[]): boolean {
 }
 
 /**
- * A writable copy of one field's values, kept in lockstep with the URL.
+ * A writable copy of the active field's values, kept in lockstep with the URL.
  *
- * The checkbox group (and the command list) need a signal they can write;
- * filters themselves are derived from the query string. Equality guards stop
- * the two effects from echoing each other.
+ * The command list needs a signal it can write; filters themselves are derived
+ * from the query string. Equality guards stop the two effects from echoing each
+ * other — and they are what makes swapping the field free, because the copy is
+ * rewritten from the new field before the write-back effect ever looks at it.
  */
 function bindFilterValues(
 	filters: Readable<Filter[]>,
-	field: FilterField,
+	field: Readable<FilterField | null>,
 	onChange: (next: Filter[]) => void,
 ): { selected: Signal<string[]>; sync: Child[] } {
-	const selected = signal(valuesOf(filters.get(), field));
+	const valuesFor = (list: Filter[], current: FilterField | null) =>
+		current === null ? [] : valuesOf(list, current);
+
+	const selected = signal(valuesFor(filters.get(), field.get()));
 
 	return {
 		selected,
 		sync: [
-			ImplementEffect([filters], (list) => {
-				const next = valuesOf(list, field);
+			ImplementEffect([filters, field], (list, current) => {
+				const next = valuesFor(list, current);
 				if (!sameIds(selected.get(), next)) selected.set(next);
 			}),
 			ImplementEffect(
 				[selected],
 				(ids) => {
-					const current = valuesOf(filters.get(), field);
+					const active = field.get();
+					if (active === null) return;
+					const current = valuesOf(filters.get(), active);
 					if (sameIds(current, ids)) return;
-					onChange(setFieldValues(filters.get(), field, ids));
+					onChange(setFieldValues(filters.get(), active, ids));
 				},
 				{ immediate: false },
 			),
@@ -289,6 +303,9 @@ function FilterChip(
 ) {
 	const field = filter.get().field;
 	const valueMenuOpen = signal(false);
+	// A chip is one dimension for life; the panel below takes a signal because
+	// the add menu drives the same component across all of them.
+	const valueField = signal<FilterField | null>(field);
 
 	const summary = derived([filter, context], (current, ctx) => {
 		const names = current.values.map((value) => labelOf(current.field, value, ctx));
@@ -358,7 +375,7 @@ function FilterChip(
 			),
 			PopoverContent(
 				{ class: "w-64 p-0", align: "start" },
-				ValueStep(field, filters, context, onChange, valueMenuOpen),
+				ValueStep(valueField, filters, context, onChange, valueMenuOpen),
 			),
 		),
 
@@ -375,11 +392,18 @@ function FilterChip(
 	);
 }
 
+/** Distinguishes the panels when two filter menus share a page. */
+let panelCount = 0;
+
 /**
- * The add-filter dropdown: hover a dimension to open its values beside it.
+ * The add-filter dropdown: one values panel, one trigger per dimension.
  *
- * Submenus open on hover after the primitive's `openDelay` (100ms), or with
- * ArrowRight / Enter / Space. The checkbox keeps the menu open; the row closes it.
+ * The dimensions used to nest a submenu each, which meant six panels built and
+ * positioned up front and a teardown-plus-rebuild every time the pointer moved
+ * one row. They are triggers on a single popover now: only the dimension being
+ * looked at has rows in the DOM, and moving between dimensions re-anchors the
+ * panel that is already open rather than opening another one. Hovering is still
+ * all it takes to open one — see `FieldTrigger`.
  */
 export function AddFilterButton(
 	filters: Readable<Filter[]>,
@@ -388,59 +412,92 @@ export function AddFilterButton(
 	open: Signal<boolean>,
 	variant: "primary" | "subtle" = "primary",
 ) {
-	return DropdownMenu(
-		{ open },
-		DropdownMenuTrigger(
-			{
-				variant: "ghost",
-				size: "sm",
-				class:
-					variant === "primary"
-						? "h-7 gap-1.5 border border-border px-2 text-[12px]"
-						: "h-6 gap-1 px-2 text-[11px] text-muted-foreground",
+	// What the shared panel is showing. The popover tracks what it is anchored
+	// *to*; this is what it is anchored *for*.
+	const activeField = signal<FilterField | null>(null);
+	const valuesOpen = signal(false);
+	const panel = `filter-values-${(panelCount += 1)}`;
+
+	// Set for the length of a handover, and only a handover. The panel is placed
+	// by writing `left`/`top`, which nothing transitions by default — so the move
+	// from one row to the next is a jump you cannot see. This flag turns those
+	// two properties into animated ones just long enough to watch the panel
+	// travel, then takes it back off: the first open is placed before the panel
+	// fades in, and `autoUpdate` rewrites the same properties on every scroll, so
+	// leaving the transition on would drag the panel around the screen.
+	const sliding = signal(false);
+	let slideTimer: ReturnType<typeof setTimeout> | null = null;
+	const slide = () => {
+		sliding.set(true);
+		if (slideTimer !== null) clearTimeout(slideTimer);
+		slideTimer = setTimeout(() => {
+			slideTimer = null;
+			sliding.set(false);
+		}, HANDOVER_SLIDE_MS + 80);
+	};
+
+	return ImplementLifecycle(
+		{
+			onUnmount: () => {
+				if (slideTimer !== null) clearTimeout(slideTimer);
 			},
-			ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
-			variant === "primary" ? "Filter" : "Add filter",
-		),
-		DropdownMenuContent(
-			{ class: "w-44", align: "start" },
-			ForEach(
-				context.bind((ctx) => availableFields(ctx).map((field) => ({ field }))),
-				(entry) => entry.field,
-				(entry) => FieldSubmenu(entry.get().field, filters, context, onChange),
+		},
+		DropdownMenu(
+			{ open },
+			DropdownMenuTrigger(
+				{
+					variant: "ghost",
+					size: "sm",
+					class:
+						variant === "primary"
+							? "h-7 gap-1.5 border border-border px-2 text-[12px]"
+							: "h-6 gap-1 px-2 text-[11px] text-muted-foreground",
+				},
+				ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
+				variant === "primary" ? "Filter" : "Add filter",
 			),
-		),
-	);
-}
-
-function FieldSubmenu(
-	field: FilterField,
-	filters: Readable<Filter[]>,
-	context: Readable<FilterContext>,
-	onChange: (next: Filter[]) => void,
-) {
-	const { selected, sync } = bindFilterValues(filters, field, onChange);
-
-	return DropdownMenuSub(
-		DropdownMenuSubTrigger(iconForField(field), FILTER_FIELD_LABELS[field]),
-		DropdownMenuSubContent(
-			{ class: "max-h-72 w-56 overflow-y-auto", align: "start" },
-			...sync,
-			DropdownMenuCheckboxGroup(
-				{ value: selected },
-				DropdownMenuGroupHeading(FILTER_FIELD_LABELS[field]),
-				ForEach(
-					context.bind((ctx) => optionsFor(field, ctx)),
-					(option) => option.value,
-					(option) =>
-						DropdownMenuCheckboxItem(
-							{
-								value: option.get().value,
-								indicator: MenuCheckbox(selected, option.get().value),
+			DropdownMenuContent(
+				{ class: "w-44", align: "start" },
+				// the panel is declared inside the menu, so closing the menu has to
+				// take it with it
+				ImplementEffect([open], (menuOpen) => {
+					if (!menuOpen) valuesOpen.set(false);
+				}),
+				Popover(
+					{ open: valuesOpen },
+					ForEach(
+						context.bind((ctx) => availableFields(ctx).map((field) => ({ field }))),
+						(entry) => entry.field,
+						(entry) =>
+							FieldTrigger(
+								entry.get().field,
+								`${panel}-${entry.get().field}`,
+								activeField,
+								valuesOpen,
+								slide,
+							),
+					),
+					PopoverContent(
+						{
+							class: cn(
+								"w-56 p-0",
+								"data-[sliding=true]:transition-[left,top] data-[sliding=true]:duration-150",
+								"data-[sliding=true]:ease-out motion-reduce:data-[sliding=true]:transition-none",
+							),
+							"data-sliding": sliding.bind((moving) => (moving ? "true" : undefined)),
+							side: "right",
+							align: "start",
+							offset: 8,
+							// Keys typed in here belong to the panel. Left to bubble they
+							// reach the menu above, whose first-letter typeahead answers by
+							// pulling focus back onto a row mid-word. Escape is the one key
+							// that still has to get out, to the layer that dismisses this.
+							onKeydown: (event: KeyboardEvent) => {
+								if (event.key !== "Escape") event.stopPropagation();
 							},
-							option.get().icon ?? null,
-							Span({ class: "flex-1 truncate" }, option.bind("label")),
-						),
+						},
+						ValueStep(activeField, filters, context, onChange, valuesOpen),
+					),
 				),
 			),
 		),
@@ -448,34 +505,159 @@ function FieldSubmenu(
 }
 
 /**
+ * How long the pointer has to rest on a row before the *first* panel opens. It
+ * is what stops a pointer travelling from the Filter button down to the row it
+ * wants from dragging a panel open behind it on the way.
+ *
+ * It applies to the first open only. Once a panel is open the next row takes it
+ * over on the spot — re-anchoring costs a `computePosition` and two style
+ * writes, measured at 1–2ms, so there is nothing here worth waiting for and a
+ * wait is exactly what stops the panel reading as following the pointer.
+ */
+const HOVER_OPEN_DELAY = 60;
+
+/** How long the panel takes to travel between rows. Matches the CSS duration. */
+const HANDOVER_SLIDE_MS = 150;
+
+/**
+ * One row of the add menu, and one more trigger on the shared panel.
+ *
+ * Hovering opens the panel against this row, as the submenu it replaced did;
+ * clicking opens it without the wait. Moving on to a sibling hands the same
+ * panel over instantly — it re-anchors and swaps its rows, so there is no
+ * close and no second panel, and the move itself is animated so the panel can
+ * be seen arriving.
+ *
+ * Opening means clicking the row, even when a hover asked for it: a click is
+ * what tells the popover which of its triggers to anchor to, and going through
+ * it is what makes the handover free. Every row but the anchored one reads
+ * `data-state="closed"`, so this never re-clicks — and so never toggles shut —
+ * the row already showing.
+ */
+function FieldTrigger(
+	field: FilterField,
+	id: string,
+	activeField: Signal<FilterField | null>,
+	open: Readable<boolean>,
+	slide: () => void,
+) {
+	const show = () => activeField.set(field);
+
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+	const clearHoverTimer = () => {
+		if (hoverTimer === null) return;
+		clearTimeout(hoverTimer);
+		hoverTimer = null;
+	};
+
+	/** Hand the panel to this row. Clicking is how the popover is told to. */
+	const take = (row: HTMLElement) => {
+		if (open.get()) slide();
+		show();
+		row.click();
+	};
+
+	return ImplementLifecycle(
+		{ onUnmount: clearHoverTimer },
+		PopoverTrigger(
+			{
+				id,
+				variant: "ghost",
+				size: "sm",
+				role: "menuitem",
+				// How the menu above finds its rows — the same attribute its own items
+				// carry. Without it arrow keys, Home/End and typeahead have nothing to
+				// walk, because these rows are the popover's parts rather than the
+				// menu's.
+				"data-dropdown-menu-item": "",
+				class: cn(
+					"h-auto w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-sm font-normal",
+					"data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+				),
+				// Swap the rows before the click re-anchors, so the panel is measured at
+				// the size it is about to be.
+				onPointerdown: show,
+				onClick: show,
+				// `pointermove` rather than `pointerenter`, so a row that was clicked
+				// shut comes back the moment the pointer stirs over it again.
+				onPointermove: (event: PointerEvent) => {
+					if (event.pointerType !== "mouse") return;
+					const row = event.currentTarget;
+					if (!(row instanceof HTMLElement) || row.dataset.state === "open") return;
+					// A panel is already up: it belongs to whichever row the pointer is
+					// on, as of now. Waiting here is what made the handover read as lag.
+					if (open.get()) {
+						clearHoverTimer();
+						take(row);
+						return;
+					}
+					if (hoverTimer !== null) return;
+					hoverTimer = setTimeout(() => {
+						hoverTimer = null;
+						take(row);
+					}, HOVER_OPEN_DELAY);
+				},
+				onPointerleave: (event: PointerEvent) => {
+					if (event.pointerType !== "mouse") return;
+					clearHoverTimer();
+				},
+			},
+			iconForField(field),
+			Span({ class: "flex-1 truncate text-left" }, FILTER_FIELD_LABELS[field]),
+			ChevronRight({ class: "size-3.5 shrink-0 text-muted-foreground", "aria-hidden": true }),
+		),
+	);
+}
+
+/**
  * The values for one dimension, multi-select and searchable.
  *
- * Same checkbox-or-row split as the add menu and the issue label picker. The
- * command input is extra, because a chip is often where you hunt through a
- * long member or label list.
+ * The dimension is a signal rather than a fixed field, so one instance serves
+ * every trigger pointing at it: switching swaps the rows and leaves the input,
+ * the panel and its position where they are. Same checkbox-or-row split as the
+ * issue label picker — the box keeps the panel open, the rest of the row
+ * toggles and closes.
  */
 function ValueStep(
-	field: FilterField,
+	field: Readable<FilterField | null>,
 	filters: Readable<Filter[]>,
 	context: Readable<FilterContext>,
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
 ) {
 	const { selected, sync } = bindFilterValues(filters, field, onChange);
+	const search = signal("");
+
+	// Keyed by dimension as well as value: assignees and creators are the same
+	// people, and a stale row would otherwise survive the swap between them.
+	const options = derived([field, context], (current, ctx) =>
+		current === null
+			? []
+			: optionsFor(current, ctx).map((option) => ({
+					...option,
+					key: `${current}:${option.value}`,
+				})),
+	);
 
 	return Div(
 		{ class: "contents" },
 		...sync,
+		// a new dimension starts a new search
+		ImplementEffect([field], () => search.set(""), { immediate: false }),
 		Command(
-			{ label: FILTER_FIELD_LABELS[field] },
-			CommandInput({ placeholder: `${FILTER_FIELD_LABELS[field]}…` }),
+			{ label: "Filter values", search },
+			CommandInput({
+				placeholder: field.bind((current) =>
+					current === null ? "Search…" : `${FILTER_FIELD_LABELS[current]}…`,
+				),
+			}),
 			CommandList(
 				CommandEmpty("Nothing matches."),
 				CommandGroup(
 					CommandGroupItems(
 						ForEach(
-							context.bind((ctx) => optionsFor(field, ctx)),
-							(option) => option.value,
+							options,
+							(option) => option.key,
 							(option) =>
 								CommandItem(
 									{

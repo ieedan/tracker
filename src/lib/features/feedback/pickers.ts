@@ -47,7 +47,7 @@ export function FeedbackStatusPicker(
 				: null,
 		),
 		DropdownMenuContent(
-			{ class: "w-48", align: "start" },
+			{ class: "w-56", align: "start", search: "Change status…", hotkeys: true },
 			DropdownMenuRadioGroup(
 				{
 					value,
@@ -106,7 +106,7 @@ export function VisibilityPicker(
 					),
 				),
 				DropdownMenuContent(
-					{ class: "w-56", align: "start" },
+					{ class: "w-56", align: "start", hotkeys: true },
 					DropdownMenuRadioGroup(
 						{
 							value,
@@ -170,7 +170,7 @@ export function FeedbackLabelPicker(
 			),
 		),
 		DropdownMenuContent(
-			{ class: "w-56", align: "start" },
+			{ class: "w-56", align: "start", search: "Add label…", hotkeys: true },
 			DropdownMenuCheckboxGroup(
 				{
 					value: selectedIds,

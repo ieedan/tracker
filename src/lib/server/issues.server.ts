@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNull, like, max, or, type SQL } from "
 import { alias } from "drizzle-orm/sqlite-core";
 import { parseIdentifier, type IssuePriority, type IssueStatus } from "@/lib/domain/issues";
 import type { Issue } from "@/lib/domain/schemas";
+import { attachmentsFor } from "./attachments.server";
 import { db } from "./db.server";
 import { emitIssueDeleted, emitIssueEvent } from "./events.server";
 import type { Membership } from "./guards.server";
@@ -18,6 +19,7 @@ import {
 	notification,
 	team,
 	user,
+	workspace,
 	workspaceMember,
 } from "./schema.server";
 import { identifierFor, toIssue } from "./serialize.server";
@@ -46,6 +48,9 @@ export interface IssueFilters {
 const baseSelect = {
 	issue,
 	team,
+	// Only for the slug: an attachment's URL is addressed by workspace, and the
+	// issue itself only knows its team.
+	workspace,
 	assignee: assigneeUser,
 	creator: creatorUser,
 	// Present only on issues converted from feedback, which is most of them
@@ -59,6 +64,7 @@ const baseSelect = {
 type IssueRows = Array<{
 	issue: typeof issue.$inferSelect;
 	team: typeof team.$inferSelect;
+	workspace: typeof workspace.$inferSelect;
 	assignee: typeof user.$inferSelect | null;
 	creator: typeof user.$inferSelect;
 	feedback: typeof feedback.$inferSelect | null;
@@ -71,6 +77,7 @@ const withJoins = () =>
 		.select(baseSelect)
 		.from(issue)
 		.innerJoin(team, eq(team.id, issue.teamId))
+		.innerJoin(workspace, eq(workspace.id, team.workspaceId))
 		.leftJoin(assigneeUser, eq(assigneeUser.id, issue.assigneeId))
 		.innerJoin(creatorUser, eq(creatorUser.id, issue.creatorId))
 		.leftJoin(feedback, eq(feedback.id, issue.feedbackId))
@@ -78,11 +85,11 @@ const withJoins = () =>
 		.leftJoin(pullRequest, eq(pullRequest.issueId, issue.id));
 
 /**
- * Attaches labels and comment counts to a page of issue rows.
+ * Attaches labels, comment counts and attachments to a page of issue rows.
  *
- * Two extra queries for the whole page rather than two per row — the join that
- * would fetch labels inline multiplies the issue rows by their label count and
- * makes the comment count wrong.
+ * Three extra queries for the whole page rather than three per row — the join
+ * that would fetch labels inline multiplies the issue rows by their label count
+ * and makes the comment count wrong.
  */
 async function hydrate(rows: IssueRows): Promise<Issue[]> {
 	if (rows.length === 0) return [];
@@ -109,6 +116,12 @@ async function hydrate(rows: IssueRows): Promise<Issue[]> {
 
 	const countsByIssue = new Map(countRows.map((row) => [row.issueId, row.total]));
 
+	// Every query above is scoped to one workspace — a list by `team.workspaceId`
+	// and a lookup to a single row — so one slug addresses the whole page.
+	const { byIssue: attachmentsByIssue } = await attachmentsFor(rows[0]!.workspace.slug, {
+		issueIds: ids,
+	});
+
 	return rows.map((row) =>
 		toIssue(row.issue, {
 			team: row.team,
@@ -118,6 +131,7 @@ async function hydrate(rows: IssueRows): Promise<Issue[]> {
 				a.name.localeCompare(b.name),
 			),
 			commentCount: countsByIssue.get(row.issue.id) ?? 0,
+			attachments: attachmentsByIssue.get(row.issue.id) ?? [],
 			feedback: row.feedback,
 			repository: row.repository,
 			pullRequest: row.pullRequest,

@@ -13,6 +13,7 @@
  */
 import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
+import { formatBytes, isAudio, isImage, isTextual } from "@/lib/domain/attachments";
 import {
 	CreateCommentBody,
 	CreateIssueBody,
@@ -22,6 +23,7 @@ import {
 	UpdateFeedbackBody,
 	UpdateIssueBody,
 } from "@/lib/domain/schemas";
+import { toolFailure, toolMedia, toolText, type ToolResult } from "./protocol.server";
 
 export interface McpTool {
 	name: string;
@@ -42,6 +44,77 @@ export interface McpTool {
 		args: Record<string, unknown>,
 		slug: string,
 	) => { method: string; path: string; body?: unknown };
+	/**
+	 * Turns a successful response into a tool result.
+	 *
+	 * Left out by every tool whose endpoint answers JSON, which is all but one:
+	 * the default parses the body and hands back both text and structured
+	 * content. A tool whose endpoint answers *bytes* has to say what becomes of
+	 * them, because reading those as text would corrupt them.
+	 */
+	result?: (response: Response) => Promise<ToolResult>;
+}
+
+/**
+ * How much of an attachment may be inlined into a tool result.
+ *
+ * Uploads go up to 100MB, and base64 adds a third on top — a video pasted into
+ * a comment would blow up the model's context long before it was useful. Files
+ * over this are refused with their size, so the model knows the file exists and
+ * why it did not get it.
+ */
+const MAX_INLINE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+/** `image/png; charset=…` → `image/png`. */
+function baseType(contentType: string): string {
+	return contentType.toLowerCase().split(";")[0]?.trim() ?? "application/octet-stream";
+}
+
+/**
+ * An attachment's bytes, as something the model can actually take in.
+ *
+ * An image comes back as an `image` block rather than as base64 inside text —
+ * that block type is the whole point, since it is what makes a screenshot on an
+ * issue something the model can look at. Text files come back as their
+ * characters. Anything else has no representation a model can read, so it is a
+ * failure that says so rather than a wall of base64.
+ */
+async function attachmentBytes(response: Response): Promise<ToolResult> {
+	const contentType = baseType(response.headers.get("content-type") ?? "");
+	const filename = filenameFrom(response.headers.get("content-disposition"));
+
+	const declared = Number(response.headers.get("content-length") ?? "");
+	if (Number.isFinite(declared) && declared > MAX_INLINE_ATTACHMENT_BYTES) {
+		return tooLarge(declared);
+	}
+
+	const bytes = Buffer.from(await response.arrayBuffer());
+	if (bytes.byteLength > MAX_INLINE_ATTACHMENT_BYTES) return tooLarge(bytes.byteLength);
+
+	if (isImage(contentType)) {
+		return toolMedia("image", bytes.toString("base64"), contentType, filename);
+	}
+	if (isAudio(contentType)) {
+		return toolMedia("audio", bytes.toString("base64"), contentType, filename);
+	}
+	if (isTextual(contentType)) {
+		return toolText(`${filename}\n\n${bytes.toString("utf8")}`);
+	}
+	return toolFailure(
+		`${filename} is ${contentType}, which cannot be read as text or shown as an image. Its metadata is on the issue or comment it hangs off.`,
+	);
+}
+
+function tooLarge(size: number): ToolResult {
+	return toolFailure(
+		`That attachment is ${formatBytes(size)}; only files up to ${formatBytes(MAX_INLINE_ATTACHMENT_BYTES)} can be read this way.`,
+	);
+}
+
+/** The original name, which the download route puts in `content-disposition`. */
+function filenameFrom(disposition: string | null): string {
+	const match = disposition === null ? null : /filename="([^"]*)"/.exec(disposition);
+	return match?.[1] === undefined || match[1] === "" ? "attachment" : match[1];
 }
 
 /**
@@ -141,7 +214,7 @@ export const MCP_TOOLS: McpTool[] = [
 		name: "get_issue",
 		title: "Get an issue",
 		description:
-			"Fetch one issue in full by its identifier, including description, labels, assignee and attachments.",
+			"Fetch one issue in full by its identifier, including description, labels, assignee, and the files attached to it. Attachments come back as metadata — pass an `id` from `attachments` to read_attachment to see the file itself.",
 		readOnly: true,
 		scoped: true,
 		input: v.object({ identifier, ...workspaceArg }),
@@ -207,7 +280,8 @@ export const MCP_TOOLS: McpTool[] = [
 	{
 		name: "list_comments",
 		title: "List comments",
-		description: "Read the comment thread on an issue, oldest first.",
+		description:
+			"Read the comment thread on an issue, oldest first. A comment's `attachments` are metadata; pass an `id` from one to read_attachment to see the file itself.",
 		readOnly: true,
 		scoped: true,
 		input: v.object({ identifier, ...workspaceArg }),
@@ -215,6 +289,26 @@ export const MCP_TOOLS: McpTool[] = [
 			method: "GET",
 			path: `/api/v1/workspaces/${slug}/issues/${encodeURIComponent(String(args.identifier))}/comments`,
 		}),
+	},
+	{
+		name: "read_attachment",
+		title: "Read an attachment",
+		description:
+			"Read the file behind an attachment id, rather than its metadata. Images come back as pictures you can look at, text files as their contents. Ids come from the `attachments` on an issue or a comment.",
+		readOnly: true,
+		scoped: true,
+		input: v.object({
+			id: v.pipe(
+				v.string(),
+				v.description("Attachment id, from `attachments` on an issue or a comment."),
+			),
+			...workspaceArg,
+		}),
+		request: (args, slug) => ({
+			method: "GET",
+			path: `/api/v1/workspaces/${slug}/attachments/${encodeURIComponent(String(args.id))}`,
+		}),
+		result: attachmentBytes,
 	},
 	{
 		name: "comment_on_issue",

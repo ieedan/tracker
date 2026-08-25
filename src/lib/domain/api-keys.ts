@@ -5,6 +5,7 @@
 export const API_KEY_RESOURCES = [
 	"issues",
 	"workspace",
+	"labels",
 	"members",
 	"webhooks",
 	"feedback",
@@ -21,6 +22,7 @@ export type ApiKeyPermissions = Partial<Record<ApiKeyResource, ApiKeyAction[]>>;
 export const API_KEY_RESOURCE_LABELS: Record<ApiKeyResource, string> = {
 	issues: "Issues",
 	workspace: "Workspace",
+	labels: "Labels",
 	members: "Members",
 	webhooks: "Webhooks",
 	feedback: "Feedback",
@@ -29,7 +31,9 @@ export const API_KEY_RESOURCE_LABELS: Record<ApiKeyResource, string> = {
 
 export const API_KEY_RESOURCE_HINTS: Record<ApiKeyResource, string> = {
 	issues: "Issues, comments, and attachments.",
-	workspace: "The workspace itself, plus its labels and teams.",
+	workspace: "The workspace itself, plus its teams and templates.",
+	labels:
+		"The workspace's labels. Writing creates new ones; renaming and deleting are not offered at all.",
 	members: "People in the workspace, and invite links.",
 	webhooks: "Outgoing webhooks and their delivery log.",
 	feedback: "User feedback, triage, and conversion to issues.",
@@ -45,6 +49,21 @@ export const API_KEY_EXPIRATIONS = [
 ] as const;
 export type ApiKeyExpiration = (typeof API_KEY_EXPIRATIONS)[number]["value"];
 
+/**
+ * Resources split out of a broader one, and the resource they used to live in.
+ *
+ * Labels were part of `workspace` until they were given a scope of their own,
+ * so a credential holding `workspace` keeps exactly the label access it already
+ * had and nothing minted before the split stops working.
+ *
+ * The implication runs one way only. `labels` never satisfies a `workspace`
+ * check, which is the entire point: `labels:write` can be handed out on its own
+ * without also handing over repositories, teams, templates and settings.
+ */
+const RESOURCE_FALLBACKS: Partial<Record<ApiKeyResource, ApiKeyResource>> = {
+	labels: "workspace",
+};
+
 export function hasPermission(
 	granted: ApiKeyPermissions | null,
 	resource: ApiKeyResource,
@@ -53,6 +72,18 @@ export function hasPermission(
 	// `null` is a key minted before scopes existed — it can do anything the
 	// owner can. An empty object is the opposite: explicitly no access.
 	if (granted === null) return true;
+	if (allows(granted, resource, action)) return true;
+
+	const fallback = RESOURCE_FALLBACKS[resource];
+	return fallback !== undefined && allows(granted, fallback, action);
+}
+
+/** One resource's actions, with `write` implying `read`. */
+function allows(
+	granted: ApiKeyPermissions,
+	resource: ApiKeyResource,
+	action: ApiKeyAction,
+): boolean {
 	const actions = granted[resource] ?? [];
 	if (action === "read") return actions.includes("read") || actions.includes("write");
 	return actions.includes("write");

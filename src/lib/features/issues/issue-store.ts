@@ -4,6 +4,10 @@
 // seeds a signal from its load data and this module patches that signal as
 // changes land. Every edit is optimistic: the row moves the moment you pick,
 // and rolls back if the request fails.
+//
+// The same gap means a page never hears about work done elsewhere — another
+// member, or an agent through the API. `refreshIssues` re-reads the list so a
+// caller can poll it.
 import type { Signal } from "@implementjs/core";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
@@ -108,4 +112,105 @@ export async function patchIssues(
 	}
 
 	return succeeded;
+}
+
+/**
+ * Deletes a set of issues.
+ *
+ * Optimistic like the patches, but with nothing to reconcile afterwards: a
+ * deleted row has no server answer to replace it with, so the rows leave the
+ * list at once and only the ones the server refused come back. The list sorts
+ * itself for display, so putting a refused row back on the end is enough to
+ * return it to where it was.
+ *
+ * Sequential, like `patchIssues`, so a partial failure can say how far it got.
+ * Returns the ids that are actually gone — the caller uses that to drop them
+ * from a selection, or to leave the page the deleted issue was on.
+ */
+export async function deleteIssues(
+	issues: Signal<Issue[]>,
+	slug: string,
+	ids: readonly string[],
+): Promise<string[]> {
+	const wanted = new Set(ids);
+	const targets = issues.get().filter((issue) => wanted.has(issue.id));
+	if (targets.length === 0) return [];
+
+	issues.update((list) => list.filter((issue) => !wanted.has(issue.id)));
+
+	const deleted: string[] = [];
+	const refused: Issue[] = [];
+
+	for (const issue of targets) {
+		const { error } = await api.DELETE("/api/v1/workspaces/[slug]/issues/[identifier]", {
+			params: { slug, identifier: issue.identifier },
+		});
+		if (error !== undefined) {
+			refused.push(issue);
+			continue;
+		}
+		deleted.push(issue.id);
+	}
+
+	if (refused.length > 0) {
+		issues.update((list) => {
+			// A poll may have put a row back while the request was in the air.
+			const present = new Set(list.map((issue) => issue.id));
+			return [...list, ...refused.filter((issue) => !present.has(issue.id))];
+		});
+	}
+
+	if (deleted.length === 0) {
+		toastError(
+			targets.length === 1 ? "Could not delete this issue" : "Could not delete the issues",
+		);
+	} else if (refused.length > 0) {
+		toastError(`Deleted ${deleted.length}, ${refused.length} failed`);
+	}
+
+	return deleted;
+}
+
+/** Which list a page is showing — `teamKey` is `null` on the workspace-wide one. */
+export interface IssueScope {
+	slug: string;
+	teamKey: string | null;
+}
+
+/**
+ * Re-reads the list the page is showing and replaces it wholesale.
+ *
+ * Read as a poll, so it defers to anything happening locally. Every local write
+ * — an optimistic edit, a create, a transfer — replaces the array in `issues`,
+ * so an answer is only applied when the array it started against is still the
+ * one on screen. Anything that moved in the meantime wins, and the next tick
+ * picks the server up again a moment later.
+ *
+ * A failed read is swallowed: a list a few seconds stale is not worth a toast.
+ *
+ * `scope` is read on each call rather than captured, so one timer survives a
+ * client navigation that reseeds the page instead of remounting it.
+ */
+export async function refreshIssues(
+	issues: Signal<Issue[]>,
+	scope: () => IssueScope,
+): Promise<void> {
+	const before = scope();
+	if (before.slug === "") return;
+	const seen = issues.get();
+
+	const { data, error } = await api.GET("/api/v1/workspaces/[slug]/issues", {
+		params: { slug: before.slug },
+		// `undefined` drops out of the query string, which is the workspace-wide list.
+		query: { team: before.teamKey ?? undefined },
+	});
+	if (error !== undefined) return;
+
+	// Something local moved while this was in the air, or the page is showing a
+	// different list now. Either way this answer is the wrong one to apply.
+	if (issues.get() !== seen) return;
+	const now = scope();
+	if (now.slug !== before.slug || now.teamKey !== before.teamKey) return;
+
+	issues.set(data);
 }

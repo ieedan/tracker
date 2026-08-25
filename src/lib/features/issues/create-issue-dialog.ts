@@ -9,11 +9,11 @@ import {
 	ImplementEffect,
 	Input,
 	Span,
-	Textarea,
 	signal,
 } from "@implementjs/core";
 import { X } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
+import { isTyping } from "@/lib/client/is-typing";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -29,10 +29,14 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@/lib/components/ui/dialog";
+// Aliased: `Label` is already the issue label type in this module.
+import { Label as ControlLabel } from "@/lib/components/ui/label";
+import { Switch } from "@/lib/components/ui/switch";
 import { preferDefaultTeam, type IssuePriority, type IssueStatus } from "@/lib/domain/issues";
 import type {
 	Attachment,
 	Issue,
+	IssueTemplate,
 	Label,
 	Member,
 	Repository,
@@ -50,13 +54,15 @@ import type { Upload } from "@/lib/features/attachments/uploader";
 import {
 	clearIssueDraft,
 	isBlankIssueDraft,
+	loadCreateMore,
 	loadIssueDraft,
+	saveCreateMore,
 	saveIssueDraft,
 	type IssueDraft,
 } from "./issue-draft";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
-import { MentionMenu, fileMentions } from "./file-mentions";
+import { BodyComposer } from "./body-composer";
 
 const open = signal(false);
 /** So the issue page can yield the drop overlay while this dialog is up. */
@@ -65,13 +71,57 @@ const slug = signal("");
 /** Which team the composer opens on — the one you were looking at, if any. */
 const preferredTeam = signal("");
 
+/**
+ * The template the next open should apply, consumed once by `loadContext`.
+ *
+ * A signal rather than a parameter because the dialog is mounted once in the
+ * shell — the same reason `slug` and `preferredTeam` live out here.
+ */
+const pendingTemplate = signal<IssueTemplate | null>(null);
+
 /** Set when a create succeeds, so an open list can splice the issue in. */
 export const issueCreated = signal<Issue | null>(null);
+
+/**
+ * The team a given open lands on: the one asked for when it still exists,
+ * otherwise Engineering. `wanted` is empty when nothing pins a team — a plain
+ * open passes the team you were looking at.
+ *
+ * Every path that has to answer "which team?" — open, restore, discard, create
+ * more — goes through here so they cannot drift apart.
+ */
+function teamRefFor(available: Team[], wanted: string): TeamRef | null {
+	const picked =
+		(wanted !== "" ? available.find((team) => team.key === wanted) : undefined) ??
+		preferDefaultTeam(available);
+	return picked === undefined ? null : { id: picked.id, name: picked.name, key: picked.key };
+}
 
 export function openCreateIssue(workspaceSlug: string, teamKey?: string): void {
 	if (workspaceSlug === "") return;
 	slug.set(workspaceSlug);
 	preferredTeam.set(teamKey ?? "");
+	// A plain New issue is never a leftover template from a previous open.
+	pendingTemplate.set(null);
+	open.set(true);
+}
+
+/**
+ * Opens the composer on a workspace template.
+ *
+ * A template is an explicit "start from this", so it wins over the saved draft
+ * rather than merging with it — the draft is only overwritten once the fields
+ * change, exactly as if it had been typed.
+ */
+export function openCreateIssueFromTemplate(
+	workspaceSlug: string,
+	template: IssueTemplate,
+	teamKey?: string,
+): void {
+	if (workspaceSlug === "") return;
+	slug.set(workspaceSlug);
+	preferredTeam.set(teamKey ?? "");
+	pendingTemplate.set(template);
 	open.set(true);
 }
 
@@ -85,6 +135,9 @@ export function CreateIssueDialog() {
 	const attachments = signal<Attachment[]>([]);
 	const uploads = signal<Upload[]>([]);
 	const submitting = signal(false);
+	// "Create more": keep the composer up after a create so issues can be filed
+	// back to back. Remembered across opens, and across reloads.
+	const createMore = signal(false);
 
 	// The pickers need the workspace's people and labels; they are fetched when
 	// the composer opens rather than held by the shell, which does not have them.
@@ -110,13 +163,6 @@ export function CreateIssueDialog() {
 		labelOpen.set(which === "label");
 	};
 
-	// `@` in the description searches the linked repositories' file index.
-	const mentions = fileMentions({
-		value: description,
-		slug: () => slug.get(),
-		repository: () => chosenRepository.get()?.id,
-		element: descriptionRef,
-	});
 	const titleInput = signal<HTMLInputElement | null>(null);
 	let focusFrame: number | undefined;
 
@@ -171,6 +217,14 @@ export function CreateIssueDialog() {
 		persist();
 	};
 
+	const focusTitle = () => {
+		if (focusFrame !== undefined) cancelAnimationFrame(focusFrame);
+		focusFrame = requestAnimationFrame(() => {
+			focusFrame = undefined;
+			titleInput.get()?.focus();
+		});
+	};
+
 	const reset = () => {
 		title.set("");
 		description.set("");
@@ -183,6 +237,19 @@ export function CreateIssueDialog() {
 		uploads.set([]);
 	};
 
+	/**
+	 * Back to exactly what a freshly opened composer shows: every field at its
+	 * default, and the team resolved the way an open resolves it — the one you
+	 * are currently viewing, else Engineering.
+	 *
+	 * Used by both "create more" and Discard, so neither invents its own idea
+	 * of what empty means.
+	 */
+	const resetToDefaults = () => {
+		reset();
+		chosenTeam.set(teamRefFor(teams.get(), preferredTeam.get()));
+	};
+
 	const discard = () => {
 		if (persistTimer !== undefined) {
 			clearTimeout(persistTimer);
@@ -193,11 +260,7 @@ export function CreateIssueDialog() {
 		hydrating = true;
 		clearIssueDraft(workspaceSlug);
 		hasDraft.set(false);
-		reset();
-		const fallback = preferDefaultTeam(teams.get());
-		chosenTeam.set(
-			fallback === undefined ? null : { id: fallback.id, name: fallback.name, key: fallback.key },
-		);
+		resetToDefaults();
 		hydrating = false;
 		for (const file of leftover) {
 			void api.DELETE("/api/v1/workspaces/[slug]/attachments/[id]", {
@@ -209,10 +272,25 @@ export function CreateIssueDialog() {
 	const loadContext = async (workspaceSlug: string) => {
 		hydrating = true;
 		try {
-			const draft = loadIssueDraft(workspaceSlug);
+			// Read on open rather than at module load: there is no storage during
+			// SSR, and another tab may have flipped it since.
+			createMore.set(loadCreateMore());
+
+			// Consumed here so a later open — the sidebar button, `c` — is a plain
+			// composer again rather than the last template picked.
+			const template = pendingTemplate.get();
+			pendingTemplate.set(null);
+
+			const draft = template === null ? loadIssueDraft(workspaceSlug) : null;
 			hasDraft.set(draft !== null);
 
-			if (draft === null) {
+			if (template !== null) {
+				reset();
+				title.set(template.title);
+				description.set(template.description);
+				status.set(template.status);
+				priority.set(template.priority);
+			} else if (draft === null) {
 				reset();
 			} else {
 				title.set(draft.title);
@@ -243,19 +321,25 @@ export function CreateIssueDialog() {
 			}
 			if (memberResult.error === undefined) {
 				members.set(memberResult.data);
-				if (draft !== null) {
+				// Either source names a user by id, and either can name someone who
+				// has since left — in which case the field is simply left empty.
+				const wantedAssignee =
+					template !== null ? (template.assignee?.id ?? null) : (draft?.assigneeId ?? null);
+				if (template !== null || draft !== null) {
 					assignee.set(
-						draft.assigneeId === null
+						wantedAssignee === null
 							? null
-							: (memberResult.data.find((member) => member.user.id === draft.assigneeId)?.user ??
+							: (memberResult.data.find((member) => member.user.id === wantedAssignee)?.user ??
 									null),
 					);
 				}
 			}
 			if (labelResult.error === undefined) {
 				labels.set(labelResult.data);
-				if (draft !== null) {
-					const kept = new Set(draft.labelIds);
+				const wantedLabels =
+					template !== null ? template.labels.map((label) => label.id) : (draft?.labelIds ?? null);
+				if (wantedLabels !== null) {
+					const kept = new Set(wantedLabels);
 					chosenLabels.set(labelResult.data.filter((label) => kept.has(label.id)));
 				}
 			}
@@ -264,22 +348,16 @@ export function CreateIssueDialog() {
 			teams.set(teamResult.data);
 
 			// Draft team wins when it still exists; otherwise Engineering. With no
-			// draft, open on the team you were looking at, then Engineering.
-			let picked: Team | undefined;
-			if (draft !== null) {
-				picked =
-					(draft.teamKey !== null
-						? teamResult.data.find((team) => team.key === draft.teamKey)
-						: undefined) ?? preferDefaultTeam(teamResult.data);
-			} else {
-				const wanted = preferredTeam.get();
-				picked =
-					(wanted !== "" ? teamResult.data.find((team) => team.key === wanted) : undefined) ??
-					preferDefaultTeam(teamResult.data);
-			}
-			chosenTeam.set(
-				picked === undefined ? null : { id: picked.id, name: picked.name, key: picked.key },
-			);
+			// draft, open on the team you were looking at, then Engineering. A
+			// template that pins no team is not an instruction to ignore where you
+			// were — it falls through to the same defaults as a plain open.
+			const wanted =
+				template !== null
+					? (template.team?.key ?? preferredTeam.get())
+					: draft !== null
+						? (draft.teamKey ?? "")
+						: preferredTeam.get();
+			chosenTeam.set(teamRefFor(teamResult.data, wanted));
 		} finally {
 			hydrating = false;
 		}
@@ -317,8 +395,24 @@ export function CreateIssueDialog() {
 		issueCreated.set(data);
 		toastSuccess(`Created ${data.identifier}`);
 		hydrating = true;
+		// The draft belonged to the issue that now exists; a pending save of it
+		// would only write it back.
+		if (persistTimer !== undefined) {
+			clearTimeout(persistTimer);
+			persistTimer = undefined;
+		}
 		clearIssueDraft(slug.get());
 		hasDraft.set(false);
+
+		if (createMore.get()) {
+			// Stay up, but as a fresh composer rather than a copy of what was just
+			// filed: every field back to its default, cursor in the title.
+			resetToDefaults();
+			hydrating = false;
+			focusTitle();
+			return;
+		}
+
 		reset();
 		open.set(false);
 		hydrating = false;
@@ -343,13 +437,10 @@ export function CreateIssueDialog() {
 			onKeydownCapture: (event) => {
 				if (!open.get()) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
-				if (event.isComposing) return;
-				const target = event.target;
-				// Description keeps the letters. An empty title still lets s/p/a/r/l
-				// open the property menus, matching Linear on a fresh composer.
-				if (target instanceof HTMLTextAreaElement) return;
-				if (target instanceof HTMLElement && target.isContentEditable) return;
-				if (target instanceof HTMLInputElement && target.value !== "") return;
+				// Typing is typing: the title keeps its letters even while it is empty,
+				// which is where `a` used to be stolen by the assignee menu. The
+				// property letters still work anywhere focus is not in a field.
+				if (isTyping(event)) return;
 				const key = event.key.toLowerCase();
 				const which =
 					key === "s"
@@ -464,26 +555,16 @@ export function CreateIssueDialog() {
 							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
 						},
 					}),
-					Div(
-						{ class: "relative" },
-						Textarea({
-							this: descriptionRef,
-							value: description,
-							placeholder: "Add description… @ to reference a file",
-							rows: 4,
-							class:
-								"w-full resize-none border-0 bg-transparent p-0 text-[13px] outline-none placeholder:text-muted-foreground",
-							onInput: mentions.onInput,
-							onKeydown: (event) => {
-								// The mention menu claims the arrows, Enter and Escape while
-								// it is open, so it gets the event first.
-								mentions.onKeydown(event);
-								if (event.defaultPrevented) return;
-								if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
-							},
-						}),
-						MentionMenu(mentions),
-					),
+					BodyComposer({
+						value: description,
+						element: descriptionRef,
+						// `@` in the description searches the linked repositories' file index.
+						slug: () => slug.get(),
+						repository: () => chosenRepository.get()?.id,
+						placeholder: "Add description… @ to reference a file",
+						rows: 4,
+						onSubmit: () => void submit(),
+					}),
 					AttachmentGrid({
 						attachments,
 						uploads,
@@ -563,6 +644,18 @@ export function CreateIssueDialog() {
 								"Discard",
 							),
 						),
+					),
+					ControlLabel(
+						{
+							for: "create-more",
+							class: "gap-2 pr-1 text-[12px] font-normal text-muted-foreground",
+						},
+						Switch({
+							id: "create-more",
+							checked: createMore,
+							onCheckedChange: (checked) => saveCreateMore(checked),
+						}),
+						"Create more",
 					),
 					Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
 					Button(

@@ -16,7 +16,15 @@ import {
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
 import { notify } from "@/lib/server/notifications.server";
 import { requireRepository } from "@/lib/server/repositories.server";
-import { issue, team } from "@/lib/server/schema.server";
+import { recordActivity, type ActivityInput } from "@/lib/server/activity.server";
+import {
+	issue,
+	issueLabel,
+	label,
+	repository,
+	team,
+	user as userTable,
+} from "@/lib/server/schema.server";
 import { identifierFor } from "@/lib/server/serialize.server";
 import { requireTeam } from "@/lib/server/teams.server";
 import { handler } from "./$types";
@@ -36,6 +44,56 @@ function split(identifier: string): { key: string; number: number } {
 	const parsed = parseIdentifier(identifier);
 	if (parsed === null) error(404, `"${identifier}" is not an issue identifier`);
 	return parsed;
+}
+
+type ActivityLabels = NonNullable<ActivityInput["labels"]>;
+
+/** The labels currently on an issue — read before a write, to diff against. */
+async function labelsOnIssue(issueId: string): Promise<Array<{ name: string; color: string }>> {
+	return await db
+		.select({ name: label.name, color: label.color })
+		.from(issueLabel)
+		.innerJoin(label, eq(label.id, issueLabel.labelId))
+		.where(eq(issueLabel.issueId, issueId));
+}
+
+/** Which labels the edit added and which it took off, by name. */
+function labelMovement(
+	before: Array<{ name: string; color: string }>,
+	after: Array<{ name: string; color: string }>,
+): ActivityLabels {
+	const had = new Set(before.map((entry) => entry.name));
+	const has = new Set(after.map((entry) => entry.name));
+	return [
+		...after
+			.filter((entry) => !had.has(entry.name))
+			.map((entry) => ({ name: entry.name, color: entry.color, added: true })),
+		...before
+			.filter((entry) => !has.has(entry.name))
+			.map((entry) => ({ name: entry.name, color: entry.color, added: false })),
+	];
+}
+
+/** The timeline stores names, not ids — so a later rename cannot rewrite it. */
+async function nameOfUser(id: string | null): Promise<string | null> {
+	if (id === null || id === "") return null;
+	const rows = await db
+		.select({ name: userTable.name })
+		.from(userTable)
+		.where(eq(userTable.id, id))
+		.limit(1);
+	return rows[0]?.name ?? null;
+}
+
+async function nameOfRepository(id: string | null): Promise<string | null> {
+	if (id === null || id === "") return null;
+	const rows = await db
+		.select({ owner: repository.owner, name: repository.name })
+		.from(repository)
+		.where(eq(repository.id, id))
+		.limit(1);
+	const row = rows[0];
+	return row === undefined ? null : `${row.owner}/${row.name}`;
 }
 
 export const GET = handler({
@@ -106,6 +164,8 @@ export const PATCH = handler({
 			await db.update(issue).set(changes).where(eq(issue.id, before.id));
 		}
 
+		// Snapshotted before the write, so the timeline can say which labels moved.
+		const labelsBefore = body.labelIds === undefined ? [] : await labelsOnIssue(before.id);
 		if (body.labelIds !== undefined) {
 			await setIssueLabels(before.id, await validLabelIds(workspace.id, body.labelIds));
 		}
@@ -184,6 +244,42 @@ export const PATCH = handler({
 		if (body.labelIds !== undefined) {
 			diff.labels = { from: null, to: updated.labels.map((entry) => entry.name) };
 		}
+
+		// The details view's timeline, built from the same diff the webhooks use so
+		// the two can never disagree about what changed.
+		const timeline: ActivityInput[] = [];
+		if (diff.title !== undefined) {
+			timeline.push({ type: "title_changed", from: before.title, to: updated.title });
+		}
+		if (diff.description !== undefined) timeline.push({ type: "description_changed" });
+		if (diff.status !== undefined) {
+			timeline.push({ type: "status_changed", from: before.status, to: updated.status });
+		}
+		if (diff.priority !== undefined) {
+			timeline.push({ type: "priority_changed", from: before.priority, to: updated.priority });
+		}
+		if (diff.assigneeId !== undefined) {
+			timeline.push({
+				type: "assignee_changed",
+				from: await nameOfUser(before.assigneeId),
+				to: updated.assignee?.name ?? null,
+			});
+		}
+		if (diff.team !== undefined) {
+			timeline.push({ type: "team_changed", from: row.team.key, to: updated.team.key });
+		}
+		if (diff.repositoryId !== undefined) {
+			timeline.push({
+				type: "repository_changed",
+				from: await nameOfRepository(before.repositoryId),
+				to: updated.repository?.fullName ?? null,
+			});
+		}
+		// Passing the same label set back is not a change, so diff rather than trust.
+		const movedLabels = labelMovement(labelsBefore, updated.labels);
+		if (movedLabels.length > 0) timeline.push({ type: "labels_changed", labels: movedLabels });
+
+		await recordActivity(before.id, user.id, timeline);
 
 		if (Object.keys(diff).length > 0) {
 			await emitIssueEvent("issue.updated", {

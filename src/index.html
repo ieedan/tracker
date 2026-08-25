@@ -3,7 +3,12 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>tracker</title>
+		<!--
+			The default, and the only title a page that sets none will show. Routes
+			set their own with `PageMeta` (src/lib/head.ts); the render replaces this
+			tag whenever one did, so there is never a second <title> in the document.
+		-->
+		<title>tracker · issue tracking for software teams</title>
 		<meta name="color-scheme" content="light dark" />
 		<script type="module" src="/.implement/entry-client.ts"></script>
 	</head>

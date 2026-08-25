@@ -252,7 +252,7 @@ export function TransferIssueDialog({
 							),
 						),
 						DropdownMenuContent(
-							{ class: "w-64", align: "start" },
+							{ class: "w-64", align: "start", search: "Search workspaces…", hotkeys: true },
 							DropdownMenuGroup(
 								DropdownMenuGroupHeading("Workspace"),
 								ForEach(

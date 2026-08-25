@@ -39,9 +39,13 @@ export const OPENID_SCOPES = ["openid", "profile", "email", "offline_access"] as
  * upfront registration error, which is a much clearer failure.
  *
  * `workspace:write` is deliberately *not* here even though it covers admin
- * routes: it also covers creating a label and uploading an image, which any
+ * routes: it also covers uploading an image and writing a template, which any
  * member can do. `requireAdmin` is what closes the admin half, so excluding the
  * whole scope would only break the parts that were always allowed.
+ *
+ * `labels:write` is likewise grantable. It was carved out of `workspace:write`
+ * precisely so an agent can create a label without being given the rest of that
+ * scope, and the endpoint behind it is member-level.
  */
 const ADMIN_ONLY_SCOPES = new Set<AgentScope>(["members:write", "webhooks:read", "webhooks:write"]);
 

@@ -3,7 +3,6 @@ import {
 	ForEach,
 	H1,
 	H2,
-	If,
 	Input,
 	P,
 	Span,
@@ -11,24 +10,26 @@ import {
 	type Child,
 	type Readable,
 } from "@implementjs/core";
-import { Copy } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
-import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
+import { MembersSection } from "./members-section";
 import { WorkspaceAgentsSection } from "./workspace-agents-section";
 import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
 import { RepositoriesSection } from "./repositories-section";
+import { TemplatesSection } from "./templates-section";
 import { WebhooksSection } from "./webhooks-section";
 
 interface PageData {
 	workspace: Workspace;
 	members: Member[];
 	labels: Label[];
+	/** The signed-in person, so the member list can mark their own row. */
+	viewerId: string;
 }
 
 export function SettingsPage({
@@ -49,8 +50,9 @@ export function SettingsPage({
 			Div(
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				WorkspaceSection(data, params),
-				MembersSection(data, params),
+				MembersSection(data, params.slug, copy),
 				LabelsSection(data, params),
+				TemplatesSection(params.slug),
 				RepositoriesSection(params),
 				FeedbackSection(
 					data.bind((value) => value.workspace),
@@ -113,6 +115,7 @@ function WorkspaceSection(data: Readable<PageData>, params: { slug: Readable<str
 			ImagePicker({
 				choice: picture,
 				fallback: name,
+				seed: params.slug,
 				label: "Upload a picture",
 				// Saved on choose rather than behind a button: there is no other
 				// field on this control to batch it with.
@@ -130,134 +133,6 @@ function WorkspaceSection(data: Readable<PageData>, params: { slug: Readable<str
 						if (event.key === "Enter") void commitName();
 					},
 				}),
-			),
-		),
-	);
-}
-
-function MembersSection(data: Readable<PageData>, params: { slug: Readable<string> }) {
-	const members = signal(data.get().members);
-	data.onChange((next) => members.set(next.members));
-
-	const email = signal("");
-	const adding = signal(false);
-	const inviteUrl = signal("");
-
-	const addByEmail = async () => {
-		const address = email.get().trim();
-		if (address === "") return;
-
-		adding.set(true);
-		const { data: member, error } = await api.POST("/api/v1/workspaces/[slug]/members", {
-			params: { slug: params.slug.get() },
-			body: { email: address },
-		});
-		adding.set(false);
-
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not add them"));
-			return;
-		}
-		members.push(member);
-		email.set("");
-		toastSuccess(`${member.user.name} joined the workspace`);
-	};
-
-	const createInvite = async () => {
-		const { data: invite, error } = await api.POST("/api/v1/workspaces/[slug]/invites", {
-			params: { slug: params.slug.get() },
-			body: {},
-		});
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not create an invite link"));
-			return;
-		}
-		inviteUrl.set(invite.url);
-		await copy(invite.url);
-	};
-
-	return Section(
-		"Members",
-		"Add someone who already has an account, or share a link.",
-
-		Div(
-			{ class: "flex flex-col divide-y divide-border rounded-md border border-border" },
-			ForEach(
-				members,
-				(member) => member.id,
-				(member) =>
-					Div(
-						{ class: "flex items-center gap-3 px-3 py-2.5" },
-						UserAvatar(member.get().user),
-						Div(
-							{ class: "min-w-0 flex-1" },
-							Div(
-								{ class: "flex items-center gap-1.5" },
-								Span(
-									{ class: "truncate text-[13px]" },
-									member.bind((value) => value.user.name),
-								),
-								If(
-									member.bind((value) => value.user.type === "agent"),
-									AgentBadge(),
-								),
-							),
-							Div(
-								{ class: "truncate text-[12px] text-muted-foreground" },
-								// A bot's address is a synthetic `@agents.invalid` placeholder
-								// that exists only because `user.email` is NOT NULL. Showing it
-								// is noise, and it leaks the client id.
-								member.bind((value) =>
-									value.user.type === "agent"
-										? "Authorized to act in this workspace"
-										: value.user.email,
-								),
-							),
-						),
-						Span(
-							{ class: "rounded bg-secondary px-1.5 py-0.5 text-[11px] text-muted-foreground" },
-							member.bind("role"),
-						),
-					),
-			),
-		),
-
-		Div(
-			{ class: "flex gap-2" },
-			Input({
-				value: email,
-				type: "email",
-				placeholder: "teammate@example.com",
-				class:
-					"h-8 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
-				onKeydown: (event) => {
-					if (event.key === "Enter") void addByEmail();
-				},
-			}),
-			Button({ size: "sm", loading: adding, onClick: () => void addByEmail() }, "Add"),
-			Button(
-				{ size: "sm", variant: "secondary", onClick: () => void createInvite() },
-				"Invite link",
-			),
-		),
-
-		If(
-			inviteUrl.bind((value) => value !== ""),
-			Div(
-				{
-					class:
-						"flex items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-2",
-				},
-				Span({ class: "min-w-0 flex-1 truncate font-mono text-[11px]" }, inviteUrl),
-				Button(
-					{
-						size: "icon-sm",
-						variant: "ghost",
-						title: "Copy link",
-						onClick: () => void copy(inviteUrl.get()),
-					},
-					Copy({ class: "size-3.5" }),
-				),
 			),
 		),
 	);

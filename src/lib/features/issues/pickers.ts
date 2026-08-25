@@ -101,7 +101,7 @@ export function StatusPicker(
 				: null,
 		),
 		DropdownMenuContent(
-			{ class: "w-48", align: "start" },
+			{ class: "w-56", align: "start", search: "Change status…", hotkeys: true },
 			DropdownMenuRadioGroup(
 				{
 					value,
@@ -148,7 +148,7 @@ export function PriorityPicker(
 				: null,
 		),
 		DropdownMenuContent(
-			{ class: "w-48", align: "start" },
+			{ class: "w-56", align: "start", search: "Set priority…", hotkeys: true },
 			DropdownMenuRadioGroup(
 				{
 					value,
@@ -196,7 +196,7 @@ export function AssigneePicker(
 				: null,
 		),
 		DropdownMenuContent(
-			{ class: "w-56", align: "start" },
+			{ class: "w-56", align: "start", search: "Assign to…", hotkeys: true },
 			DropdownMenuRadioGroup(
 				{
 					value,
@@ -216,7 +216,9 @@ export function AssigneePicker(
 					(member) => member.id,
 					(member) =>
 						DropdownMenuRadioItem(
-							{ value: member.get().user.id },
+							// The avatar falls back to initials, which would otherwise be
+							// part of what the filter matches on.
+							{ value: member.get().user.id, label: member.get().user.name },
 							UserAvatar(member.get().user),
 							Span(
 								{ class: "flex-1 truncate" },
@@ -250,7 +252,7 @@ export function LabelPicker(
 			LabelTrigger(selected),
 		),
 		DropdownMenuContent(
-			{ class: "w-56", align: "start" },
+			{ class: "w-56", align: "start", search: "Add label…", hotkeys: true },
 			DropdownMenuCheckboxGroup(
 				{
 					value: selectedIds,
@@ -293,7 +295,7 @@ export function AssigneeAvatar(current: Readable<UserSummary | null>, className?
 
 /**
  * Linear's label chip: empty is a tag, one label is color + name, several
- * are overlapping dots.
+ * are overlapping dots followed by a count ("3 labels").
  */
 function LabelTrigger(selected: Readable<Label[]>) {
 	return Dynamic([selected], (labels) => {
@@ -310,17 +312,23 @@ function LabelTrigger(selected: Readable<Label[]>) {
 				Span({ class: "max-w-28 truncate" }, label.name),
 			);
 		}
-		return Span(
-			{ class: "flex items-center" },
-			...labels.slice(0, 4).map((label, index) =>
-				Span({
-					class: cn(
-						"inline-block size-2.5 shrink-0 rounded-full border-2 border-background",
-						index > 0 && "-ml-1.5",
-					),
-					style: { backgroundColor: label.color },
-					title: label.name,
-				}),
+		return Fragment(
+			Span(
+				{ class: "flex items-center" },
+				...labels.slice(0, 4).map((label, index) =>
+					Span({
+						class: cn(
+							"inline-block size-2.5 shrink-0 rounded-full border-2 border-background",
+							index > 0 && "-ml-1.5",
+						),
+						style: { backgroundColor: label.color },
+						title: label.name,
+					}),
+				),
+			),
+			Span(
+				{ class: "whitespace-nowrap" },
+				`${labels.length} label${labels.length === 1 ? "" : "s"}`,
 			),
 		);
 	});
@@ -408,7 +416,7 @@ export function TeamPicker(
 		syncRadio(current, value, (team) => team?.key ?? null),
 		trigger,
 		DropdownMenuContent(
-			{ class: "w-56", align: "start" },
+			{ class: "w-56", align: "start", search: "Change team…", hotkeys: true },
 			DropdownMenuRadioGroup(
 				{
 					value,

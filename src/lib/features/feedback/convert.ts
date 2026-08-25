@@ -111,7 +111,7 @@ export function ConvertButton(options: ConvertOptions) {
 				ChevronDown({ class: "size-3" }),
 			),
 			DropdownMenuContent(
-				{ class: "w-56", align: "end" },
+				{ class: "w-56", align: "end", search: "Search teams…", hotkeys: true },
 				DropdownMenuGroup(
 					DropdownMenuGroupHeading("File the issue in"),
 					ForEach(

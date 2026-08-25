@@ -5,11 +5,12 @@
  * what differs is `canPost` (signed in or not) and `canNote` (a member, who may
  * leave an internal note). Building two would guarantee they drifted.
  */
-import { Div, ForEach, If, P, Span, Textarea, signal, type Readable } from "@implementjs/core";
+import { Div, ForEach, If, Span, Textarea, signal, type Readable } from "@implementjs/core";
 import { Lock, MessageSquare } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
+import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
 import {
 	Empty,
@@ -111,7 +112,10 @@ export function FeedbackThread(options: {
 									)
 								: null,
 						),
-						P({ class: "text-[13px] leading-relaxed whitespace-pre-wrap" }, comment.bind("body")),
+						// The same renderer the issue timeline uses — a reply is a
+						// comment, and the two threads should not disagree about what
+						// `**bold**` means.
+						Markdown(comment.bind("body"), { class: "mt-0.5" }),
 					),
 				),
 		),
@@ -152,7 +156,10 @@ export function FeedbackThread(options: {
 										internal.bind((on) => (on ? "Internal note" : "Reply publicly")),
 									),
 								),
-						Span({ class: "ml-auto text-[11px] text-muted-foreground" }, "⌘↵ to send"),
+						Span(
+							{ class: "ml-auto text-[11px] text-muted-foreground" },
+							"Markdown supported · ⌘↵ to send",
+						),
 						Button(
 							{
 								size: "sm",

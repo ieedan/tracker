@@ -5,6 +5,7 @@ import * as v from "valibot";
 import { parseIdentifier } from "@/lib/domain/issues";
 import { parseBareNumber, parsePullRequestRef } from "@/lib/domain/providers";
 import { LinkPullRequestBody, PullRequestSchema } from "@/lib/domain/schemas";
+import { recordActivity } from "@/lib/server/activity.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { providerFor } from "@/lib/server/providers/index.server";
@@ -123,6 +124,10 @@ export const POST = handler({
 		};
 		await db.insert(pullRequest).values(row);
 
+		await recordActivity(target.id, user.id, [
+			{ type: "pull_request_linked", to: `${repo.owner}/${repo.name}#${remote.number}` },
+		]);
+
 		// Linking a pull request says which repository the work is in, so an issue
 		// that had not been scoped gets scoped by the act of linking.
 		if (target.repositoryId === null) {
@@ -137,11 +142,21 @@ export const DELETE = handler({
 	params: Params,
 	response: v.object({ unlinked: v.boolean() }),
 	async handle({ locals, params }) {
-		const { workspace } = await requireMembership(locals, params.slug);
+		const { workspace, user } = await requireMembership(locals, params.slug);
 		requirePermission(locals, "issues", "write");
 
 		const target = await findIssue(workspace.id, params.identifier);
-		await db.delete(pullRequest).where(eq(pullRequest.issueId, target.id));
+		const removed = await db
+			.delete(pullRequest)
+			.where(eq(pullRequest.issueId, target.id))
+			.returning({ number: pullRequest.number });
+
+		const gone = removed[0];
+		if (gone !== undefined) {
+			await recordActivity(target.id, user.id, [
+				{ type: "pull_request_unlinked", from: `#${gone.number}` },
+			]);
+		}
 		return { unlinked: true };
 	},
 });

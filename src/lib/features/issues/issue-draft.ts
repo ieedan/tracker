@@ -118,3 +118,20 @@ export function clearIssueDraft(slug: string): void {
 	if (!canUseStorage() || slug === "") return;
 	localStorage.removeItem(issueDraftKey(slug));
 }
+
+const CREATE_MORE_KEY = "tracker:create-more";
+
+/**
+ * Whether the composer stays open after a create. Not part of a draft — it is
+ * a preference that outlives any one issue, so it is stored on its own and
+ * shared by every workspace, the way Linear remembers the switch.
+ */
+export function loadCreateMore(): boolean {
+	if (!canUseStorage()) return false;
+	return localStorage.getItem(CREATE_MORE_KEY) === "true";
+}
+
+export function saveCreateMore(value: boolean): void {
+	if (!canUseStorage()) return;
+	localStorage.setItem(CREATE_MORE_KEY, value ? "true" : "false");
+}

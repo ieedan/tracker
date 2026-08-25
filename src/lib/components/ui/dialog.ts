@@ -11,6 +11,7 @@ import {
 	DialogTrigger as DialogTriggerPrimitive,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
+import { TabOrder } from "./tab-order";
 import { cn } from "@/lib/utils";
 import { createComponent } from "@implementjs/primitives";
 
@@ -103,18 +104,24 @@ export const DialogContent = createComponent(function DialogContent(
 					className,
 				),
 			},
-			...children,
-			showCloseButton
-				? DialogClose(
-						{
-							variant: "ghost",
-							size: "icon-sm",
-							class: "absolute top-3 right-3",
-						},
-						XIcon({ class: "size-4", "aria-hidden": true }),
-						Span({ class: "sr-only" }, "Close"),
-					)
-				: null,
+			// Tab is the panel's own, not the primitive's: its trap counts controls
+			// that are in the DOM without being rendered — a picker's filter box
+			// while its menu is closed, the hidden file input behind a paperclip —
+			// and moving focus to one of those leaves the caret where it was.
+			TabOrder(
+				...children,
+				showCloseButton
+					? DialogClose(
+							{
+								variant: "ghost",
+								size: "icon-sm",
+								class: "absolute top-3 right-3",
+							},
+							XIcon({ class: "size-4", "aria-hidden": true }),
+							Span({ class: "sr-only" }, "Close"),
+						)
+					: null,
+			),
 		),
 	);
 });

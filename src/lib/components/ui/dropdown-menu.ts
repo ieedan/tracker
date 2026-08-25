@@ -17,6 +17,7 @@ import {
 	DropdownMenuTrigger as DropdownMenuTriggerPrimitive,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
+import { menuSearch, type MenuSearchOptions } from "./menu-search";
 import { cn } from "@/lib/utils";
 import { createComponent } from "@implementjs/primitives";
 
@@ -44,12 +45,17 @@ export const DropdownMenuTrigger = createComponent(function DropdownMenuTrigger(
 	);
 });
 
-export type DropdownMenuContentProps = ComponentProps<typeof DropdownMenuContentPrimitive>;
+export type DropdownMenuContentProps = ComponentProps<typeof DropdownMenuContentPrimitive> &
+	MenuSearchOptions;
 
 export const DropdownMenuContent = createComponent(function DropdownMenuContent(
-	{ class: className, offset = 4, ...props }: DropdownMenuContentProps,
+	{ class: className, offset = 4, search, hotkeys, ...props }: DropdownMenuContentProps,
 	...children: Child[]
 ) {
+	// The filter box goes above the caller's rows and the empty state below
+	// them, so the two halves are placed rather than wrapped.
+	const parts = menuSearch({ search, hotkeys });
+
 	return DropdownMenuContentPrimitive(
 		{
 			offset,
@@ -68,19 +74,35 @@ export const DropdownMenuContent = createComponent(function DropdownMenuContent(
 				className,
 			),
 		},
+		parts.behavior,
+		parts.header,
 		...children,
+		parts.empty,
 	);
 });
 
-export type DropdownMenuItemProps = ComponentProps<typeof DropdownMenuItemPrimitive>;
+/**
+ * Rows carry two optional hints for a searchable menu: `hotkey` claims a key
+ * instead of taking the number it would otherwise be handed, and `label` is
+ * the text the filter matches when the row's own text is not it (an avatar and
+ * an initial, say).
+ */
+export type MenuRowHints = {
+	hotkey?: string;
+	label?: string;
+};
+
+export type DropdownMenuItemProps = ComponentProps<typeof DropdownMenuItemPrimitive> & MenuRowHints;
 
 export const DropdownMenuItem = createComponent(function DropdownMenuItem(
-	{ class: className, ...props }: DropdownMenuItemProps,
+	{ class: className, hotkey, label, ...props }: DropdownMenuItemProps,
 	...children: Child[]
 ) {
 	return DropdownMenuItemPrimitive(
 		{
 			...props,
+			"data-hotkey": hotkey,
+			"data-label": label,
 			"data-slot": "dropdown-menu-item",
 			class: cn(
 				"relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none",
@@ -101,22 +123,25 @@ export const DropdownMenuCheckboxGroup = DropdownMenuCheckboxGroupPrimitive;
 
 export type DropdownMenuCheckboxItemProps = ComponentProps<
 	typeof DropdownMenuCheckboxItemPrimitive
-> & {
-	/**
-	 * The checked indicator, drawn in place of the default check. The left
-	 * padding the default one is absolutely positioned into comes off with it:
-	 * a custom indicator sits in the row's flow, so placing it is yours.
-	 */
-	indicator?: Child;
-};
+> &
+	MenuRowHints & {
+		/**
+		 * The checked indicator, drawn in place of the default check. The left
+		 * padding the default one is absolutely positioned into comes off with it:
+		 * a custom indicator sits in the row's flow, so placing it is yours.
+		 */
+		indicator?: Child;
+	};
 
 export const DropdownMenuCheckboxItem = createComponent(function DropdownMenuCheckboxItem(
-	{ class: className, indicator, ...props }: DropdownMenuCheckboxItemProps,
+	{ class: className, indicator, hotkey, label, ...props }: DropdownMenuCheckboxItemProps,
 	...children: Child[]
 ) {
 	return DropdownMenuCheckboxItemPrimitive(
 		{
 			...props,
+			"data-hotkey": hotkey,
+			"data-label": label,
 			"data-slot": "dropdown-menu-checkbox-item",
 			class: cn(
 				"group/menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none",
@@ -146,15 +171,18 @@ export const DropdownMenuCheckboxItem = createComponent(function DropdownMenuChe
 export type DropdownMenuRadioGroupProps = ComponentProps<typeof DropdownMenuRadioGroupPrimitive>;
 export const DropdownMenuRadioGroup = DropdownMenuRadioGroupPrimitive;
 
-export type DropdownMenuRadioItemProps = ComponentProps<typeof DropdownMenuRadioItemPrimitive>;
+export type DropdownMenuRadioItemProps = ComponentProps<typeof DropdownMenuRadioItemPrimitive> &
+	MenuRowHints;
 
 export const DropdownMenuRadioItem = createComponent(function DropdownMenuRadioItem(
-	{ class: className, ...props }: DropdownMenuRadioItemProps,
+	{ class: className, hotkey, label, ...props }: DropdownMenuRadioItemProps,
 	...children: Child[]
 ) {
 	return DropdownMenuRadioItemPrimitive(
 		{
 			...props,
+			"data-hotkey": hotkey,
+			"data-label": label,
 			"data-slot": "dropdown-menu-radio-item",
 			class: cn(
 				"group/menu-item relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-none select-none",

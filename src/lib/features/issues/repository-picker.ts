@@ -69,7 +69,7 @@ export function RepositoryPicker(
 				),
 			),
 			DropdownMenuContent(
-				{ class: "w-64", align: "start" },
+				{ class: "w-64", align: "start", search: "Search repositories…", hotkeys: true },
 				DropdownMenuGroup(
 					DropdownMenuGroupHeading("Repository"),
 					DropdownMenuItem(
@@ -125,7 +125,8 @@ function RepositoryGlyph(
 	});
 }
 
-function ProviderMark(provider: GitProviderId | undefined, className: string): Child {
+/** The provider's mark, falling back to a generic repository glyph. */
+export function ProviderMark(provider: GitProviderId | undefined, className: string): Child {
 	if (provider === "github") return GithubMark({ class: className });
 	return FolderGit2({ class: className });
 }

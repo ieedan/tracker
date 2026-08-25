@@ -1,6 +1,7 @@
 import { error } from "@implementjs/kit/server";
 import { asc, eq } from "drizzle-orm";
 import { parseIdentifier } from "@/lib/domain/issues";
+import { listActivity } from "@/lib/server/activity.server";
 import { attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
@@ -26,8 +27,9 @@ export default async function load({ locals, params }: LoadEvent) {
 		.where(eq(comment.issueId, found.id))
 		.orderBy(asc(comment.createdAt));
 
-	const { byIssue, byComment } = await attachmentsFor(params.slug, {
-		issueIds: [found.id],
+	// The issue's own attachments come back on the issue; only the comments'
+	// still have to be looked up.
+	const { byComment } = await attachmentsFor(params.slug, {
 		commentIds: commentRows.map((row) => row.comment.id),
 	});
 
@@ -52,9 +54,13 @@ export default async function load({ locals, params }: LoadEvent) {
 		// The rail's repository picker needs the whole list, not just the one
 		// this issue points at.
 		repositories: await listRepositories(workspace.id),
-		attachments: byIssue.get(found.id) ?? [],
+		attachments: found.attachments,
 		comments: commentRows.map((row) =>
 			toComment(row.comment, row.author, byComment.get(row.comment.id) ?? []),
 		),
+		// The other half of the timeline. The client interleaves it with the
+		// comments by timestamp rather than the server flattening them, because
+		// only one of the two can be posted from the page.
+		activity: await listActivity(found.id),
 	};
 }

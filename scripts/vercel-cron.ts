@@ -4,7 +4,8 @@
  * `@implementjs/adapter-vercel` writes `.vercel/output/config.json` itself, and
  * with the Build Output API a root `vercel.json` does not get merged into a
  * prebuilt deployment — so declaring the cron there would look right and never
- * fire. This injects it into the config the adapter just produced.
+ * fire. (`vercel.json` is still used for `framework` / `buildCommand`.) This
+ * injects the cron into the config the adapter just produced.
  *
  * A no-op for any other adapter, since the file will not exist.
  */

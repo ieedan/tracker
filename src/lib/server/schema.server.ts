@@ -7,6 +7,7 @@ import {
 	text,
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import type { ActivityType } from "@/lib/domain/activity";
 import type {
 	FeedbackBoard,
 	FeedbackIntake,
@@ -467,6 +468,32 @@ export const comment = sqliteTable(
 	(table) => [index("comment_issue").on(table.issueId)],
 );
 
+/**
+ * One thing that happened to an issue, for the details view's timeline.
+ *
+ * `data` is a JSON snapshot (`{ from, to, labels }`) rather than foreign keys:
+ * the timeline is a record of what someone did at the time, so a label renamed
+ * or a repository unlinked afterwards must not rewrite what it says. Comments
+ * stay in their own table — they are content, not a record of a change — and
+ * the client interleaves the two by timestamp.
+ */
+export const issueActivity = sqliteTable(
+	"issue_activity",
+	{
+		id: text("id").primaryKey(),
+		issueId: text("issueId")
+			.notNull()
+			.references(() => issue.id, { onDelete: "cascade" }),
+		actorId: text("actorId")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		type: text("type").$type<ActivityType>().notNull(),
+		data: text("data").notNull().default("{}"),
+		createdAt: now(),
+	},
+	(table) => [index("issue_activity_issue").on(table.issueId, table.createdAt)],
+);
+
 export const notification = sqliteTable(
 	"notification",
 	{
@@ -747,4 +774,77 @@ export const agentGrantRelations = relations(agentGrant, ({ one }) => ({
 		fields: [agentGrant.installedByUserId],
 		references: [user.id],
 	}),
+}));
+
+/**
+ * A workspace-level issue template: the fields a new issue starts out with.
+ *
+ * Every prefill is optional in spirit — a template that only sets a team and a
+ * label is as valid as one that writes the whole description. Team and assignee
+ * are `set null` rather than cascade, so deleting a team does not silently take
+ * the templates that pointed at it with it; the composer just falls back to its
+ * usual default.
+ */
+export const issueTemplate = sqliteTable(
+	"issue_template",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		/** What the template is called in the New issue menu. */
+		name: text("name").notNull(),
+		/** One line under the name in settings. Never lands on the issue. */
+		summary: text("summary").notNull().default(""),
+		/** The prefilled issue title. Blank means "start empty". */
+		title: text("title").notNull().default(""),
+		description: text("description").notNull().default(""),
+		teamId: text("teamId").references(() => team.id, { onDelete: "set null" }),
+		status: text("status").$type<IssueStatus>().notNull().default("backlog"),
+		priority: text("priority").$type<IssuePriority>().notNull().default("none"),
+		assigneeId: text("assigneeId").references(() => user.id, { onDelete: "set null" }),
+		createdBy: text("createdBy")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: now(),
+		updatedAt: timestamp("updatedAt")
+			.notNull()
+			.default(sql`(unixepoch() * 1000)`),
+	},
+	(table) => [
+		index("issue_template_workspace").on(table.workspaceId),
+		index("issue_template_team").on(table.teamId),
+	],
+);
+
+/** The labels a template applies. Same shape as `issue_label`. */
+export const issueTemplateLabel = sqliteTable(
+	"issue_template_label",
+	{
+		templateId: text("templateId")
+			.notNull()
+			.references(() => issueTemplate.id, { onDelete: "cascade" }),
+		labelId: text("labelId")
+			.notNull()
+			.references(() => label.id, { onDelete: "cascade" }),
+	},
+	(table) => [primaryKey({ columns: [table.templateId, table.labelId] })],
+);
+
+export const issueTemplateRelations = relations(issueTemplate, ({ one, many }) => ({
+	workspace: one(workspace, {
+		fields: [issueTemplate.workspaceId],
+		references: [workspace.id],
+	}),
+	team: one(team, { fields: [issueTemplate.teamId], references: [team.id] }),
+	assignee: one(user, { fields: [issueTemplate.assigneeId], references: [user.id] }),
+	labels: many(issueTemplateLabel),
+}));
+
+export const issueTemplateLabelRelations = relations(issueTemplateLabel, ({ one }) => ({
+	template: one(issueTemplate, {
+		fields: [issueTemplateLabel.templateId],
+		references: [issueTemplate.id],
+	}),
+	label: one(label, { fields: [issueTemplateLabel.labelId], references: [label.id] }),
 }));

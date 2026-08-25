@@ -6,11 +6,21 @@
  * while you are still typing a name. The preview comes from an object URL, so
  * the image appears instantly instead of after a round trip to storage.
  */
-import { Div, If, Img, Input, Span, signal, type Readable, type Signal } from "@implementjs/core";
+import {
+	Div,
+	Dynamic,
+	If,
+	Img,
+	Input,
+	signal,
+	type Readable,
+	type Signal,
+} from "@implementjs/core";
 import { ImagePlus, Loader2, X } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import { GeneratedWorkspaceAvatar } from "@/lib/components/workspace-avatar";
 import { imageRejectionReason } from "@/lib/domain/images";
 import { cn } from "@/lib/utils";
 
@@ -33,8 +43,14 @@ export function imageChoice(existing: string | null = null): ImageChoice {
 /** A square you click to choose a picture, showing the current one if there is one. */
 export function ImagePicker(options: {
 	choice: ImageChoice;
-	/** Letter tile shown when there is no picture — usually the first initial. */
+	/** Name behind the generated tile shown when there is no picture. */
 	fallback: Readable<string>;
+	/**
+	 * What the generated tile is derived from — the workspace slug, so the
+	 * preview here is the tile the sidebar will show. Defaults to the name,
+	 * which is all a workspace that does not exist yet has.
+	 */
+	seed?: Readable<string>;
 	label?: string;
 	/** Called after a successful upload or a clear, for forms that save eagerly. */
 	onChange?: (key: string | null) => void;
@@ -128,12 +144,16 @@ export function ImagePicker(options: {
 					}),
 				)
 				.Else(
-					Div(
-						{ class: "flex size-full items-center justify-center bg-secondary/40" },
-						Span(
-							{ class: "text-lg font-semibold text-muted-foreground" },
-							options.fallback.bind((value) => value.slice(0, 1).toUpperCase() || "?"),
-						),
+					// The generated avatar, not a grey placeholder: this is what the
+					// workspace actually looks like everywhere else until a picture
+					// is uploaded, so the picker should show it rather than imply
+					// there is nothing there.
+					Dynamic([options.seed ?? options.fallback, options.fallback], (seed, name) =>
+						GeneratedWorkspaceAvatar({
+							seed,
+							name,
+							class: "size-full rounded-none text-lg",
+						}),
 					),
 				),
 

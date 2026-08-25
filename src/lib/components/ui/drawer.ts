@@ -15,6 +15,7 @@ import {
 	type DrawerDirection,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
+import { TabOrder } from "./tab-order";
 import { cn } from "@/lib/utils";
 
 /**
@@ -217,25 +218,31 @@ export const DrawerContent = createComponent(function DrawerContent(
 						className,
 					),
 				},
-				// a top drawer drags out of its bottom edge, so the bar belongs after
-				// the content rather than before it
-				showHandle && state.direction !== "top"
-					? DrawerHandle({ class: handleClasses[state.direction] })
-					: null,
-				...children,
-				showHandle && state.direction === "top" ? DrawerHandle({ class: handleClasses.top }) : null,
-				state.direction !== "top" ? KeyboardSpacer() : null,
-				showCloseButton
-					? DrawerClose(
-							{
-								variant: "ghost",
-								size: "icon-sm",
-								class: "absolute top-3 right-3",
-							},
-							XIcon({ class: "size-4", "aria-hidden": true }),
-							Span({ class: "sr-only" }, "Close"),
-						)
-					: null,
+				// The drawer is the dialog's focus trap with a drag on top, so it
+				// inherits the dialog's Tab bug and the same fix. See `TabOrder`.
+				TabOrder(
+					// a top drawer drags out of its bottom edge, so the bar belongs after
+					// the content rather than before it
+					showHandle && state.direction !== "top"
+						? DrawerHandle({ class: handleClasses[state.direction] })
+						: null,
+					...children,
+					showHandle && state.direction === "top"
+						? DrawerHandle({ class: handleClasses.top })
+						: null,
+					state.direction !== "top" ? KeyboardSpacer() : null,
+					showCloseButton
+						? DrawerClose(
+								{
+									variant: "ghost",
+									size: "icon-sm",
+									class: "absolute top-3 right-3",
+								},
+								XIcon({ class: "size-4", "aria-hidden": true }),
+								Span({ class: "sr-only" }, "Close"),
+							)
+						: null,
+				),
 			),
 		),
 	);

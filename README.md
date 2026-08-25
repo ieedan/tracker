@@ -16,11 +16,11 @@ OpenAPI 3.1 document.
 ```sh
 pnpm install
 docker compose up -d      # MinIO, for attachment storage
-pnpm dev:setup            # walks through .env, then offers to migrate and seed
+pnpm setup:dev            # walks through .env, then offers to migrate and seed
 pnpm dev
 ```
 
-`dev:setup` prompts for each value, validates answers against the same schemas
+`setup:dev` prompts for each value, validates answers against the same schemas
 the app enforces at build time, generates an auth secret, and can run the
 migrations and seed for you. Add `--yes` to take every default without prompts.
 Prefer doing it by hand? `cp .env.example .env`, then `pnpm db:migrate && pnpm db:seed`.
@@ -31,8 +31,42 @@ Everything under `/app` needs a workspace; anyone without one is sent to
 `/workspaces/new`, which renders on its own so there is never a sidebar linking
 at a workspace that does not exist.
 
+## Deploying it
+
+```sh
+pnpm setup:prod           # walks through .env.production, then pushes it to Vercel
+```
+
+Production needs four things this walks you through, in the order that avoids
+going back and forth between dashboards:
+
+1. **The public URL** — `BETTER_AUTH_URL`. Every callback URL printed later is
+   built from it, so it is asked first.
+2. **A database** — Turso. If the `turso` CLI is on your PATH the setup creates
+   the database and mints its token itself; otherwise it hands you the dashboard
+   link and takes the two values by hand.
+3. **A bucket** — Cloudflare R2, or anything else speaking S3. It prints the
+   exact CORS policy to paste, with your origin already in it; the browser PUTs
+   straight to the bucket, so uploads fail without it.
+4. **GitHub** — the OAuth app for sign-in and the GitHub App for repositories,
+   with the callback URLs spelled out. Both are optional; skipping one leaves
+   that feature off rather than half-working.
+
+It ends by writing `.env.production`, pushing every value to Vercel (via the
+`vercel` CLI, if installed), then offering the two irreversible steps last:
+migrating the production database, and `vercel deploy --prebuilt --prod`.
+
+Run it as often as you like — anything already set is reported and skipped, so a
+second run is how you fill in the part you postponed. `--all` revisits every
+answer. Nothing seeds demo data into production.
+
+The webhook retry cron registers itself during `build`; it needs `CRON_SECRET`
+set, which the setup generates.
+
 | Script            | What it does                                                         |
 | ----------------- | -------------------------------------------------------------------- |
+| `setup:dev`       | Interactive `.env` for this machine                                  |
+| `setup:prod`      | Interactive `.env.production` for a deployment                       |
 | `dev`             | Dev server, server-rendered, HMR                                     |
 | `build`           | Production build (writes `.vercel/output` and `static/openapi.json`) |
 | `preview`         | Serve the build locally                                              |
@@ -105,8 +139,9 @@ keys — that needs a signed-in session. See `src/lib/server/api-key.server.ts`
 for why.
 
 Each key is scoped. At creation you choose read and/or write on **issues**
-(comments and attachments included), **workspace** (the workspace, labels,
-teams), **members**, **webhooks**, **feedback**, and **notifications**. Sessions
+(comments and attachments included), **workspace** (the workspace, its teams and
+templates), **labels** (write creates one; there is no rename or delete),
+**members**, **webhooks**, **feedback**, and **notifications**. Sessions
 skip those checks; a key without a scope gets 403. Keys minted before scoping
 still have full access. Ingest (`POST …/user-feedback`) needs **feedback**
 write when a key is presented.

@@ -11,6 +11,7 @@ import {
 	AlertDialogTrigger as AlertDialogTriggerPrimitive,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
+import { TabOrder } from "./tab-order";
 import { cn } from "@/lib/utils";
 import { createComponent } from "@implementjs/primitives";
 
@@ -109,7 +110,9 @@ export const AlertDialogContent = createComponent(function AlertDialogContent(
 					className,
 				),
 			},
-			...children,
+			// Same trap as the dialog's, and the same fix: Tab skips controls that
+			// are in the DOM without being rendered. See `TabOrder`.
+			TabOrder(...children),
 		),
 	);
 });

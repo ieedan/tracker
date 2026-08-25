@@ -44,6 +44,15 @@ export const isImage = (contentType: string): boolean => contentType.startsWith(
 export const isVideo = (contentType: string): boolean => contentType.startsWith("video/");
 export const isAudio = (contentType: string): boolean => contentType.startsWith("audio/");
 
+/**
+ * Readable as characters rather than bytes.
+ *
+ * `application/json` is text in every way that matters here, and is the one
+ * allowed type outside `text/*` that is.
+ */
+export const isTextual = (contentType: string): boolean =>
+	contentType.startsWith("text/") || contentType.startsWith("application/json");
+
 /** Rendered in place rather than downloaded. */
 export const isInline = (contentType: string): boolean =>
 	isImage(contentType) || isVideo(contentType) || isAudio(contentType);

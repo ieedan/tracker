@@ -5,8 +5,8 @@ import {
 	Dynamic,
 	ForEach,
 	If,
-	Img,
 	ImplementDocument,
+	ImplementEffect,
 	ImplementLifecycle,
 	Main,
 	Span,
@@ -19,6 +19,7 @@ import {
 	ChevronDown,
 	Inbox as InboxIcon,
 	LayoutList,
+	LayoutTemplate,
 	MessageSquareQuote,
 	LogOut,
 	Plus,
@@ -41,11 +42,16 @@ import {
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { UserAvatar } from "@/lib/components/glyphs";
-import type { Team, Workspace } from "@/lib/domain/schemas";
+import { WorkspaceAvatar } from "@/lib/components/workspace-avatar";
+import type { IssueTemplate, Team, Workspace } from "@/lib/domain/schemas";
 import { mode } from "@/lib/mode";
 import { cn } from "@/lib/utils";
 import { CommandPalette, openCommandPalette } from "./command-palette";
-import { CreateIssueDialog, openCreateIssue } from "@/lib/features/issues/create-issue-dialog";
+import {
+	CreateIssueDialog,
+	openCreateIssue,
+	openCreateIssueFromTemplate,
+} from "@/lib/features/issues/create-issue-dialog";
 
 export interface ShellData {
 	user: App.SessionUser;
@@ -103,12 +109,11 @@ export function AppShell(
 
 		ImplementDocument({
 			onKeydown: (event) => {
-				if (isTyping(event.target)) return;
+				if (isTyping(event)) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
 				if (event.key.toLowerCase() !== "c") return;
 				event.preventDefault();
-				const match = /\/app\/[^/]+\/team\/([^/?#]+)/.exec(url.get().path);
-				openCreateIssue(activeSlug.get(), match?.[1]?.toUpperCase());
+				openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path));
 			},
 		}),
 
@@ -132,17 +137,7 @@ function Sidebar(
 		},
 		WorkspaceSwitcher(data, activeSlug),
 
-		Button(
-			{
-				variant: "secondary",
-				size: "sm",
-				class: "mt-2 mb-2 w-full justify-start gap-2 text-[13px]",
-				onClick: () => openCreateIssue(activeSlug.get()),
-			},
-			Plus({ class: "size-3.5" }),
-			"New issue",
-			Span({ class: "ml-auto text-[11px] text-muted-foreground" }, "C"),
-		),
+		NewIssueControl(activeSlug, url),
 
 		Div(
 			{ class: "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" },
@@ -165,6 +160,99 @@ function Sidebar(
 			Span({ class: "ml-auto text-[11px]" }, "⌘K"),
 		),
 		UserMenu(data),
+	);
+}
+
+/** `/app/acme/team/ENG/…` → `ENG`, and undefined anywhere else. */
+function teamKeyFromPath(path: string): string | undefined {
+	return /\/app\/[^/]+\/team\/([^/?#]+)/.exec(path)?.[1]?.toUpperCase();
+}
+
+/**
+ * New issue, split: the button opens a blank composer, the chevron opens one of
+ * the workspace's templates. Templates are fetched here rather than seeded by
+ * the layout so adding one in settings shows up without a reload.
+ */
+function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: string }>) {
+	const templates = signal<IssueTemplate[]>([]);
+
+	const load = async () => {
+		const slug = activeSlug.get();
+		if (slug === "") return;
+		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/templates", {
+			params: { slug },
+		});
+		if (error === undefined) templates.set(data);
+	};
+
+	return Div(
+		{ class: "mt-2 mb-2 flex w-full items-stretch" },
+		ImplementLifecycle({ onMount: () => void load() }),
+		// Switching workspaces keeps this control mounted, so the list has to
+		// follow the slug rather than only load once.
+		ImplementEffect([activeSlug], () => void load(), { immediate: false }),
+
+		Button(
+			{
+				variant: "secondary",
+				size: "sm",
+				class: "min-w-0 flex-1 justify-start gap-2 rounded-r-none text-[13px]",
+				onClick: () => openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path)),
+			},
+			Plus({ class: "size-3.5" }),
+			"New issue",
+			Span({ class: "ml-auto text-[11px] text-muted-foreground" }, "C"),
+		),
+
+		DropdownMenu(
+			{ preventScroll: false },
+			DropdownMenuTrigger(
+				{
+					variant: "secondary",
+					size: "sm",
+					class: "shrink-0 rounded-l-none border-l border-background/60 px-1.5",
+					title: "New issue from a template",
+					"aria-label": "New issue from a template",
+				},
+				ChevronDown({ class: "size-3.5" }),
+			),
+			DropdownMenuContent(
+				{ class: "w-60", align: "start" },
+				DropdownMenuGroup(
+					DropdownMenuGroupHeading("Templates"),
+					If(
+						templates.bind((list) => list.length === 0),
+						Div(
+							{ class: "px-2 py-1.5 text-[12px] text-muted-foreground" },
+							"No templates yet.",
+						),
+					),
+					ForEach(
+						templates,
+						(template) => template.id,
+						(template) =>
+							DropdownMenuItem(
+								{
+									onSelect: () =>
+										openCreateIssueFromTemplate(
+											activeSlug.get(),
+											template.get(),
+											teamKeyFromPath(url.get().path),
+										),
+								},
+								LayoutTemplate({ class: "size-3.5 shrink-0" }),
+								Span({ class: "truncate" }, template.bind("name")),
+							),
+					),
+				),
+				DropdownMenuSeparator(),
+				DropdownMenuItem(
+					{ onSelect: () => router.navigate("/app/:slug/settings", { slug: activeSlug.get() }) },
+					SettingsIcon({ class: "size-3.5" }),
+					"Manage templates",
+				),
+			),
+		),
 	);
 }
 
@@ -215,27 +303,13 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 }
 
 /**
- * The workspace's picture, or the initial on a colored tile.
+ * The workspace's picture, or the avatar generated from its slug.
  *
  * `Dynamic` rather than `If`, because the two branches are different elements
  * and swapping between them is exactly what `Dynamic` is for.
  */
 function WorkspaceTile(workspace: Readable<Workspace | undefined>) {
-	return Dynamic([workspace], (value) =>
-		value?.image != null && value.image !== ""
-			? Img({
-					src: value.image,
-					alt: "",
-					class: "size-5 shrink-0 rounded-[5px] object-cover",
-				})
-			: Div(
-					{ class: "flex size-5 shrink-0 items-center justify-center rounded-[5px] bg-primary" },
-					Span(
-						{ class: "text-[10px] font-bold text-primary-foreground" },
-						(value?.name ?? "?").slice(0, 1).toUpperCase(),
-					),
-				),
-	);
+	return Dynamic([workspace], (value) => WorkspaceAvatar(value));
 }
 
 type NavPath = "/app/:slug" | "/app/:slug/inbox" | "/app/:slug/feedback" | "/app/:slug/settings";

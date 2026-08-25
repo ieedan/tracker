@@ -79,9 +79,21 @@ export function rpcError(
 	};
 }
 
+/**
+ * One block of a tool's answer.
+ *
+ * Text covers everything the API returns as JSON. The binary blocks exist for
+ * attachments: an image handed back as a `text` block is a base64 string the
+ * model cannot look at, while an `image` block is a picture it can.
+ */
+export type ContentBlock =
+	| { type: "text"; text: string }
+	| { type: "image"; data: string; mimeType: string }
+	| { type: "audio"; data: string; mimeType: string };
+
 /** A `tools/call` result. Text content is kept alongside any structured data. */
 export interface ToolResult {
-	content: { type: "text"; text: string }[];
+	content: ContentBlock[];
 	structuredContent?: Record<string, unknown>;
 	isError?: boolean;
 }
@@ -104,6 +116,29 @@ export function toolSuccess(data: unknown, summary?: string): ToolResult {
 	return {
 		content: [{ type: "text", text: summary === undefined ? json : `${summary}\n\n${json}` }],
 		structuredContent: isPlainObject(data) ? data : { result: data },
+	};
+}
+
+/** Plain text, for a tool whose answer is not JSON. */
+export function toolText(text: string): ToolResult {
+	return { content: [{ type: "text", text }] };
+}
+
+/**
+ * Bytes the model can actually perceive, rather than a base64 string.
+ *
+ * `data` is base64 either way — the difference is the block type, which is what
+ * tells the client to decode it and show the model a picture or play a sound.
+ */
+export function toolMedia(
+	kind: "image" | "audio",
+	data: string,
+	mimeType: string,
+	summary?: string,
+): ToolResult {
+	const media: ContentBlock = { type: kind, data, mimeType };
+	return {
+		content: summary === undefined ? [media] : [{ type: "text", text: summary }, media],
 	};
 }
 

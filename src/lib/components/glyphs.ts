@@ -15,14 +15,14 @@ import { HarnessLogo } from "./harness-logo";
  * controls rather than one row.
  *
  * `cn` runs these through tailwind-merge, so a `size-*` here beats the one baked
- * into the glyph. Two need more than that: the status ring carries width/height
- * attributes on its markup, which only the `[&_svg]:` variant overrides, and the
- * priority bars are a column of fixed heights rather than one box, so the column
- * is resized and centred inside the same square as everything else.
+ * into the glyph. The status ring needs more than that: it carries width/height
+ * attributes on its markup, which only the `[&_svg]:` variant overrides. The
+ * priority glyph resizes on its own — it draws inside `PRIORITY_GLYPH_BOX`, and
+ * both of its shapes are sized against that box rather than against content.
  */
 export const CHIP_GLYPH = {
 	status: "size-3.5 [&_svg]:size-3.5",
-	priority: "size-3.5 justify-center [&>div]:h-3.5",
+	priority: "size-3.5",
 	avatar: "size-3.5 text-[8px]",
 	dot: "size-2",
 	icon: "size-3.5",
@@ -100,6 +100,17 @@ const PRIORITY_BARS: Record<IssuePriority, number> = {
 };
 
 /**
+ * The fixed square every priority glyph is drawn inside.
+ *
+ * The two glyphs are different shapes — three 3px bars with 2px gaps is a 13px
+ * column, while urgent's filled badge is a full square. Sizing each one to its
+ * own content made urgent rows in the issue list 3px wider than the rest, so
+ * the identifier and status ring after it fell out of column. The box is fixed
+ * here and both glyphs size themselves against it instead.
+ */
+const PRIORITY_GLYPH_BOX = "inline-flex size-4 shrink-0 items-center justify-center";
+
+/**
  * Three ascending bars, lit up to the issue's level — Linear's priority glyph.
  * Urgent is the exception: it gets a filled block instead of bars.
  */
@@ -110,7 +121,7 @@ export function PriorityIcon(
 	const render = (current: IssuePriority) => {
 		if (current === "urgent") {
 			return Div(
-				{ class: "flex size-4 items-center justify-center rounded-[3px] bg-[#f2994a]" },
+				{ class: "flex size-full items-center justify-center rounded-[3px] bg-[#f2994a]" },
 				Span({ class: "text-[10px] font-bold leading-none text-black" }, "!"),
 			);
 		}
@@ -118,7 +129,7 @@ export function PriorityIcon(
 		const lit = PRIORITY_BARS[current];
 		const heights = ["h-1.5", "h-2.5", "h-3.5"];
 		return Div(
-			{ class: "flex h-4 items-end gap-[2px]" },
+			{ class: "flex h-full items-end gap-[2px]" },
 			...heights.map((height, index) =>
 				Div({
 					class: cn(
@@ -134,7 +145,7 @@ export function PriorityIcon(
 	if (typeof priority === "string") {
 		return Span(
 			{
-				class: cn("inline-flex shrink-0 items-center", className),
+				class: cn(PRIORITY_GLYPH_BOX, className),
 				title: PRIORITY_LABELS[priority],
 			},
 			render(priority),
@@ -143,7 +154,7 @@ export function PriorityIcon(
 
 	// A signal of a priority swaps the whole glyph, so the bars re-light in place.
 	return Span(
-		{ class: cn("inline-flex shrink-0 items-center", className) },
+		{ class: cn(PRIORITY_GLYPH_BOX, className) },
 		Dynamic([priority], (current) => render(current)),
 	);
 }

@@ -1,10 +1,11 @@
 import { router } from "$implement/router";
 import {
 	Div,
-	ForEach,
+	Fragment,
 	H1,
 	If,
 	ImplementDocument,
+	ImplementEffect,
 	Input,
 	P,
 	Span,
@@ -17,9 +18,9 @@ import {
 import { ChevronLeft } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
-import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import type {
+	Activity,
 	Attachment,
 	Comment,
 	Issue,
@@ -37,29 +38,27 @@ import {
 	preventFilePaste,
 } from "@/lib/features/attachments/file-drop";
 import type { Upload } from "@/lib/features/attachments/uploader";
-import { fullTime, relativeTime } from "@/lib/format";
+import { fullTime } from "@/lib/format";
 import { CopyPromptButton } from "./copy-prompt";
 import { createIssueOpen, openCreateIssue } from "./create-issue-dialog";
 import { isTyping } from "@/lib/client/is-typing";
-import {
-	AssigneePicker,
-	LabelChips,
-	LabelPicker,
-	PriorityPicker,
-	StatusPicker,
-	TeamPicker,
-} from "./pickers";
+import { AssigneePicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
+import { IssueLabelPicker } from "./label-picker";
+import { IssueTimeline } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
-import { MentionMenu, MentionText, fileMentions } from "./file-mentions";
+import { MentionMenu, fileMentions } from "./file-mentions";
+import { BodyComposer } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
+import { DeleteIssueButton } from "./delete-issue";
 
 interface PageData {
 	issue: Issue;
 	repositories: Repository[];
 	attachments: Attachment[];
 	comments: Comment[];
+	activity: Activity[];
 	workspace: Workspace;
 	teams: Team[];
 	members: Member[];
@@ -80,6 +79,20 @@ export function IssueDetailPage({
 
 	const comments = signal(data.get().comments);
 	data.onChange((next) => comments.set(next.comments));
+
+	const activity = signal(data.get().activity);
+	data.onChange((next) => activity.set(next.activity));
+
+	// Kit cannot re-run a load after a mutation, and every edit made from the
+	// rail is something the timeline is supposed to have just recorded — so the
+	// entries are refetched rather than guessed at locally.
+	const refreshActivity = async () => {
+		const { data: entries, error } = await api.GET(
+			"/api/v1/workspaces/[slug]/issues/[identifier]/activity",
+			{ params: { slug: params.slug.get(), identifier: issue.get().identifier } },
+		);
+		if (error === undefined) activity.set(entries);
+	};
 
 	const attachments = signal(data.get().attachments);
 	data.onChange((next) => attachments.set(next.attachments));
@@ -121,7 +134,9 @@ export function IssueDetailPage({
 			data.get().issue.identifier,
 			patch,
 			apply,
-		);
+		).then((updated) => {
+			if (updated !== undefined) void refreshActivity();
+		});
 
 	// Moving teams renumbers the issue, so the URL it lives at changes with it.
 	const moveTeam = (key: string) => {
@@ -155,7 +170,7 @@ export function IssueDetailPage({
 
 		ImplementDocument({
 			onKeydown: (event) => {
-				if (isTyping(event.target)) return;
+				if (isTyping(event)) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
 				const key = event.key.toLowerCase();
 				if (key === "c") {
@@ -223,6 +238,8 @@ export function IssueDetailPage({
 
 					CommentThread(
 						comments,
+						activity,
+						issue,
 						params,
 						issue.bind((value) => value.repository?.id),
 					),
@@ -230,37 +247,26 @@ export function IssueDetailPage({
 			),
 		),
 
-		// Linear puts the properties in a right rail rather than above the body.
+		// Linear puts the properties in a right rail rather than above the body,
+		// under headings rather than beside per-row labels. Every pill already
+		// says what it is — a status ring, a priority column, an avatar, a
+		// coloured dot — so a "Status" caption next to a control reading
+		// "In Progress" is a word doing no work.
 		Div(
-			{ class: "hidden w-64 shrink-0 flex-col gap-4 border-l border-border p-4 lg:flex" },
-			PropertyRow("Workspace", TransferIssueButton({ slug: params.slug, issue })),
-			PropertyRow(
-				"Team",
-				TeamPicker(
-					issue.bind("team"),
-					data.bind((value) => value.teams),
-					moveTeam,
-					{ showLabel: true, open: teamOpen },
-				),
-			),
-			PropertyRow(
-				"Status",
+			{ class: "hidden w-64 shrink-0 flex-col gap-5 border-l border-border p-4 lg:flex" },
+
+			PropertySection(
+				"Properties",
 				StatusPicker(
 					issue.bind("status"),
 					(status) => update({ status }, (value) => ({ ...value, status })),
-					{ showLabel: true, open: statusOpen },
+					{ showLabel: true, open: statusOpen, class: propertyClass },
 				),
-			),
-			PropertyRow(
-				"Priority",
 				PriorityPicker(
 					issue.bind("priority"),
 					(priority) => update({ priority }, (value) => ({ ...value, priority })),
-					{ showLabel: true, open: priorityOpen },
+					{ showLabel: true, open: priorityOpen, class: propertyClass },
 				),
-			),
-			PropertyRow(
-				"Assignee",
 				AssigneePicker(
 					issue.bind("assignee"),
 					data.bind((value) => value.members),
@@ -273,11 +279,14 @@ export function IssueDetailPage({
 									: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
 										value.assignee),
 						})),
-					{ showLabel: true, open: assigneeOpen },
+					{ showLabel: true, open: assigneeOpen, class: propertyClass },
 				),
-			),
-			PropertyRow(
-				"Repository",
+				TeamPicker(
+					issue.bind("team"),
+					data.bind((value) => value.teams),
+					moveTeam,
+					{ showLabel: true, open: teamOpen, class: propertyClass },
+				),
 				RepositoryPicker(
 					issue.bind((value) => value.repository),
 					repositories,
@@ -296,51 +305,54 @@ export function IssueDetailPage({
 												provider: repo.provider,
 											}))[0] ?? value.repository),
 						})),
-					{ showLabel: true },
+					{ showLabel: true, class: propertyClass },
+				),
+				Div(
+					{ class: "px-1" },
+					PullRequestLink({
+						slug: params.slug,
+						identifier: issue.bind("identifier"),
+						current: linkedPull,
+						enabled: repositories.bind((list) => list.length > 0),
+					}),
 				),
 			),
-			PropertyRow(
-				"Pull request",
-				PullRequestLink({
-					slug: params.slug,
-					identifier: issue.bind("identifier"),
-					current: linkedPull,
-					enabled: repositories.bind((list) => list.length > 0),
+
+			// Labels get their own section rather than a row, because there are any
+			// number of them and each one is its own control.
+			PropertySection(
+				"Labels",
+				IssueLabelPicker({
+					selected: issue.bind("labels"),
+					available: data.bind((value) => value.labels),
+					onToggle: (labelId) =>
+						update(
+							{
+								labelIds: toggle(
+									issue.get().labels.map((label) => label.id),
+									labelId,
+								),
+							},
+							(value) => ({
+								...value,
+								labels: value.labels.some((label) => label.id === labelId)
+									? value.labels.filter((label) => label.id !== labelId)
+									: [...value.labels, data.get().labels.find((label) => label.id === labelId)!],
+							}),
+						),
+					open: labelOpen,
 				}),
 			),
-			PropertyRow(
-				"Labels",
-				Div(
-					{ class: "flex flex-col items-start gap-1.5" },
-					// The picker's trigger only counts them; the chips say which.
-					Div({ class: "flex flex-wrap gap-1" }, LabelChips(issue.bind("labels"))),
-					LabelPicker(
-						issue.bind("labels"),
-						data.bind((value) => value.labels),
-						(labelId) =>
-							update(
-								{
-									labelIds: toggle(
-										issue.get().labels.map((label) => label.id),
-										labelId,
-									),
-								},
-								(value) => ({
-									...value,
-									labels: value.labels.some((label) => label.id === labelId)
-										? value.labels.filter((label) => label.id !== labelId)
-										: [...value.labels, data.get().labels.find((label) => label.id === labelId)!],
-								}),
-							),
-						{ open: labelOpen },
-					),
-				),
-			),
-
-			CopyPromptButton({ issue, slug: params.slug }),
 
 			Div(
-				{ class: "mt-2 border-t border-border pt-3 text-[11px] text-muted-foreground" },
+				{ class: "flex flex-col items-start gap-1 border-t border-border pt-3" },
+				CopyPromptButton({ issue, slug: params.slug }),
+				TransferIssueButton({ slug: params.slug, issue }),
+				DeleteIssueButton({ slug: params.slug, issue }),
+			),
+
+			Div(
+				{ class: "text-[11px] text-muted-foreground" },
 				P(
 					{},
 					issue.bind((value) => `Created ${fullTime(value.createdAt)}`),
@@ -358,11 +370,24 @@ function toggle(ids: string[], id: string): string[] {
 	return ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
 }
 
-function PropertyRow(label: string, control: Child) {
+/**
+ * A rail pill: full width, value first, no caption.
+ *
+ * The pickers default to an inline chip sized for a list row; in the rail they
+ * are rows of their own, which is what makes the section read as a list of
+ * properties rather than a scatter of buttons.
+ */
+const propertyClass = "flex h-7 w-full justify-start gap-2 px-2 text-[13px] text-foreground";
+
+/** A titled group of properties — Linear's "Properties" and "Labels" blocks. */
+function PropertySection(title: string, ...children: Child[]) {
 	return Div(
-		{ class: "flex items-center gap-2" },
-		Span({ class: "w-16 shrink-0 text-[12px] text-muted-foreground" }, label),
-		Div({ class: "min-w-0 flex-1" }, control),
+		{ class: "flex flex-col gap-1.5" },
+		Span(
+			{ class: "px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase" },
+			title,
+		),
+		Div({ class: "flex flex-col gap-0.5" }, ...children),
 	);
 }
 
@@ -415,73 +440,59 @@ function EditableDescription(
 	update: (patch: { description: string }, apply: (value: Issue) => Issue) => void,
 	params: { slug: Readable<string> },
 ) {
-	const editing = signal(false);
 	const draft = signal("");
 	const draftRef = signal<HTMLTextAreaElement | null>(null);
 
-	// The same `@` as the composer and the comment box — an issue body is an
-	// issue body whichever screen it is being written on.
-	const mentions = fileMentions({
-		value: draft,
-		slug: () => params.slug.get(),
-		repository: () => issue.get().repository?.id,
-		element: draftRef,
-	});
-
 	const commit = () => {
-		// Picking from the menu blurs the textarea, and committing here would
-		// close the editor out from under the insertion.
-		if (mentions.open.get()) return;
 		const next = draft.get();
-		editing.set(false);
 		if (next === issue.get().description) return;
 		update({ description: next }, (value) => ({ ...value, description: next }));
 	};
 
-	return If(editing)
-		.Then(
-			Div(
-				{ class: "relative" },
-				Textarea({
-					this: draftRef,
-					value: draft,
-					autofocus: true,
-					rows: 8,
-					class:
-						"w-full resize-y rounded-md border border-input bg-background p-3 text-[14px] outline-none focus:border-ring",
-					onInput: mentions.onInput,
-					onKeydown: (event) => {
-						mentions.onKeydown(event);
-						if (event.defaultPrevented) return;
-						if (event.key === "Escape") editing.set(false);
-						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) commit();
-					},
-					onBlur: commit,
-				}),
-				MentionMenu(mentions),
-			),
-		)
-		.Else(
-			Div(
-				{
-					class:
-						"cursor-text rounded-md py-1 text-[14px] leading-relaxed whitespace-pre-wrap text-foreground/90 hover:bg-accent/40",
-					onClick: () => {
-						draft.set(issue.get().description);
-						editing.set(true);
-					},
-				},
-				MentionText(
-					issue.bind((value) =>
-						value.description.trim() === "" ? "Add a description…" : value.description,
-					),
-				),
-			),
-		);
+	// The same box as the create dialog, so an issue body is written the same
+	// way whichever screen it is being written on.
+	return Fragment(
+		// The stored body fills the box on load, and again when it changes
+		// somewhere else — but never on top of what is being typed here.
+		ImplementEffect([issue], (value) => {
+			// Null before the box is mounted, and on the server, where there is no
+			// `document` to ask.
+			const node = draftRef.get();
+			if (node !== null && node === document.activeElement) return;
+			draft.set(value.description);
+		}),
+		BodyComposer({
+			value: draft,
+			element: draftRef,
+			slug: () => params.slug.get(),
+			repository: () => issue.get().repository?.id,
+			placeholder: "Add description… @ to reference a file",
+			// The body is as tall as it needs to be here: there is no dialog to
+			// stay inside, and a scrollbar within a page that already scrolls is
+			// the worst of both.
+			rows: 4,
+			autoGrow: true,
+			renderMentions: true,
+			onBlur: commit,
+			// Blur commits, so ⌘⏎ only has to leave the box.
+			onSubmit: () => draftRef.get()?.blur(),
+			onEscape: () => {
+				draft.set(issue.get().description);
+				draftRef.get()?.blur();
+			},
+		}),
+	);
 }
 
+/**
+ * The activity view: everything that has happened to the issue, oldest first,
+ * with the comment box at the bottom. Comments are only one kind of entry now,
+ * so the heading says Activity and the timeline decides how each one reads.
+ */
 function CommentThread(
 	comments: ReturnType<typeof signal<Comment[]>>,
+	activity: Readable<Activity[]>,
+	issue: Readable<Issue>,
 	params: { slug: Readable<string>; identifier: Readable<string> },
 	repositoryId: Readable<string | undefined>,
 ) {
@@ -537,42 +548,11 @@ function CommentThread(
 
 	return Div(
 		{ class: "flex flex-col gap-4 border-t border-border pt-6" },
-		Span({ class: "text-[13px] font-medium" }, "Comments"),
+		Span({ class: "text-[13px] font-medium" }, "Activity"),
 
-		ForEach(
-			comments,
-			(comment) => comment.id,
-			(comment) =>
-				Div(
-					{ class: "flex gap-3" },
-					UserAvatar(comment.get().author, "mt-0.5"),
-					Div(
-						{ class: "min-w-0 flex-1" },
-						Div(
-							{ class: "flex items-baseline gap-2" },
-							Span(
-								{ class: "text-[13px] font-medium" },
-								comment.bind((c) => c.author.name),
-							),
-							If(
-								comment.bind((c) => c.author.type === "agent"),
-								AgentBadge(),
-							),
-							Span(
-								{ class: "text-[11px] text-muted-foreground" },
-								comment.bind((c) => relativeTime(c.createdAt)),
-							),
-						),
-						P(
-							{ class: "text-[13px] leading-relaxed whitespace-pre-wrap" },
-							MentionText(comment.bind("body")),
-						),
-						AttachmentGrid({
-							attachments: comment.bind("attachments"),
-							slug: params.slug,
-						}),
-					),
-				),
+		Div(
+			{ class: "flex flex-col gap-4" },
+			IssueTimeline({ comments, activity, issue, slug: params.slug }),
 		),
 
 		Div(
@@ -605,6 +585,10 @@ function CommentThread(
 			Div(
 				{ class: "flex items-center gap-2" },
 				AttachTrigger({ onFiles: attach }),
+				// The box looks like a plain textarea, so nothing about it says the
+				// body will be rendered. One line, not a toolbar: the point is to
+				// tell someone who already knows markdown that it will be honoured.
+				Span({ class: "hidden text-[11px] text-muted-foreground sm:inline" }, "Markdown supported"),
 				Button(
 					{
 						size: "sm",

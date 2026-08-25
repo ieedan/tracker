@@ -10,7 +10,6 @@
  * caret still inside that run.
  */
 import {
-	A,
 	Div,
 	Dynamic,
 	ForEach,
@@ -24,6 +23,7 @@ import {
 } from "@implementjs/core";
 import { FileCode2 } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
+import { MentionLink } from "@/lib/components/markdown";
 import { cn } from "@/lib/utils";
 
 export interface FileMatch {
@@ -149,17 +149,24 @@ export function mentionMarkdown(match: FileMatch): string {
 /**
  * Renders a body's `@file` references as links, leaving everything else alone.
  *
- * Not a markdown renderer — this recognizes exactly the shape `mentionMarkdown`
- * writes and nothing else. A general renderer here would be a much bigger
- * promise than "the file you referenced is clickable", and would have to answer
- * for every other markdown construct in a field nothing else treats as
- * markdown.
+ * Deliberately not the markdown renderer, even though one exists now: this
+ * draws the overlay that sits *on top of* a live textarea, so its output has to
+ * occupy exactly the same space as the raw characters underneath it. A
+ * markdown render collapses `**bold**` to four fewer characters and the caret
+ * stops landing where you clicked. Posted bodies — where there is no textarea
+ * to line up with — go through `Markdown` instead.
  *
- * Nodes are built rather than HTML injected, so a body containing angle
- * brackets stays text. The URL is still checked: anyone can type this shape by
- * hand, and `javascript:` in an href is the obvious thing to try.
+ * The pill itself is shared with that renderer, so a mention looks the same
+ * while it is being written as it does once it is posted.
  */
 const MENTION = /\[@([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+/** Whether a body has anything for {@link MentionText} to render differently. */
+export function hasMention(body: string): boolean {
+	// A global regex carries `lastIndex` between calls, so the pattern is
+	// re-created rather than shared.
+	return new RegExp(MENTION.source).test(body);
+}
 
 export function MentionText(body: Readable<string>, className?: string) {
 	return Span(
@@ -178,19 +185,7 @@ function renderMentions(text: string): Child[] {
 		const start = match.index;
 		if (start > cursor) parts.push(text.slice(cursor, start));
 
-		parts.push(
-			A(
-				{
-					href: match[2]!,
-					target: "_blank",
-					rel: "noreferrer",
-					class:
-						"inline-flex items-center gap-1 rounded border border-border bg-secondary/50 px-1 font-mono text-[0.9em] hover:border-ring",
-					title: match[2],
-				},
-				`@${match[1]!.slice(match[1]!.lastIndexOf("/") + 1)}`,
-			),
-		);
+		parts.push(MentionLink(match[1]!, match[2]!));
 		cursor = start + match[0].length;
 	}
 
@@ -300,10 +295,14 @@ export function fileMentions(options: {
 				highlighted.update((index) => (index - 1 + matches.get().length) % matches.get().length);
 				return;
 			}
+			// Tab completes the highlighted file rather than leaving the box. A
+			// menu that is showing a choice is what Tab is for; the composer only
+			// hands Tab on to the next control when there is no menu to answer it.
 			if (event.key === "Enter" || event.key === "Tab") {
 				const picked = matches.get()[highlighted.get()];
 				if (picked !== undefined) {
-					// Stops the Enter from also submitting the composer.
+					// Stops the Enter from also submitting the composer, and the Tab
+					// from also moving focus out of it.
 					event.preventDefault();
 					event.stopPropagation();
 					choose(picked);

@@ -142,6 +142,14 @@ async function callTool(event: RequestEvent, params: Record<string, unknown>): P
 	const response = await apiFetch(event, method, path, body);
 	if (response === null) return toolFailure("Could not reach the API");
 
+	// A failure is JSON whatever the tool normally answers with, so it is read
+	// the same way before the tool gets a look at the body.
+	if (!response.ok) return await failureFrom(response);
+
+	// A tool whose endpoint answers bytes shapes its own result; everything else
+	// takes the JSON default.
+	if (tool.result !== undefined) return await tool.result(response);
+
 	const text = await response.text();
 	let parsed: unknown = text;
 	try {
@@ -150,15 +158,23 @@ async function callTool(event: RequestEvent, params: Record<string, unknown>): P
 		// Leave it as text; a non-JSON body is still worth showing the model.
 	}
 
-	if (!response.ok) {
-		const message =
-			typeof parsed === "object" && parsed !== null && "message" in parsed
-				? String((parsed as { message: unknown }).message)
-				: `Request failed with ${response.status}`;
-		return toolFailure(`${message} (HTTP ${response.status})`);
-	}
-
 	return toolSuccess(parsed);
+}
+
+/** An error response, as the message the endpoint put in it. */
+async function failureFrom(response: Response): Promise<ToolResult> {
+	const text = await response.text();
+	let parsed: unknown = text;
+	try {
+		parsed = text === "" ? null : JSON.parse(text);
+	} catch {
+		// Not JSON; the status is all there is to say.
+	}
+	const message =
+		typeof parsed === "object" && parsed !== null && "message" in parsed
+			? String((parsed as { message: unknown }).message)
+			: `Request failed with ${response.status}`;
+	return toolFailure(`${message} (HTTP ${response.status})`);
 }
 
 /**

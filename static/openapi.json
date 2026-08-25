@@ -6,6 +6,114 @@
 		"description": "Issue tracking API. Authenticate with `Authorization: Bearer <api key>`; keys are created in the app under Settings → API keys."
 	},
 	"paths": {
+		"/api/v1/agents": {
+			"get": {
+				"operationId": "getApiV1Agents",
+				"parameters": [],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"grantId": {
+												"type": "string"
+											},
+											"clientId": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"harness": {
+												"enum": [
+													"claude-code",
+													"cursor",
+													"codex",
+													"opencode",
+													"copilot",
+													"other"
+												],
+												"type": "string"
+											},
+											"scopes": {
+												"type": "array",
+												"items": {
+													"type": "string"
+												}
+											},
+											"lastUsedAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"grantId",
+											"clientId",
+											"name",
+											"harness",
+											"scopes",
+											"lastUsedAt",
+											"createdAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/agents/{grantId}": {
+			"delete": {
+				"operationId": "deleteApiV1AgentsByGrantId",
+				"parameters": [
+					{
+						"name": "grantId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"ok": {
+											"const": true
+										}
+									},
+									"required": [
+										"ok"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/api/v1/api-keys": {
 			"get": {
 				"operationId": "getApiV1ApiKeys",
@@ -87,42 +195,70 @@
 															"issues": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															},
 															"workspace": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
+																	"type": "string"
+																}
+															},
+															"labels": {
+																"type": "array",
+																"items": {
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															},
 															"members": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															},
 															"webhooks": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															},
 															"feedback": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															},
 															"notifications": {
 																"type": "array",
 																"items": {
-																	"enum": ["read", "write"],
+																	"enum": [
+																		"read",
+																		"write"
+																	],
 																	"type": "string"
 																}
 															}
@@ -175,42 +311,70 @@
 											"issues": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											},
 											"workspace": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
+													"type": "string"
+												}
+											},
+											"labels": {
+												"type": "array",
+												"items": {
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											},
 											"members": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											},
 											"webhooks": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											},
 											"feedback": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											},
 											"notifications": {
 												"type": "array",
 												"items": {
-													"enum": ["read", "write"],
+													"enum": [
+														"read",
+														"write"
+													],
 													"type": "string"
 												}
 											}
@@ -223,7 +387,10 @@
 										"maximum": 31536000
 									}
 								},
-								"required": ["name", "permissions"],
+								"required": [
+									"name",
+									"permissions"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -307,42 +474,70 @@
 																"issues": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																},
 																"workspace": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
+																		"type": "string"
+																	}
+																},
+																"labels": {
+																	"type": "array",
+																	"items": {
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																},
 																"members": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																},
 																"webhooks": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																},
 																"feedback": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																},
 																"notifications": {
 																	"type": "array",
 																	"items": {
-																		"enum": ["read", "write"],
+																		"enum": [
+																			"read",
+																			"write"
+																		],
 																		"type": "string"
 																	}
 																}
@@ -371,7 +566,10 @@
 											"type": "string"
 										}
 									},
-									"required": ["key", "plaintext"],
+									"required": [
+										"key",
+										"plaintext"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -408,109 +606,6 @@
 				}
 			}
 		},
-		"/api/v1/device/approve": {
-			"post": {
-				"operationId": "postApiV1DeviceApprove",
-				"parameters": [],
-				"requestBody": {
-					"required": true,
-					"content": {
-						"application/json": {
-							"schema": {
-								"type": "object",
-								"properties": {
-									"userCode": {
-										"type": "string",
-										"minLength": 1
-									},
-									"slug": {
-										"type": "string",
-										"minLength": 1
-									},
-									"scopes": {
-										"type": "array",
-										"items": {
-											"type": "string"
-										},
-										"minItems": 1
-									}
-								},
-								"required": ["userCode", "slug", "scopes"],
-								"$schema": "http://json-schema.org/draft-07/schema#"
-							}
-						}
-					}
-				},
-				"responses": {
-					"200": {
-						"description": "OK",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "object",
-									"properties": {
-										"ok": {
-											"const": true
-										}
-									},
-									"required": ["ok"],
-									"$schema": "http://json-schema.org/draft-07/schema#"
-								}
-							}
-						}
-					},
-					"400": {
-						"description": "the request failed validation"
-					}
-				}
-			}
-		},
-		"/api/v1/device/deny": {
-			"post": {
-				"operationId": "postApiV1DeviceDeny",
-				"parameters": [],
-				"requestBody": {
-					"required": true,
-					"content": {
-						"application/json": {
-							"schema": {
-								"type": "object",
-								"properties": {
-									"userCode": {
-										"type": "string",
-										"minLength": 1
-									}
-								},
-								"required": ["userCode"],
-								"$schema": "http://json-schema.org/draft-07/schema#"
-							}
-						}
-					}
-				},
-				"responses": {
-					"200": {
-						"description": "OK",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "object",
-									"properties": {
-										"ok": {
-											"const": true
-										}
-									},
-									"required": ["ok"],
-									"$schema": "http://json-schema.org/draft-07/schema#"
-								}
-							}
-						}
-					},
-					"400": {
-						"description": "the request failed validation"
-					}
-				}
-			}
-		},
 		"/api/v1/invites/{token}/accept": {
 			"post": {
 				"operationId": "postApiV1InvitesByTokenAccept",
@@ -542,7 +637,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"image": {
@@ -556,11 +654,18 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": ["disabled", "api_key", "public"],
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
@@ -620,8 +725,29 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												},
 												"onBehalfOf": {
 													"anyOf": [
@@ -635,7 +761,10 @@
 																	"type": "string"
 																}
 															},
-															"required": ["id", "name"]
+															"required": [
+																"id",
+																"name"
+															]
 														},
 														{
 															"type": "null"
@@ -643,10 +772,21 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"authVia": {
-											"enum": ["session", "api-key", "oauth"],
+											"enum": [
+												"session",
+												"api-key",
+												"oauth"
+											],
 											"type": "string"
 										},
 										"agent": {
@@ -657,14 +797,33 @@
 														"clientId": {
 															"type": "string"
 														},
-														"workspaceId": {
-															"type": "string"
-														},
 														"installedBy": {
 															"type": "string"
+														},
+														"workspaces": {
+															"type": "array",
+															"items": {
+																"type": "object",
+																"properties": {
+																	"slug": {
+																		"type": "string"
+																	},
+																	"name": {
+																		"type": "string"
+																	}
+																},
+																"required": [
+																	"slug",
+																	"name"
+																]
+															}
 														}
 													},
-													"required": ["clientId", "workspaceId", "installedBy"]
+													"required": [
+														"clientId",
+														"installedBy",
+														"workspaces"
+													]
 												},
 												{
 													"type": "null"
@@ -672,7 +831,11 @@
 											]
 										}
 									},
-									"required": ["user", "authVia", "agent"],
+									"required": [
+										"user",
+										"authVia",
+										"agent"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -690,6 +853,18 @@
 						"in": "query",
 						"required": false,
 						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "order",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"enum": [
+								"newest",
+								"oldest"
+							],
 							"type": "string"
 						}
 					}
@@ -746,11 +921,39 @@
 														]
 													},
 													"type": {
-														"enum": ["human", "agent"],
+														"enum": [
+															"human",
+															"agent"
+														],
 														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
 													}
 												},
-												"required": ["id", "name", "email", "image", "type"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
 											},
 											"workspaceSlug": {
 												"type": "string"
@@ -770,7 +973,11 @@
 																"type": "number"
 															}
 														},
-														"required": ["identifier", "title", "number"]
+														"required": [
+															"identifier",
+															"title",
+															"number"
+														]
 													},
 													{
 														"type": "null"
@@ -817,6 +1024,9 @@
 										"items": {
 											"type": "string"
 										}
+									},
+									"read": {
+										"type": "boolean"
 									}
 								},
 								"required": [],
@@ -837,7 +1047,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["ok"],
+									"required": [
+										"ok"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -865,7 +1077,9 @@
 											"type": "number"
 										}
 									},
-									"required": ["count"],
+									"required": [
+										"count"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -900,7 +1114,11 @@
 										"minimum": 1
 									}
 								},
-								"required": ["filename", "contentType", "size"],
+								"required": [
+									"filename",
+									"contentType",
+									"size"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -924,7 +1142,11 @@
 											"type": "string"
 										}
 									},
-									"required": ["key", "uploadUrl", "contentType"],
+									"required": [
+										"key",
+										"uploadUrl",
+										"contentType"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -960,7 +1182,10 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
 												"type": "string"
 											},
 											"image": {
@@ -974,11 +1199,18 @@
 												]
 											},
 											"feedbackIntake": {
-												"enum": ["disabled", "api_key", "public"],
+												"enum": [
+													"disabled",
+													"api_key",
+													"public"
+												],
 												"type": "string"
 											},
 											"feedbackBoard": {
-												"enum": ["private", "public"],
+												"enum": [
+													"private",
+													"public"
+												],
 												"type": "string"
 											},
 											"createdAt": {
@@ -1022,7 +1254,9 @@
 										"type": "string"
 									}
 								},
-								"required": ["name"],
+								"required": [
+									"name"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1046,7 +1280,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"image": {
@@ -1060,11 +1297,18 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": ["disabled", "api_key", "public"],
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1123,7 +1367,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"image": {
@@ -1137,11 +1384,18 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": ["disabled", "api_key", "public"],
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1200,11 +1454,18 @@
 										]
 									},
 									"feedbackIntake": {
-										"enum": ["disabled", "api_key", "public"],
+										"enum": [
+											"disabled",
+											"api_key",
+											"public"
+										],
 										"type": "string"
 									},
 									"feedbackBoard": {
-										"enum": ["private", "public"],
+										"enum": [
+											"private",
+											"public"
+										],
 										"type": "string"
 									}
 								},
@@ -1232,7 +1493,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"image": {
@@ -1246,11 +1510,18 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": ["disabled", "api_key", "public"],
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1301,110 +1572,45 @@
 									"items": {
 										"type": "object",
 										"properties": {
-											"grantId": {
-												"type": "string"
-											},
-											"clientId": {
+											"harness": {
+												"enum": [
+													"claude-code",
+													"cursor",
+													"codex",
+													"opencode",
+													"copilot",
+													"other"
+												],
 												"type": "string"
 											},
 											"name": {
 												"type": "string"
 											},
-											"image": {
-												"anyOf": [
-													{
-														"type": "string"
-													},
-													{
-														"type": "null"
-													}
-												]
-											},
-											"scopes": {
+											"connectedBy": {
 												"type": "array",
 												"items": {
-													"type": "string"
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name"
+													]
 												}
-											},
-											"installedBy": {
-												"type": "object",
-												"properties": {
-													"id": {
-														"type": "string"
-													},
-													"name": {
-														"type": "string"
-													}
-												},
-												"required": ["id", "name"]
-											},
-											"lastUsedAt": {
-												"anyOf": [
-													{
-														"type": "string"
-													},
-													{
-														"type": "null"
-													}
-												]
-											},
-											"createdAt": {
-												"type": "string"
 											}
 										},
 										"required": [
-											"grantId",
-											"clientId",
+											"harness",
 											"name",
-											"image",
-											"scopes",
-											"installedBy",
-											"lastUsedAt",
-											"createdAt"
+											"connectedBy"
 										]
 									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
-								}
-							}
-						}
-					}
-				}
-			}
-		},
-		"/api/v1/workspaces/{slug}/agents/{grantId}": {
-			"delete": {
-				"operationId": "deleteApiV1WorkspacesBySlugAgentsByGrantId",
-				"parameters": [
-					{
-						"name": "slug",
-						"in": "path",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					},
-					{
-						"name": "grantId",
-						"in": "path",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"description": "OK",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "object",
-									"properties": {
-										"ok": {
-											"const": true
-										}
-									},
-									"required": ["ok"],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -1454,7 +1660,11 @@
 										"type": "string"
 									}
 								},
-								"required": ["filename", "contentType", "size"],
+								"required": [
+									"filename",
+									"contentType",
+									"size"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1509,11 +1719,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												"createdAt": {
 													"type": "string"
@@ -1536,7 +1774,11 @@
 											"type": "string"
 										}
 									},
-									"required": ["attachment", "uploadUrl", "contentType"],
+									"required": [
+										"attachment",
+										"uploadUrl",
+										"contentType"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -1615,11 +1857,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -1703,7 +1973,12 @@
 												"type": "string"
 											}
 										},
-										"required": ["repositoryId", "fullName", "path", "url"]
+										"required": [
+											"repositoryId",
+											"fullName",
+											"path",
+											"url"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -1746,7 +2021,10 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
 												"type": "string"
 											},
 											"url": {
@@ -1769,7 +2047,15 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"]
+										"required": [
+											"id",
+											"token",
+											"role",
+											"url",
+											"expiresAt",
+											"revoked",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -1798,7 +2084,10 @@
 								"type": "object",
 								"properties": {
 									"role": {
-										"enum": ["admin", "member"],
+										"enum": [
+											"admin",
+											"member"
+										],
 										"type": "string",
 										"default": "member"
 									},
@@ -1829,7 +2118,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"url": {
@@ -1852,7 +2144,15 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"],
+									"required": [
+										"id",
+										"token",
+										"role",
+										"url",
+										"expiresAt",
+										"revoked",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -1893,12 +2193,24 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string"
 									}
 								},
 								{
-									"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+									"enum": [
+										"backlog",
+										"todo",
+										"in_progress",
+										"done",
+										"canceled"
+									],
 									"type": "string"
 								}
 							]
@@ -1913,12 +2225,24 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string"
 									}
 								},
 								{
-									"enum": ["none", "urgent", "high", "medium", "low"],
+									"enum": [
+										"none",
+										"urgent",
+										"high",
+										"medium",
+										"low"
+									],
 									"type": "string"
 								}
 							]
@@ -1981,7 +2305,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "key"]
+												"required": [
+													"id",
+													"name",
+													"key"
+												]
 											},
 											"title": {
 												"type": "string"
@@ -1990,11 +2318,23 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+												"enum": [
+													"backlog",
+													"todo",
+													"in_progress",
+													"done",
+													"canceled"
+												],
 												"type": "string"
 											},
 											"priority": {
-												"enum": ["none", "urgent", "high", "medium", "low"],
+												"enum": [
+													"none",
+													"urgent",
+													"high",
+													"medium",
+													"low"
+												],
 												"type": "string"
 											},
 											"assignee": {
@@ -2022,11 +2362,39 @@
 																]
 															},
 															"type": {
-																"enum": ["human", "agent"],
+																"enum": [
+																	"human",
+																	"agent"
+																],
 																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
 															}
 														},
-														"required": ["id", "name", "email", "image", "type"]
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
 													},
 													{
 														"type": "null"
@@ -2056,11 +2424,39 @@
 														]
 													},
 													"type": {
-														"enum": ["human", "agent"],
+														"enum": [
+															"human",
+															"agent"
+														],
 														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
 													}
 												},
-												"required": ["id", "name", "email", "image", "type"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
 											},
 											"labels": {
 												"type": "array",
@@ -2077,7 +2473,11 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "name", "color"]
+													"required": [
+														"id",
+														"name",
+														"color"
+													]
 												}
 											},
 											"commentCount": {
@@ -2095,11 +2495,17 @@
 																"type": "string"
 															},
 															"provider": {
-																"enum": ["github"],
+																"enum": [
+																	"github"
+																],
 																"type": "string"
 															}
 														},
-														"required": ["id", "fullName", "provider"]
+														"required": [
+															"id",
+															"fullName",
+															"provider"
+														]
 													},
 													{
 														"type": "null"
@@ -2121,14 +2527,25 @@
 																"type": "string"
 															},
 															"state": {
-																"enum": ["open", "merged", "closed", "draft"],
+																"enum": [
+																	"open",
+																	"merged",
+																	"closed",
+																	"draft"
+																],
 																"type": "string"
 															},
 															"url": {
 																"type": "string"
 															}
 														},
-														"required": ["id", "number", "title", "state", "url"]
+														"required": [
+															"id",
+															"number",
+															"title",
+															"state",
+															"url"
+														]
 													},
 													{
 														"type": "null"
@@ -2153,12 +2570,109 @@
 																"type": "string"
 															}
 														},
-														"required": ["id", "number", "identifier", "title"]
+														"required": [
+															"id",
+															"number",
+															"identifier",
+															"title"
+														]
 													},
 													{
 														"type": "null"
 													}
 												]
+											},
+											"attachments": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"filename": {
+															"type": "string"
+														},
+														"contentType": {
+															"type": "string"
+														},
+														"size": {
+															"type": "number"
+														},
+														"url": {
+															"type": "string"
+														},
+														"uploadedBy": {
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																},
+																"email": {
+																	"type": "string"
+																},
+																"image": {
+																	"anyOf": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																},
+																"type": {
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
+																	"type": "string"
+																},
+																"harness": {
+																	"anyOf": [
+																		{
+																			"enum": [
+																				"claude-code",
+																				"cursor",
+																				"codex",
+																				"opencode",
+																				"copilot",
+																				"other"
+																			],
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																}
+															},
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image",
+																"type",
+																"harness"
+															]
+														},
+														"createdAt": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"filename",
+														"contentType",
+														"size",
+														"url",
+														"uploadedBy",
+														"createdAt"
+													]
+												}
 											},
 											"createdAt": {
 												"type": "string"
@@ -2183,6 +2697,7 @@
 											"repository",
 											"pullRequest",
 											"feedback",
+											"attachments",
 											"createdAt",
 											"updatedAt"
 										]
@@ -2241,12 +2756,24 @@
 										"default": ""
 									},
 									"status": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string",
 										"default": "backlog"
 									},
 									"priority": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string",
 										"default": "none"
 									},
@@ -2273,7 +2800,10 @@
 										}
 									}
 								},
-								"required": ["teamKey", "title"],
+								"required": [
+									"teamKey",
+									"title"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2309,7 +2839,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -2318,11 +2852,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -2350,11 +2896,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												{
 													"type": "null"
@@ -2384,11 +2958,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -2405,7 +3007,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
@@ -2423,11 +3029,17 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": ["github"],
+															"enum": [
+																"github"
+															],
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName", "provider"]
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
 												},
 												{
 													"type": "null"
@@ -2449,14 +3061,25 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": ["open", "merged", "closed", "draft"],
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "title", "state", "url"]
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
 												},
 												{
 													"type": "null"
@@ -2481,12 +3104,109 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "identifier", "title"]
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
 												}
 											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -2511,6 +3231,7 @@
 										"repository",
 										"pullRequest",
 										"feedback",
+										"attachments",
 										"createdAt",
 										"updatedAt"
 									],
@@ -2576,7 +3297,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -2585,11 +3310,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -2617,11 +3354,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												{
 													"type": "null"
@@ -2651,11 +3416,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -2672,7 +3465,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
@@ -2690,11 +3487,17 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": ["github"],
+															"enum": [
+																"github"
+															],
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName", "provider"]
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
 												},
 												{
 													"type": "null"
@@ -2716,14 +3519,25 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": ["open", "merged", "closed", "draft"],
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "title", "state", "url"]
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
 												},
 												{
 													"type": "null"
@@ -2748,12 +3562,109 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "identifier", "title"]
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
 												}
 											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -2778,6 +3689,7 @@
 										"repository",
 										"pullRequest",
 										"feedback",
+										"attachments",
 										"createdAt",
 										"updatedAt"
 									],
@@ -2842,11 +3754,23 @@
 										"maxLength": 20000
 									},
 									"status": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string"
 									},
 									"priority": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string"
 									},
 									"assigneeId": {
@@ -2902,7 +3826,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -2911,11 +3839,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -2943,11 +3883,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												{
 													"type": "null"
@@ -2977,11 +3945,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -2998,7 +3994,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
@@ -3016,11 +4016,17 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": ["github"],
+															"enum": [
+																"github"
+															],
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName", "provider"]
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
 												},
 												{
 													"type": "null"
@@ -3042,14 +4048,25 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": ["open", "merged", "closed", "draft"],
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "title", "state", "url"]
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
 												},
 												{
 													"type": "null"
@@ -3074,12 +4091,109 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "identifier", "title"]
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
 												}
 											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -3104,6 +4218,7 @@
 										"repository",
 										"pullRequest",
 										"feedback",
+										"attachments",
 										"createdAt",
 										"updatedAt"
 									],
@@ -3143,6 +4258,180 @@
 						"content": {
 							"application/json": {
 								"schema": {}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/issues/{identifier}/activity": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifierActivity",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"type": {
+												"enum": [
+													"created",
+													"status_changed",
+													"priority_changed",
+													"assignee_changed",
+													"title_changed",
+													"description_changed",
+													"labels_changed",
+													"team_changed",
+													"repository_changed",
+													"pull_request_linked",
+													"pull_request_unlinked"
+												],
+												"type": "string"
+											},
+											"actor": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"email": {
+														"type": "string"
+													},
+													"image": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"type": {
+														"enum": [
+															"human",
+															"agent"
+														],
+														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
+											},
+											"from": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"to": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"labels": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string"
+														},
+														"color": {
+															"type": "string"
+														},
+														"added": {
+															"type": "boolean"
+														}
+													},
+													"required": [
+														"name",
+														"color",
+														"added"
+													]
+												}
+											},
+											"createdAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"type",
+											"actor",
+											"from",
+											"to",
+											"labels",
+											"createdAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
 							}
 						}
 					},
@@ -3212,11 +4501,39 @@
 														]
 													},
 													"type": {
-														"enum": ["human", "agent"],
+														"enum": [
+															"human",
+															"agent"
+														],
 														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
 													}
 												},
-												"required": ["id", "name", "email", "image", "type"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
 											},
 											"attachments": {
 												"type": "array",
@@ -3261,11 +4578,39 @@
 																	]
 																},
 																"type": {
-																	"enum": ["human", "agent"],
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
 																	"type": "string"
+																},
+																"harness": {
+																	"anyOf": [
+																		{
+																			"enum": [
+																				"claude-code",
+																				"cursor",
+																				"codex",
+																				"opencode",
+																				"copilot",
+																				"other"
+																			],
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
 																}
 															},
-															"required": ["id", "name", "email", "image", "type"]
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image",
+																"type",
+																"harness"
+															]
 														},
 														"createdAt": {
 															"type": "string"
@@ -3289,7 +4634,14 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "body", "author", "attachments", "createdAt", "updatedAt"]
+										"required": [
+											"id",
+											"body",
+											"author",
+											"attachments",
+											"createdAt",
+											"updatedAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -3340,7 +4692,9 @@
 										}
 									}
 								},
-								"required": ["body"],
+								"required": [
+									"body"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -3383,11 +4737,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"attachments": {
 											"type": "array",
@@ -3432,11 +4814,39 @@
 																]
 															},
 															"type": {
-																"enum": ["human", "agent"],
+																"enum": [
+																	"human",
+																	"agent"
+																],
 																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
 															}
 														},
-														"required": ["id", "name", "email", "image", "type"]
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
 													},
 													"createdAt": {
 														"type": "string"
@@ -3460,7 +4870,14 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "body", "author", "attachments", "createdAt", "updatedAt"],
+									"required": [
+										"id",
+										"body",
+										"author",
+										"attachments",
+										"createdAt",
+										"updatedAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -3513,7 +4930,12 @@
 													"type": "string"
 												},
 												"state": {
-													"enum": ["open", "merged", "closed", "draft"],
+													"enum": [
+														"open",
+														"merged",
+														"closed",
+														"draft"
+													],
 													"type": "string"
 												},
 												"url": {
@@ -3532,7 +4954,10 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName"]
+													"required": [
+														"id",
+														"fullName"
+													]
 												},
 												"syncedAt": {
 													"anyOf": [
@@ -3607,7 +5032,9 @@
 										"maxLength": 400
 									}
 								},
-								"required": ["reference"],
+								"required": [
+									"reference"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -3631,7 +5058,12 @@
 											"type": "string"
 										},
 										"state": {
-											"enum": ["open", "merged", "closed", "draft"],
+											"enum": [
+												"open",
+												"merged",
+												"closed",
+												"draft"
+											],
 											"type": "string"
 										},
 										"url": {
@@ -3650,7 +5082,10 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "fullName"]
+											"required": [
+												"id",
+												"fullName"
+											]
 										},
 										"syncedAt": {
 											"anyOf": [
@@ -3719,7 +5154,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["unlinked"],
+									"required": [
+										"unlinked"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -3769,7 +5206,10 @@
 										"maxLength": 6
 									}
 								},
-								"required": ["workspaceSlug", "teamKey"],
+								"required": [
+									"workspaceSlug",
+									"teamKey"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -3805,7 +5245,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -3814,11 +5258,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -3846,11 +5302,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												{
 													"type": "null"
@@ -3880,11 +5364,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -3901,7 +5413,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
@@ -3919,11 +5435,17 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": ["github"],
+															"enum": [
+																"github"
+															],
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName", "provider"]
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
 												},
 												{
 													"type": "null"
@@ -3945,14 +5467,25 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": ["open", "merged", "closed", "draft"],
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "title", "state", "url"]
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
 												},
 												{
 													"type": "null"
@@ -3977,12 +5510,109 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "identifier", "title"]
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
 												}
 											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -4007,6 +5637,7 @@
 										"repository",
 										"pullRequest",
 										"feedback",
+										"attachments",
 										"createdAt",
 										"updatedAt"
 									],
@@ -4054,7 +5685,11 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "color"]
+										"required": [
+											"id",
+											"name",
+											"color"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -4092,7 +5727,10 @@
 										"pattern": "^#[0-9a-fA-F]{6}$"
 									}
 								},
-								"required": ["name", "color"],
+								"required": [
+									"name",
+									"color"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -4116,7 +5754,11 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "color"],
+									"required": [
+										"id",
+										"name",
+										"color"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -4155,7 +5797,10 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
 												"type": "string"
 											},
 											"user": {
@@ -4181,17 +5826,50 @@
 														]
 													},
 													"type": {
-														"enum": ["human", "agent"],
+														"enum": [
+															"human",
+															"agent"
+														],
 														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
 													}
 												},
-												"required": ["id", "name", "email", "image", "type"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": ["id", "role", "user", "createdAt"]
+										"required": [
+											"id",
+											"role",
+											"user",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -4224,12 +5902,17 @@
 										"format": "email"
 									},
 									"role": {
-										"enum": ["admin", "member"],
+										"enum": [
+											"admin",
+											"member"
+										],
 										"type": "string",
 										"default": "member"
 									}
 								},
-								"required": ["email"],
+								"required": [
+									"email"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -4247,7 +5930,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"user": {
@@ -4273,17 +5959,50 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "role", "user", "createdAt"],
+									"required": [
+										"id",
+										"role",
+										"user",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -4296,6 +6015,144 @@
 			}
 		},
 		"/api/v1/workspaces/{slug}/members/{userId}": {
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugMembersByUserId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "userId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"role": {
+										"enum": [
+											"admin",
+											"member"
+										],
+										"type": "string"
+									}
+								},
+								"required": [
+									"role"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"role": {
+											"enum": [
+												"admin",
+												"member"
+											],
+											"type": "string"
+										},
+										"user": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"role",
+										"user",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
 			"delete": {
 				"operationId": "deleteApiV1WorkspacesBySlugMembersByUserId",
 				"parameters": [
@@ -4355,7 +6212,9 @@
 												"type": "string"
 											},
 											"provider": {
-												"enum": ["github"],
+												"enum": [
+													"github"
+												],
 												"type": "string"
 											},
 											"owner": {
@@ -4383,7 +6242,12 @@
 												"type": "object",
 												"properties": {
 													"state": {
-														"enum": ["never", "indexing", "ready", "failed"],
+														"enum": [
+															"never",
+															"indexing",
+															"ready",
+															"failed"
+														],
 														"type": "string"
 													},
 													"ref": {
@@ -4409,7 +6273,14 @@
 														"type": "string"
 													}
 												},
-												"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+												"required": [
+													"state",
+													"ref",
+													"fileCount",
+													"truncated",
+													"indexedAt",
+													"error"
+												]
 											},
 											"createdAt": {
 												"type": "string"
@@ -4485,7 +6356,9 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": ["github"],
+											"enum": [
+												"github"
+											],
 											"type": "string"
 										},
 										"owner": {
@@ -4513,7 +6386,12 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": ["never", "indexing", "ready", "failed"],
+													"enum": [
+														"never",
+														"indexing",
+														"ready",
+														"failed"
+													],
 													"type": "string"
 												},
 												"ref": {
@@ -4539,7 +6417,14 @@
 													"type": "string"
 												}
 											},
-											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+											"required": [
+												"state",
+												"ref",
+												"fileCount",
+												"truncated",
+												"indexedAt",
+												"error"
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -4602,7 +6487,9 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": ["github"],
+											"enum": [
+												"github"
+											],
 											"type": "string"
 										},
 										"owner": {
@@ -4630,7 +6517,12 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": ["never", "indexing", "ready", "failed"],
+													"enum": [
+														"never",
+														"indexing",
+														"ready",
+														"failed"
+													],
 													"type": "string"
 												},
 												"ref": {
@@ -4656,7 +6548,14 @@
 													"type": "string"
 												}
 											},
-											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+											"required": [
+												"state",
+												"ref",
+												"fileCount",
+												"truncated",
+												"indexedAt",
+												"error"
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -4717,7 +6616,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["unlinked"],
+									"required": [
+										"unlinked"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -4762,7 +6663,9 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": ["github"],
+											"enum": [
+												"github"
+											],
 											"type": "string"
 										},
 										"owner": {
@@ -4790,7 +6693,12 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": ["never", "indexing", "ready", "failed"],
+													"enum": [
+														"never",
+														"indexing",
+														"ready",
+														"failed"
+													],
 													"type": "string"
 												},
 												"ref": {
@@ -4816,7 +6724,14 @@
 													"type": "string"
 												}
 											},
-											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
+											"required": [
+												"state",
+												"ref",
+												"fileCount",
+												"truncated",
+												"indexedAt",
+												"error"
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -4933,7 +6848,9 @@
 										"provider": {
 											"anyOf": [
 												{
-													"enum": ["github"],
+													"enum": [
+														"github"
+													],
 													"type": "string"
 												},
 												{
@@ -4963,7 +6880,10 @@
 															"type": "string"
 														}
 													},
-													"required": ["account", "externalId"]
+													"required": [
+														"account",
+														"externalId"
+													]
 												},
 												{
 													"type": "null"
@@ -4982,11 +6902,19 @@
 														"type": "string"
 													}
 												},
-												"required": ["account", "externalId"]
+												"required": [
+													"account",
+													"externalId"
+												]
 											}
 										}
 									},
-									"required": ["provider", "installUrl", "connected", "reusable"],
+									"required": [
+										"provider",
+										"installUrl",
+										"connected",
+										"reusable"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -5014,7 +6942,9 @@
 								"type": "object",
 								"properties": {
 									"provider": {
-										"enum": ["github"],
+										"enum": [
+											"github"
+										],
 										"type": "string",
 										"default": "github"
 									},
@@ -5029,7 +6959,9 @@
 										"default": ""
 									}
 								},
-								"required": ["externalId"],
+								"required": [
+									"externalId"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -5050,7 +6982,10 @@
 											"type": "string"
 										}
 									},
-									"required": ["connected", "account"],
+									"required": [
+										"connected",
+										"account"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -5101,7 +7036,13 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "key", "issueCount", "createdAt"]
+										"required": [
+											"id",
+											"name",
+											"key",
+											"issueCount",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -5139,7 +7080,9 @@
 										"maxLength": 6
 									}
 								},
-								"required": ["name"],
+								"required": [
+									"name"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -5169,7 +7112,13 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "key", "issueCount", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"key",
+										"issueCount",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -5177,6 +7126,809 @@
 					},
 					"400": {
 						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/templates": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugTemplates",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"name": {
+												"type": "string"
+											},
+											"summary": {
+												"type": "string"
+											},
+											"title": {
+												"type": "string"
+											},
+											"description": {
+												"type": "string"
+											},
+											"team": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"key": {
+																"type": "string"
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"key"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"status": {
+												"enum": [
+													"backlog",
+													"todo",
+													"in_progress",
+													"done",
+													"canceled"
+												],
+												"type": "string"
+											},
+											"priority": {
+												"enum": [
+													"none",
+													"urgent",
+													"high",
+													"medium",
+													"low"
+												],
+												"type": "string"
+											},
+											"assignee": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"labels": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"color": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"color"
+													]
+												}
+											},
+											"createdAt": {
+												"type": "string"
+											},
+											"updatedAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"name",
+											"summary",
+											"title",
+											"description",
+											"team",
+											"status",
+											"priority",
+											"assignee",
+											"labels",
+											"createdAt",
+											"updatedAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugTemplates",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 60
+									},
+									"summary": {
+										"type": "string",
+										"maxLength": 200,
+										"default": ""
+									},
+									"title": {
+										"type": "string",
+										"maxLength": 200,
+										"default": ""
+									},
+									"description": {
+										"type": "string",
+										"maxLength": 20000,
+										"default": ""
+									},
+									"teamKey": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 6
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
+									},
+									"status": {
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
+										"type": "string",
+										"default": "backlog"
+									},
+									"priority": {
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
+										"type": "string",
+										"default": "none"
+									},
+									"assigneeId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
+									},
+									"labelIds": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										},
+										"default": []
+									}
+								},
+								"required": [
+									"name"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"summary": {
+											"type": "string"
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"team": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"key": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"key"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"status": {
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
+											"type": "string"
+										},
+										"priority": {
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
+											"type": "string"
+										},
+										"assignee": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"email": {
+															"type": "string"
+														},
+														"image": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"summary",
+										"title",
+										"description",
+										"team",
+										"status",
+										"priority",
+										"assignee",
+										"labels",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/templates/{id}": {
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugTemplatesById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 60
+									},
+									"summary": {
+										"type": "string",
+										"maxLength": 200
+									},
+									"title": {
+										"type": "string",
+										"maxLength": 200
+									},
+									"description": {
+										"type": "string",
+										"maxLength": 20000
+									},
+									"teamKey": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 6
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
+									"status": {
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
+										"type": "string"
+									},
+									"priority": {
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
+										"type": "string"
+									},
+									"assigneeId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
+									"labelIds": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								},
+								"required": [],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"summary": {
+											"type": "string"
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"team": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"key": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"key"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"status": {
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
+											"type": "string"
+										},
+										"priority": {
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
+											"type": "string"
+										},
+										"assignee": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"email": {
+															"type": "string"
+														},
+														"image": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														},
+														"type": {
+															"enum": [
+																"human",
+																"agent"
+															],
+															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"summary",
+										"title",
+										"description",
+										"team",
+										"status",
+										"priority",
+										"assignee",
+										"labels",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugTemplatesById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {}
+							}
+						}
 					}
 				}
 			}
@@ -5202,12 +7954,24 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
 										"type": "string"
 									}
 								},
 								{
-									"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+									"enum": [
+										"new",
+										"reviewing",
+										"planned",
+										"accepted",
+										"declined"
+									],
 									"type": "string"
 								}
 							]
@@ -5218,7 +7982,10 @@
 						"in": "query",
 						"required": false,
 						"schema": {
-							"enum": ["private", "public"],
+							"enum": [
+								"private",
+								"public"
+							],
 							"type": "string"
 						}
 					},
@@ -5227,7 +7994,10 @@
 						"in": "query",
 						"required": false,
 						"schema": {
-							"enum": ["true", "false"],
+							"enum": [
+								"true",
+								"false"
+							],
 							"type": "string"
 						}
 					},
@@ -5266,11 +8036,20 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+												"enum": [
+													"new",
+													"reviewing",
+													"planned",
+													"accepted",
+													"declined"
+												],
 												"type": "string"
 											},
 											"visibility": {
-												"enum": ["private", "public"],
+												"enum": [
+													"private",
+													"public"
+												],
 												"type": "string"
 											},
 											"labels": {
@@ -5288,7 +8067,11 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "name", "color"]
+													"required": [
+														"id",
+														"name",
+														"color"
+													]
 												}
 											},
 											"submitter": {
@@ -5339,11 +8122,39 @@
 																		]
 																	},
 																	"type": {
-																		"enum": ["human", "agent"],
+																		"enum": [
+																			"human",
+																			"agent"
+																		],
 																		"type": "string"
+																	},
+																	"harness": {
+																		"anyOf": [
+																			{
+																				"enum": [
+																					"claude-code",
+																					"cursor",
+																					"codex",
+																					"opencode",
+																					"copilot",
+																					"other"
+																				],
+																				"type": "string"
+																			},
+																			{
+																				"type": "null"
+																			}
+																		]
 																	}
 																},
-																"required": ["id", "name", "email", "image", "type"]
+																"required": [
+																	"id",
+																	"name",
+																	"email",
+																	"image",
+																	"type",
+																	"harness"
+																]
 															},
 															{
 																"type": "null"
@@ -5351,7 +8162,11 @@
 														]
 													}
 												},
-												"required": ["name", "email", "user"]
+												"required": [
+													"name",
+													"email",
+													"user"
+												]
 											},
 											"source": {
 												"anyOf": [
@@ -5384,7 +8199,11 @@
 																"type": "string"
 															}
 														},
-														"required": ["id", "identifier", "title"]
+														"required": [
+															"id",
+															"identifier",
+															"title"
+														]
 													},
 													{
 														"type": "null"
@@ -5476,7 +8295,9 @@
 										"default": false
 									}
 								},
-								"required": ["title"],
+								"required": [
+									"title"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -5506,11 +8327,20 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"labels": {
@@ -5528,7 +8358,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"submitter": {
@@ -5579,11 +8413,39 @@
 																	]
 																},
 																"type": {
-																	"enum": ["human", "agent"],
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
 																	"type": "string"
+																},
+																"harness": {
+																	"anyOf": [
+																		{
+																			"enum": [
+																				"claude-code",
+																				"cursor",
+																				"codex",
+																				"opencode",
+																				"copilot",
+																				"other"
+																			],
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
 																}
 															},
-															"required": ["id", "name", "email", "image", "type"]
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image",
+																"type",
+																"harness"
+															]
 														},
 														{
 															"type": "null"
@@ -5591,7 +8453,11 @@
 													]
 												}
 											},
-											"required": ["name", "email", "user"]
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
 										},
 										"source": {
 											"anyOf": [
@@ -5624,7 +8490,11 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "identifier", "title"]
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
@@ -5711,11 +8581,20 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"labels": {
@@ -5733,7 +8612,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"submitter": {
@@ -5784,11 +8667,39 @@
 																	]
 																},
 																"type": {
-																	"enum": ["human", "agent"],
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
 																	"type": "string"
+																},
+																"harness": {
+																	"anyOf": [
+																		{
+																			"enum": [
+																				"claude-code",
+																				"cursor",
+																				"codex",
+																				"opencode",
+																				"copilot",
+																				"other"
+																			],
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
 																}
 															},
-															"required": ["id", "name", "email", "image", "type"]
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image",
+																"type",
+																"harness"
+															]
 														},
 														{
 															"type": "null"
@@ -5796,7 +8707,11 @@
 													]
 												}
 											},
-											"required": ["name", "email", "user"]
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
 										},
 										"source": {
 											"anyOf": [
@@ -5829,7 +8744,11 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "identifier", "title"]
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
@@ -5907,11 +8826,20 @@
 										"maxLength": 20000
 									},
 									"status": {
-										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
 										"type": "string"
 									},
 									"visibility": {
-										"enum": ["private", "public"],
+										"enum": [
+											"private",
+											"public"
+										],
 										"type": "string"
 									},
 									"labelIds": {
@@ -5951,11 +8879,20 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": ["private", "public"],
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"labels": {
@@ -5973,7 +8910,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"submitter": {
@@ -6024,11 +8965,39 @@
 																	]
 																},
 																"type": {
-																	"enum": ["human", "agent"],
+																	"enum": [
+																		"human",
+																		"agent"
+																	],
 																	"type": "string"
+																},
+																"harness": {
+																	"anyOf": [
+																		{
+																			"enum": [
+																				"claude-code",
+																				"cursor",
+																				"codex",
+																				"opencode",
+																				"copilot",
+																				"other"
+																			],
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
 																}
 															},
-															"required": ["id", "name", "email", "image", "type"]
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image",
+																"type",
+																"harness"
+															]
 														},
 														{
 															"type": "null"
@@ -6036,7 +9005,11 @@
 													]
 												}
 											},
-											"required": ["name", "email", "user"]
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
 										},
 										"source": {
 											"anyOf": [
@@ -6069,7 +9042,11 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "identifier", "title"]
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
@@ -6142,7 +9119,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["deleted"],
+									"required": [
+										"deleted"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -6214,11 +9193,39 @@
 														]
 													},
 													"type": {
-														"enum": ["human", "agent"],
+														"enum": [
+															"human",
+															"agent"
+														],
 														"type": "string"
+													},
+													"harness": {
+														"anyOf": [
+															{
+																"enum": [
+																	"claude-code",
+																	"cursor",
+																	"codex",
+																	"opencode",
+																	"copilot",
+																	"other"
+																],
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
 													}
 												},
-												"required": ["id", "name", "email", "image", "type"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image",
+													"type",
+													"harness"
+												]
 											},
 											"internal": {
 												"type": "boolean"
@@ -6230,7 +9237,14 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "body", "author", "internal", "createdAt", "updatedAt"]
+										"required": [
+											"id",
+											"body",
+											"author",
+											"internal",
+											"createdAt",
+											"updatedAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -6279,7 +9293,9 @@
 										"default": false
 									}
 								},
-								"required": ["body"],
+								"required": [
+									"body"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -6322,11 +9338,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"internal": {
 											"type": "boolean"
@@ -6338,7 +9382,14 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "body", "author", "internal", "createdAt", "updatedAt"],
+									"required": [
+										"id",
+										"body",
+										"author",
+										"internal",
+										"createdAt",
+										"updatedAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -6388,7 +9439,13 @@
 										"maxLength": 200
 									},
 									"priority": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string",
 										"default": "none"
 									},
@@ -6403,7 +9460,13 @@
 										]
 									},
 									"status": {
-										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
 										"type": "string",
 										"default": "accepted"
 									}
@@ -6444,7 +9507,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -6453,11 +9520,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -6485,11 +9564,39 @@
 															]
 														},
 														"type": {
-															"enum": ["human", "agent"],
+															"enum": [
+																"human",
+																"agent"
+															],
 															"type": "string"
+														},
+														"harness": {
+															"anyOf": [
+																{
+																	"enum": [
+																		"claude-code",
+																		"cursor",
+																		"codex",
+																		"opencode",
+																		"copilot",
+																		"other"
+																	],
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
 														}
 													},
-													"required": ["id", "name", "email", "image", "type"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image",
+														"type",
+														"harness"
+													]
 												},
 												{
 													"type": "null"
@@ -6519,11 +9626,39 @@
 													]
 												},
 												"type": {
-													"enum": ["human", "agent"],
+													"enum": [
+														"human",
+														"agent"
+													],
 													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
-											"required": ["id", "name", "email", "image", "type"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -6540,7 +9675,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
@@ -6558,11 +9697,17 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": ["github"],
+															"enum": [
+																"github"
+															],
 															"type": "string"
 														}
 													},
-													"required": ["id", "fullName", "provider"]
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
 												},
 												{
 													"type": "null"
@@ -6584,14 +9729,25 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": ["open", "merged", "closed", "draft"],
+															"enum": [
+																"open",
+																"merged",
+																"closed",
+																"draft"
+															],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "title", "state", "url"]
+													"required": [
+														"id",
+														"number",
+														"title",
+														"state",
+														"url"
+													]
 												},
 												{
 													"type": "null"
@@ -6616,12 +9772,109 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "number", "identifier", "title"]
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
 												},
 												{
 													"type": "null"
 												}
 											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -6646,6 +9899,7 @@
 										"repository",
 										"pullRequest",
 										"feedback",
+										"attachments",
 										"createdAt",
 										"updatedAt"
 									],
@@ -6693,7 +9947,9 @@
 										"format": "email"
 									}
 								},
-								"required": ["email"],
+								"required": [
+									"email"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -6711,7 +9967,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["subscribed"],
+									"required": [
+										"subscribed"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -6794,7 +10052,11 @@
 											"lastDeliveryStatus": {
 												"anyOf": [
 													{
-														"enum": ["pending", "succeeded", "failed"],
+														"enum": [
+															"pending",
+															"succeeded",
+															"failed"
+														],
 														"type": "string"
 													},
 													{
@@ -6882,7 +10144,10 @@
 										"minItems": 1
 									}
 								},
-								"required": ["url", "events"],
+								"required": [
+									"url",
+									"events"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -6947,7 +10212,11 @@
 												"lastDeliveryStatus": {
 													"anyOf": [
 														{
-															"enum": ["pending", "succeeded", "failed"],
+															"enum": [
+																"pending",
+																"succeeded",
+																"failed"
+															],
 															"type": "string"
 														},
 														{
@@ -6982,7 +10251,10 @@
 											"type": "string"
 										}
 									},
-									"required": ["webhook", "secret"],
+									"required": [
+										"webhook",
+										"secret"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -7113,7 +10385,11 @@
 										"lastDeliveryStatus": {
 											"anyOf": [
 												{
-													"enum": ["pending", "succeeded", "failed"],
+													"enum": [
+														"pending",
+														"succeeded",
+														"failed"
+													],
 													"type": "string"
 												},
 												{
@@ -7248,7 +10524,11 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": ["pending", "succeeded", "failed"],
+												"enum": [
+													"pending",
+													"succeeded",
+													"failed"
+												],
 												"type": "string"
 											},
 											"attempts": {
@@ -7371,7 +10651,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["pending", "succeeded", "failed"],
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
 											"type": "string"
 										},
 										"attempts": {

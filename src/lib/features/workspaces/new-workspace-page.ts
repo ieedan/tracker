@@ -56,6 +56,9 @@ export function NewWorkspacePage() {
 				// name is typed there is already a key to submit with it.
 				ImagePicker({
 					choice: picture,
+					// The slug, so the tile previewed here is the one the workspace
+					// keeps: the name can be renamed later, the slug cannot.
+					seed: slug,
 					fallback: name,
 					label: "Add a picture",
 				}),

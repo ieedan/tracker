@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { NotificationType } from "@/lib/domain/issues";
-import type { Notification } from "@/lib/domain/schemas";
+import type { Notification, NotificationOrder } from "@/lib/domain/schemas";
 import { db } from "./db.server";
 import { issue, notification, team, user, workspace } from "./schema.server";
 import { identifierFor, toUser } from "./serialize.server";
@@ -51,7 +51,7 @@ export async function notify(input: NotifyInput): Promise<void> {
 
 export async function listNotifications(
 	userId: string,
-	options: { unreadOnly?: boolean; limit?: number } = {},
+	options: { unreadOnly?: boolean; limit?: number; order?: NotificationOrder } = {},
 ): Promise<Notification[]> {
 	const conditions = [eq(notification.userId, userId)];
 	if (options.unreadOnly === true) conditions.push(isNull(notification.readAt));
@@ -66,7 +66,9 @@ export async function listNotifications(
 		.leftJoin(issue, eq(issue.id, notification.issueId))
 		.leftJoin(team, eq(team.id, issue.teamId))
 		.where(and(...conditions))
-		.orderBy(desc(notification.createdAt))
+		.orderBy(
+			options.order === "oldest" ? asc(notification.createdAt) : desc(notification.createdAt),
+		)
 		.limit(options.limit ?? 50);
 
 	return rows.map((row) => ({
@@ -96,16 +98,31 @@ export async function unreadCount(userId: string): Promise<number> {
 	return rows.length;
 }
 
-export async function markRead(userId: string, ids?: string[]): Promise<void> {
-	// Marking nothing is a no-op, not "mark everything" — an empty selection
-	// arriving from the client must not clear the whole inbox.
+/**
+ * Flips the read flag on some — or all — of a user's notifications.
+ *
+ * `ids` omitted means the whole inbox, which is what "mark all read" posts.
+ * An empty array is still a no-op rather than "everything": an empty selection
+ * arriving from the client must not clear the inbox.
+ *
+ * Rows already in the target state are excluded so re-marking a read
+ * notification does not move its `readAt` forward.
+ */
+export async function setRead(
+	userId: string,
+	ids: string[] | undefined,
+	read: boolean,
+): Promise<void> {
 	if (ids !== undefined && ids.length === 0) return;
 
-	const conditions = [eq(notification.userId, userId), isNull(notification.readAt)];
+	const conditions = [
+		eq(notification.userId, userId),
+		read ? isNull(notification.readAt) : isNotNull(notification.readAt),
+	];
 	if (ids !== undefined) conditions.push(inArray(notification.id, ids));
 
 	await db
 		.update(notification)
-		.set({ readAt: new Date() })
+		.set({ readAt: read ? new Date() : null })
 		.where(and(...conditions));
 }

@@ -11,6 +11,7 @@ import {
 	DialogTrigger as DialogTriggerPrimitive,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
+import { TabOrder } from "./tab-order";
 import { cn } from "@/lib/utils";
 import { createComponent } from "@implementjs/primitives";
 
@@ -140,18 +141,22 @@ export const SheetContent = createComponent(function SheetContent(
 					className,
 				),
 			},
-			...children,
-			showCloseButton
-				? SheetClose(
-						{
-							variant: "ghost",
-							size: "icon-sm",
-							class: "absolute top-2.5 right-2.5",
-						},
-						XIcon({ class: "size-4", "aria-hidden": true }),
-						Span({ class: "sr-only" }, "Close"),
-					)
-				: null,
+			// The dialog's focus trap comes with the dialog's Tab bug; `TabOrder`
+			// is the same fix wearing the same costume.
+			TabOrder(
+				...children,
+				showCloseButton
+					? SheetClose(
+							{
+								variant: "ghost",
+								size: "icon-sm",
+								class: "absolute top-2.5 right-2.5",
+							},
+							XIcon({ class: "size-4", "aria-hidden": true }),
+							Span({ class: "sr-only" }, "Close"),
+						)
+					: null,
+			),
 		),
 	);
 });

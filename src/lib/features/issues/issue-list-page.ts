@@ -40,15 +40,41 @@ import {
 	PRIORITY_ORDER,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Issue, Label, Member, Team, TeamRef, Workspace } from "@/lib/domain/schemas";
+import type {
+	Issue,
+	Label,
+	Member,
+	Repository,
+	Team,
+	TeamRef,
+	Workspace,
+} from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 import { issueCreated, openCreateIssue } from "./create-issue-dialog";
 import { AddFilterButton, FilterBar, type FilterContext } from "./filter-bar";
-import { matchesFilters, parseFilters, serializeFilters, type Filter } from "./filters";
+import {
+	DEFAULT_VIEW,
+	ISSUE_VIEW_LABELS,
+	matchesFilters,
+	matchesView,
+	parseFilters,
+	parseView,
+	serializeFilters,
+	viewHref,
+	type Filter,
+	type IssueView,
+} from "./filters";
+import { ViewTabs } from "./view-tabs";
 import { AssigneePicker, LabelChips, PriorityPicker, StatusPicker, TeamBadge } from "./pickers";
 import { RepositoryBadge } from "./repository-picker";
 import { PullRequestBadge } from "./pull-request-link";
-import { patchIssue } from "./issue-store";
+import { patchIssue, refreshIssues, type IssueScope } from "./issue-store";
+
+/**
+ * How often the list re-reads itself. Same cadence as the inbox badge: near
+ * enough to live that you stop reaching for reload, cheap enough to leave on.
+ */
+const POLL_MS = 15_000;
 
 interface PageData {
 	issues: Issue[];
@@ -58,6 +84,8 @@ interface PageData {
 	teams: Team[];
 	members: Member[];
 	labels: Label[];
+	/** For the bulk repository action; empty when the workspace has linked none. */
+	repositories: Repository[];
 	user: { id: string };
 }
 
@@ -75,6 +103,14 @@ export function IssueListPage({
 	// remounting the page, so the local list has to follow `data`.
 	data.onChange((next) => issues.set(next.issues));
 
+	// Read fresh on every tick: the same reseed means one timer has to keep
+	// pointing at whatever list is on screen now.
+	const scope = (): IssueScope => ({
+		slug: params.slug.get(),
+		teamKey: data.get().team?.key ?? null,
+	});
+	const refresh = () => void refreshIssues(issues, scope);
+
 	const query = signal("");
 
 	// The URL is the filter state. Deriving from it rather than mirroring it into
@@ -91,6 +127,16 @@ export function IssueListPage({
 		navigateTo(`${location.path}${search}`, { replace: true, noScroll: true });
 	};
 
+	// The tab is URL state too, under its own key — so it survives a reload,
+	// pastes as a link, and narrows *with* the filters rather than instead of
+	// them. `serializeFilters` only rewrites the fields it owns, so a filter
+	// edit carries the tab through untouched.
+	const view = derived([url], (location) => parseView(location.search));
+
+	const applyView = (next: IssueView) => {
+		navigateTo(viewHref(url.get(), next), { noScroll: true });
+	};
+
 	const filterContext = derived([data], (value): FilterContext => ({
 		teams: value.teams,
 		members: value.members,
@@ -100,10 +146,12 @@ export function IssueListPage({
 
 	const addFilterOpen = signal(false);
 
-	const visible = derived([issues, query, filters], (list, term, active) => {
+	const visible = derived([issues, query, filters, view], (list, term, active, tab) => {
 		const needle = term.trim().toLowerCase();
+		// Tab first, then the filters within it, then the search box.
+		const inView = list.filter((issue) => matchesView(issue, tab));
 		const matched =
-			active.length === 0 ? list : list.filter((issue) => matchesFilters(issue, active));
+			active.length === 0 ? inView : inView.filter((issue) => matchesFilters(issue, active));
 		if (needle === "") return matched;
 		return matched.filter(
 			(issue) =>
@@ -127,6 +175,29 @@ export function IssueListPage({
 
 	return Div(
 		{ class: "relative flex min-h-0 flex-1 flex-col" },
+
+		// Nothing pushes here yet, so the list polls: work filed or moved by
+		// another member — or by an agent over the API — shows up on its own
+		// instead of waiting for a reload.
+		ImplementLifecycle({
+			onMount: () => {
+				const timer = setInterval(() => {
+					// A hidden tab has nobody to show the update to. The visibility
+					// handler catches it up the moment it comes back.
+					if (document.visibilityState === "visible") refresh();
+				}, POLL_MS);
+
+				const onVisible = () => {
+					if (document.visibilityState === "visible") refresh();
+				};
+				document.addEventListener("visibilitychange", onVisible);
+
+				return () => {
+					clearInterval(timer);
+					document.removeEventListener("visibilitychange", onVisible);
+				};
+			},
+		}),
 
 		ImplementLifecycle({
 			onMount: () =>
@@ -159,7 +230,7 @@ export function IssueListPage({
 		// `c` opens the composer, `/` focuses search — the two Linear reflexes.
 		ImplementDocument({
 			onKeydown: (event) => {
-				if (isTyping(event.target)) return;
+				if (isTyping(event)) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
 				if (bulkOpen.get()) return;
 				const key = event.key.toLowerCase();
@@ -209,6 +280,9 @@ export function IssueListPage({
 					} else if (key === "t") {
 						event.preventDefault();
 						openBulk("team");
+					} else if (key === "r" && data.get().repositories.length > 0) {
+						event.preventDefault();
+						openBulk("repository");
 					}
 					return;
 				}
@@ -238,6 +312,7 @@ export function IssueListPage({
 			addFilterOpen,
 			selected,
 		),
+		ViewTabs({ url }),
 		FilterBar({ filters, context: filterContext, onChange: applyFilters }),
 		BulkActionsDialog({
 			open: bulkOpen,
@@ -249,6 +324,7 @@ export function IssueListPage({
 			members: data.bind((value) => value.members),
 			labels: data.bind((value) => value.labels),
 			teams: data.bind((value) => value.teams),
+			repositories: data.bind((value) => value.repositories),
 		}),
 
 		Div(
@@ -257,7 +333,7 @@ export function IssueListPage({
 			},
 			If(
 				visible.bind((list) => list.length === 0),
-				EmptyState(query, params, data, filters, applyFilters),
+				EmptyState(query, params, data, filters, applyFilters, view, applyView),
 			),
 			...ISSUE_STATUSES.map((status) =>
 				StatusGroup(
@@ -352,8 +428,10 @@ function EmptyState(
 	data: Readable<PageData>,
 	filters: Readable<Filter[]>,
 	applyFilters: (next: Filter[]) => void,
+	view: Readable<IssueView>,
+	applyView: (next: IssueView) => void,
 ) {
-	// "Nothing here" means three different things; say which one.
+	// "Nothing here" means four different things; say which one.
 	return If(
 		query.bind((term) => term.trim() !== ""),
 		Empty(
@@ -376,6 +454,24 @@ function EmptyState(
 					Button(
 						{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
 						"Clear filters",
+					),
+				),
+			),
+		)
+		.ElseIf(
+			// A tab can come up empty while the workspace is full of work, so
+			// offer the way back out rather than claiming there is nothing.
+			view.bind((tab) => tab !== DEFAULT_VIEW),
+			Empty(
+				EmptyHeader(
+					EmptyMedia({ variant: "icon" }, LayoutList({ "aria-hidden": true })),
+					EmptyTitle(view.bind((tab) => `Nothing in ${ISSUE_VIEW_LABELS[tab]}`)),
+					EmptyDescription("No issues sit in this view right now."),
+				),
+				EmptyContent(
+					Button(
+						{ size: "sm", variant: "secondary", onClick: () => applyView(DEFAULT_VIEW) },
+						`Show ${ISSUE_VIEW_LABELS[DEFAULT_VIEW].toLowerCase()} issues`,
 					),
 				),
 			),

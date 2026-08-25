@@ -2,6 +2,7 @@
 // OpenAPI document, and the browser. Kit forbids a client file from importing
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
+import { ACTIVITY_TYPES } from "./activity";
 import { AGENT_HARNESSES, USER_TYPES } from "./agents";
 import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
@@ -74,6 +75,18 @@ export const TeamRefSchema = v.object({
 });
 export type TeamRef = v.InferOutput<typeof TeamRefSchema>;
 
+export const AttachmentSchema = v.object({
+	id: v.string(),
+	filename: v.string(),
+	contentType: v.string(),
+	size: v.number(),
+	/** Points at this app, which redirects to a short-lived storage URL. */
+	url: v.string(),
+	uploadedBy: UserSummary,
+	createdAt: v.string(),
+});
+export type Attachment = v.InferOutput<typeof AttachmentSchema>;
+
 export const IssueSchema = v.object({
 	id: v.string(),
 	number: v.number(),
@@ -106,22 +119,17 @@ export const IssueSchema = v.object({
 	feedback: v.nullable(
 		v.object({ id: v.string(), number: v.number(), identifier: v.string(), title: v.string() }),
 	),
+	/**
+	 * Files hanging off the issue itself.
+	 *
+	 * Attachments left on a comment belong to that comment and come back with
+	 * it instead — this is only what was attached to the issue.
+	 */
+	attachments: v.array(AttachmentSchema),
 	createdAt: v.string(),
 	updatedAt: v.string(),
 });
 export type Issue = v.InferOutput<typeof IssueSchema>;
-
-export const AttachmentSchema = v.object({
-	id: v.string(),
-	filename: v.string(),
-	contentType: v.string(),
-	size: v.number(),
-	/** Points at this app, which redirects to a short-lived storage URL. */
-	url: v.string(),
-	uploadedBy: UserSummary,
-	createdAt: v.string(),
-});
-export type Attachment = v.InferOutput<typeof AttachmentSchema>;
 
 export const CreateAttachmentBody = v.object({
 	filename: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
@@ -141,6 +149,28 @@ export const CommentSchema = v.object({
 	updatedAt: v.string(),
 });
 export type Comment = v.InferOutput<typeof CommentSchema>;
+
+export const ActivityTypeSchema = v.picklist(ACTIVITY_TYPES);
+
+/**
+ * One entry on an issue's timeline.
+ *
+ * `from`/`to` are snapshots taken when the change happened rather than live
+ * references: a status is its raw value (`in_progress`), everything else is the
+ * text it read as at the time, so renaming a repository later does not rewrite
+ * history.
+ */
+export const ActivitySchema = v.object({
+	id: v.string(),
+	type: ActivityTypeSchema,
+	actor: UserSummary,
+	from: v.nullable(v.string()),
+	to: v.nullable(v.string()),
+	/** Only on `labels_changed`: which labels moved, and which way. */
+	labels: v.array(v.object({ name: v.string(), color: v.string(), added: v.boolean() })),
+	createdAt: v.string(),
+});
+export type Activity = v.InferOutput<typeof ActivitySchema>;
 
 export const MemberSchema = v.object({
 	id: v.string(),
@@ -212,6 +242,7 @@ export const ApiKeyPermissionsSchema = v.partial(
 	v.object({
 		issues: v.array(ApiKeyActionSchema),
 		workspace: v.array(ApiKeyActionSchema),
+		labels: v.array(ApiKeyActionSchema),
 		members: v.array(ApiKeyActionSchema),
 		webhooks: v.array(ApiKeyActionSchema),
 		feedback: v.array(ApiKeyActionSchema),
@@ -375,6 +406,10 @@ export const AddMemberBody = v.object({
 	role: v.optional(WorkspaceRoleSchema, "member"),
 });
 
+export const UpdateMemberBody = v.object({
+	role: WorkspaceRoleSchema,
+});
+
 export const CreateInviteBody = v.object({
 	role: v.optional(WorkspaceRoleSchema, "member"),
 	/** Hours until the link stops working. Omit for a link that does not expire. */
@@ -502,9 +537,16 @@ export const CreateApiKeyBody = v.object({
 	),
 });
 
+/** How the inbox is ordered. Newest first is the default. */
+export const NOTIFICATION_ORDERS = ["newest", "oldest"] as const;
+export const NotificationOrderSchema = v.picklist(NOTIFICATION_ORDERS);
+export type NotificationOrder = v.InferOutput<typeof NotificationOrderSchema>;
+
 export const MarkNotificationsBody = v.object({
-	/** Omit to mark every notification read. */
+	/** Omit to mark every notification. */
 	ids: v.optional(v.array(v.string())),
+	/** `false` puts them back in the unread state. Defaults to marking read. */
+	read: v.optional(v.boolean()),
 });
 
 /** One agent install you have connected. */
@@ -548,5 +590,64 @@ export const UpdateAgentBody = v.partial(
 	v.object({
 		name: v.pipe(v.string(), v.trim(), v.maxLength(60)),
 		harness: v.picklist(AGENT_HARNESSES),
+	}),
+);
+
+// --- issue templates ------------------------------------------------------
+
+/**
+ * A saved starting point for a new issue, owned by the workspace.
+ *
+ * Every prefill is resolved server-side, so the composer can apply a template
+ * without a second round of lookups — the team, assignee and labels arrive as
+ * the same shapes an issue carries them in.
+ */
+export const IssueTemplateSchema = v.object({
+	id: v.string(),
+	/** What the template is called in the New issue menu. */
+	name: v.string(),
+	/** One line under the name in settings. Never lands on the issue. */
+	summary: v.string(),
+	/** The prefilled issue title. Blank means "start empty". */
+	title: v.string(),
+	description: v.string(),
+	/** Null when the template does not pin a team, or its team was deleted. */
+	team: v.nullable(TeamRefSchema),
+	status: IssueStatusSchema,
+	priority: IssuePrioritySchema,
+	assignee: v.nullable(UserSummary),
+	labels: v.array(LabelSchema),
+	createdAt: v.string(),
+	updatedAt: v.string(),
+});
+export type IssueTemplate = v.InferOutput<typeof IssueTemplateSchema>;
+
+export const CreateIssueTemplateBody = v.object({
+	name: trimmed(1, 60),
+	summary: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ""),
+	title: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ""),
+	description: v.optional(v.pipe(v.string(), v.maxLength(20_000)), ""),
+	/** Omit or null to let the composer pick the team as it normally would. */
+	teamKey: v.optional(
+		v.nullable(v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6))),
+		null,
+	),
+	status: v.optional(IssueStatusSchema, "backlog"),
+	priority: v.optional(IssuePrioritySchema, "none"),
+	assigneeId: v.optional(v.nullable(v.string()), null),
+	labelIds: v.optional(v.array(v.string()), []),
+});
+
+export const UpdateIssueTemplateBody = v.partial(
+	v.object({
+		name: trimmed(1, 60),
+		summary: v.pipe(v.string(), v.trim(), v.maxLength(200)),
+		title: v.pipe(v.string(), v.trim(), v.maxLength(200)),
+		description: v.pipe(v.string(), v.maxLength(20_000)),
+		teamKey: v.nullable(v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6))),
+		status: IssueStatusSchema,
+		priority: IssuePrioritySchema,
+		assigneeId: v.nullable(v.string()),
+		labelIds: v.array(v.string()),
 	}),
 );

@@ -12,7 +12,12 @@
  *   ?status=!done,canceled       status is not Done or Canceled
  *   ?assignee=none               unassigned
  *   ?label=<id>&team=ENG         combined — every filter must match
+ *   ?view=backlog&priority=high  the Backlog tab, narrowed to High
+ *
+ * The view tabs ride in the same query string under their own `view` key —
+ * see the bottom of this file.
  */
+import type { IssueStatus } from "@/lib/domain/issues";
 import type { Issue } from "@/lib/domain/schemas";
 
 export const FILTER_FIELDS = [
@@ -159,4 +164,74 @@ export function setFieldValues(filters: Filter[], field: FilterField, values: st
 
 export function removeField(filters: Filter[], target: FilterField): Filter[] {
 	return filters.filter((filter) => filter.field !== target);
+}
+
+/**
+ * The view tabs above the list — Linear's Active / Backlog / All.
+ *
+ * A view is a coarse band of statuses rather than a filter, and it rides in the
+ * URL under its own `view` key so the two compose instead of fighting: picking
+ * Backlog and then adding a priority filter narrows *within* the tab, and
+ * `serializeFilters` leaves the key alone because it only ever rewrites the
+ * filter fields it owns.
+ */
+export const ISSUE_VIEWS = ["active", "backlog", "all"] as const;
+export type IssueView = (typeof ISSUE_VIEWS)[number];
+
+export const ISSUE_VIEW_LABELS: Record<IssueView, string> = {
+	active: "Active",
+	backlog: "Backlog",
+	all: "All",
+};
+
+/**
+ * What each tab admits, `null` meaning "no opinion". Linear's split: Active is
+ * the work in flight, Backlog is what nobody has picked up yet, and All is
+ * everything — the terminal states included.
+ */
+export const VIEW_STATUSES: Record<IssueView, readonly IssueStatus[] | null> = {
+	active: ["todo", "in_progress"],
+	backlog: ["backlog"],
+	all: null,
+};
+
+/**
+ * Where a bare URL lands. `all` rather than Linear's `active`, so every link
+ * and bookmark made before the tabs existed still shows what it used to
+ * instead of quietly dropping Done and Canceled — flip this one constant to
+ * open on Active instead.
+ */
+export const DEFAULT_VIEW: IssueView = "all";
+
+const VIEW_PARAM = "view";
+
+/** Reads the tab out of a query string; anything unrecognised is the default. */
+export function parseView(search: string): IssueView {
+	const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+	const raw = params.get(VIEW_PARAM);
+	return ISSUE_VIEWS.find((view) => view === raw) ?? DEFAULT_VIEW;
+}
+
+/** Writes the tab back, preserving the filters and the search box beside it. */
+export function serializeView(view: IssueView, existingSearch = ""): string {
+	const params = new URLSearchParams(
+		existingSearch.startsWith("?") ? existingSearch.slice(1) : existingSearch,
+	);
+
+	// The default tab is the absence of the key, so a plain list link stays plain.
+	if (view === DEFAULT_VIEW) params.delete(VIEW_PARAM);
+	else params.set(VIEW_PARAM, view);
+
+	const query = params.toString();
+	return query === "" ? "" : `?${query}`;
+}
+
+/** The URL a tab points at — this path, this tab, everything else untouched. */
+export function viewHref(location: { path: string; search: string }, view: IssueView): string {
+	return `${location.path}${serializeView(view, location.search)}`;
+}
+
+export function matchesView(issue: Issue, view: IssueView): boolean {
+	const statuses = VIEW_STATUSES[view];
+	return statuses === null || statuses.includes(issue.status);
 }

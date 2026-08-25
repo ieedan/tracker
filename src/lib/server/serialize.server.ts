@@ -1,6 +1,8 @@
 // Row shapes → the JSON the API documents. Dates become ISO strings because a
 // load's return value has to survive being serialized into the page.
 import type {
+	Activity,
+	Attachment,
 	Comment,
 	Feedback,
 	FeedbackComment,
@@ -22,6 +24,7 @@ type UserRow = typeof schema.user.$inferSelect;
 type IssueRow = typeof schema.issue.$inferSelect;
 type LabelRow = typeof schema.label.$inferSelect;
 type CommentRow = typeof schema.comment.$inferSelect;
+type ActivityRow = typeof schema.issueActivity.$inferSelect;
 type WorkspaceRow = typeof schema.workspace.$inferSelect;
 type TeamRow = typeof schema.team.$inferSelect;
 type FeedbackRow = typeof schema.feedback.$inferSelect;
@@ -95,6 +98,8 @@ export function toIssue(
 		/** The repository this issue is scoped to, when it is scoped to one. */
 		repository?: Pick<RepositoryRow, "id" | "owner" | "name" | "provider"> | null;
 		pullRequest?: Pick<PullRequestRow, "id" | "number" | "title" | "state" | "url"> | null;
+		/** Files attached to the issue itself; omitted where none were loaded. */
+		attachments?: Attachment[];
 	},
 ): Issue {
 	return {
@@ -137,6 +142,7 @@ export function toIssue(
 						identifier: feedbackIdentifier(context.feedback.number),
 						title: context.feedback.title,
 					},
+		attachments: context.attachments ?? [],
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};
@@ -154,6 +160,36 @@ export function toComment(
 		attachments,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
+/**
+ * A timeline entry. `data` is free-form JSON on the row, so a shape written by
+ * an older build is read defensively rather than trusted.
+ */
+export function toActivity(row: ActivityRow, actor: UserFields): Activity {
+	const parsed: unknown = JSON.parse(row.data === "" ? "{}" : row.data);
+	const data = (typeof parsed === "object" && parsed !== null ? parsed : {}) as {
+		from?: unknown;
+		to?: unknown;
+		labels?: unknown;
+	};
+
+	return {
+		id: row.id,
+		type: row.type,
+		actor: toUser(actor),
+		from: typeof data.from === "string" ? data.from : null,
+		to: typeof data.to === "string" ? data.to : null,
+		labels: Array.isArray(data.labels)
+			? data.labels.flatMap((entry) => {
+					if (typeof entry !== "object" || entry === null) return [];
+					const label = entry as { name?: unknown; color?: unknown; added?: unknown };
+					if (typeof label.name !== "string" || typeof label.color !== "string") return [];
+					return [{ name: label.name, color: label.color, added: label.added === true }];
+				})
+			: [],
+		createdAt: row.createdAt.toISOString(),
 	};
 }
 

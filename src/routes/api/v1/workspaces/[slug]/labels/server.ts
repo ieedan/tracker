@@ -13,7 +13,7 @@ export const GET = handler({
 	response: v.array(LabelSchema),
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
-		requirePermission(locals, "workspace", "read");
+		requirePermission(locals, "labels", "read");
 		const rows = await db
 			.select()
 			.from(label)
@@ -28,7 +28,12 @@ export const POST = handler({
 	response: LabelSchema,
 	async handle({ locals, params, body }) {
 		const { workspace } = await requireMembership(locals, params.slug);
-		requirePermission(locals, "workspace", "write");
+		// `labels:write` rather than `workspace:write`: creating a label is a
+		// member-level act, and an agent that only needs to file a well-labelled
+		// issue should not have to be handed repositories, teams and settings to
+		// do it. There is no rename or delete endpoint, so this scope means
+		// "create" and nothing else.
+		requirePermission(locals, "labels", "write");
 		const row = {
 			id: nanoid(),
 			workspaceId: workspace.id,
