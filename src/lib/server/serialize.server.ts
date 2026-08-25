@@ -290,6 +290,10 @@ export function toWebhook(
 		url: row.url,
 		description: row.description,
 		events: row.events,
+		// Readable, unlike the signing secret: a header is something you edit,
+		// and this response is already behind admin + `webhooks:read`.
+		headers: row.headers ?? {},
+		filter: row.filter ?? null,
 		enabled: row.enabled,
 		createdAt: row.createdAt.toISOString(),
 		lastDeliveryAt: iso(health?.lastAt ?? null),

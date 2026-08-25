@@ -10033,6 +10033,48 @@
 													"type": "string"
 												}
 											},
+											"headers": {
+												"type": "object",
+												"propertyNames": {
+													"type": "string"
+												},
+												"additionalProperties": {
+													"type": "string"
+												}
+											},
+											"filter": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"type": {
+																"const": "group"
+															},
+															"match": {
+																"enum": [
+																	"all",
+																	"any"
+																],
+																"type": "string"
+															},
+															"rules": {
+																"type": "array",
+																"items": {
+																	"$ref": "#/$defs/0"
+																}
+															}
+														},
+														"required": [
+															"type",
+															"match",
+															"rules"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"enabled": {
 												"type": "boolean"
 											},
@@ -10080,6 +10122,8 @@
 											"url",
 											"description",
 											"events",
+											"headers",
+											"filter",
 											"enabled",
 											"createdAt",
 											"lastDeliveryAt",
@@ -10087,7 +10131,90 @@
 											"failingSince"
 										]
 									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									"$schema": "http://json-schema.org/draft-07/schema#",
+									"$defs": {
+										"0": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "condition"
+														},
+														"field": {
+															"type": "string",
+															"minLength": 1
+														},
+														"operator": {
+															"enum": [
+																"equals",
+																"not_equals",
+																"contains",
+																"not_contains",
+																"starts_with",
+																"ends_with",
+																"in",
+																"not_in",
+																"includes",
+																"not_includes",
+																"includes_any",
+																"includes_all",
+																"greater_than",
+																"less_than",
+																"is_set",
+																"is_not_set"
+															],
+															"type": "string"
+														},
+														"value": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "array",
+																	"items": {
+																		"type": "string"
+																	}
+																}
+															]
+														}
+													},
+													"required": [
+														"type",
+														"field",
+														"operator"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "group"
+														},
+														"match": {
+															"enum": [
+																"all",
+																"any"
+															],
+															"type": "string"
+														},
+														"rules": {
+															"type": "array",
+															"items": {
+																"$ref": "#/$defs/0"
+															}
+														}
+													},
+													"required": [
+														"type",
+														"match",
+														"rules"
+													]
+												}
+											]
+										}
+									}
 								}
 							}
 						}
@@ -10142,13 +10269,140 @@
 											"type": "string"
 										},
 										"minItems": 1
+									},
+									"headers": {
+										"type": "object",
+										"propertyNames": {
+											"type": "string"
+										},
+										"additionalProperties": {
+											"type": "string"
+										},
+										"default": {}
+									},
+									"filter": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "group"
+													},
+													"match": {
+														"enum": [
+															"all",
+															"any"
+														],
+														"type": "string"
+													},
+													"rules": {
+														"type": "array",
+														"items": {
+															"$ref": "#/$defs/1"
+														}
+													}
+												},
+												"required": [
+													"type",
+													"match",
+													"rules"
+												]
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
 									}
 								},
 								"required": [
 									"url",
 									"events"
 								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"$schema": "http://json-schema.org/draft-07/schema#",
+								"$defs": {
+									"1": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "condition"
+													},
+													"field": {
+														"type": "string",
+														"minLength": 1
+													},
+													"operator": {
+														"enum": [
+															"equals",
+															"not_equals",
+															"contains",
+															"not_contains",
+															"starts_with",
+															"ends_with",
+															"in",
+															"not_in",
+															"includes",
+															"not_includes",
+															"includes_any",
+															"includes_all",
+															"greater_than",
+															"less_than",
+															"is_set",
+															"is_not_set"
+														],
+														"type": "string"
+													},
+													"value": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "array",
+																"items": {
+																	"type": "string"
+																}
+															}
+														]
+													}
+												},
+												"required": [
+													"type",
+													"field",
+													"operator"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "group"
+													},
+													"match": {
+														"enum": [
+															"all",
+															"any"
+														],
+														"type": "string"
+													},
+													"rules": {
+														"type": "array",
+														"items": {
+															"$ref": "#/$defs/1"
+														}
+													}
+												},
+												"required": [
+													"type",
+													"match",
+													"rules"
+												]
+											}
+										]
+									}
+								}
 							}
 						}
 					}
@@ -10192,6 +10446,48 @@
 														],
 														"type": "string"
 													}
+												},
+												"headers": {
+													"type": "object",
+													"propertyNames": {
+														"type": "string"
+													},
+													"additionalProperties": {
+														"type": "string"
+													}
+												},
+												"filter": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"type": {
+																	"const": "group"
+																},
+																"match": {
+																	"enum": [
+																		"all",
+																		"any"
+																	],
+																	"type": "string"
+																},
+																"rules": {
+																	"type": "array",
+																	"items": {
+																		"$ref": "#/$defs/2"
+																	}
+																}
+															},
+															"required": [
+																"type",
+																"match",
+																"rules"
+															]
+														},
+														{
+															"type": "null"
+														}
+													]
 												},
 												"enabled": {
 													"type": "boolean"
@@ -10240,6 +10536,8 @@
 												"url",
 												"description",
 												"events",
+												"headers",
+												"filter",
 												"enabled",
 												"createdAt",
 												"lastDeliveryAt",
@@ -10255,7 +10553,90 @@
 										"webhook",
 										"secret"
 									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									"$schema": "http://json-schema.org/draft-07/schema#",
+									"$defs": {
+										"2": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "condition"
+														},
+														"field": {
+															"type": "string",
+															"minLength": 1
+														},
+														"operator": {
+															"enum": [
+																"equals",
+																"not_equals",
+																"contains",
+																"not_contains",
+																"starts_with",
+																"ends_with",
+																"in",
+																"not_in",
+																"includes",
+																"not_includes",
+																"includes_any",
+																"includes_all",
+																"greater_than",
+																"less_than",
+																"is_set",
+																"is_not_set"
+															],
+															"type": "string"
+														},
+														"value": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "array",
+																	"items": {
+																		"type": "string"
+																	}
+																}
+															]
+														}
+													},
+													"required": [
+														"type",
+														"field",
+														"operator"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "group"
+														},
+														"match": {
+															"enum": [
+																"all",
+																"any"
+															],
+															"type": "string"
+														},
+														"rules": {
+															"type": "array",
+															"items": {
+																"$ref": "#/$defs/2"
+															}
+														}
+													},
+													"required": [
+														"type",
+														"match",
+														"rules"
+													]
+												}
+											]
+										}
+									}
 								}
 							}
 						}
@@ -10319,12 +10700,137 @@
 										},
 										"minItems": 1
 									},
+									"headers": {
+										"type": "object",
+										"propertyNames": {
+											"type": "string"
+										},
+										"additionalProperties": {
+											"type": "string"
+										}
+									},
+									"filter": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "group"
+													},
+													"match": {
+														"enum": [
+															"all",
+															"any"
+														],
+														"type": "string"
+													},
+													"rules": {
+														"type": "array",
+														"items": {
+															"$ref": "#/$defs/3"
+														}
+													}
+												},
+												"required": [
+													"type",
+													"match",
+													"rules"
+												]
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
 									"enabled": {
 										"type": "boolean"
 									}
 								},
 								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"$schema": "http://json-schema.org/draft-07/schema#",
+								"$defs": {
+									"3": {
+										"anyOf": [
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "condition"
+													},
+													"field": {
+														"type": "string",
+														"minLength": 1
+													},
+													"operator": {
+														"enum": [
+															"equals",
+															"not_equals",
+															"contains",
+															"not_contains",
+															"starts_with",
+															"ends_with",
+															"in",
+															"not_in",
+															"includes",
+															"not_includes",
+															"includes_any",
+															"includes_all",
+															"greater_than",
+															"less_than",
+															"is_set",
+															"is_not_set"
+														],
+														"type": "string"
+													},
+													"value": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "array",
+																"items": {
+																	"type": "string"
+																}
+															}
+														]
+													}
+												},
+												"required": [
+													"type",
+													"field",
+													"operator"
+												]
+											},
+											{
+												"type": "object",
+												"properties": {
+													"type": {
+														"const": "group"
+													},
+													"match": {
+														"enum": [
+															"all",
+															"any"
+														],
+														"type": "string"
+													},
+													"rules": {
+														"type": "array",
+														"items": {
+															"$ref": "#/$defs/3"
+														}
+													}
+												},
+												"required": [
+													"type",
+													"match",
+													"rules"
+												]
+											}
+										]
+									}
+								}
 							}
 						}
 					}
@@ -10365,6 +10871,48 @@
 												],
 												"type": "string"
 											}
+										},
+										"headers": {
+											"type": "object",
+											"propertyNames": {
+												"type": "string"
+											},
+											"additionalProperties": {
+												"type": "string"
+											}
+										},
+										"filter": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "group"
+														},
+														"match": {
+															"enum": [
+																"all",
+																"any"
+															],
+															"type": "string"
+														},
+														"rules": {
+															"type": "array",
+															"items": {
+																"$ref": "#/$defs/4"
+															}
+														}
+													},
+													"required": [
+														"type",
+														"match",
+														"rules"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
 										},
 										"enabled": {
 											"type": "boolean"
@@ -10413,13 +10961,98 @@
 										"url",
 										"description",
 										"events",
+										"headers",
+										"filter",
 										"enabled",
 										"createdAt",
 										"lastDeliveryAt",
 										"lastDeliveryStatus",
 										"failingSince"
 									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									"$schema": "http://json-schema.org/draft-07/schema#",
+									"$defs": {
+										"4": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "condition"
+														},
+														"field": {
+															"type": "string",
+															"minLength": 1
+														},
+														"operator": {
+															"enum": [
+																"equals",
+																"not_equals",
+																"contains",
+																"not_contains",
+																"starts_with",
+																"ends_with",
+																"in",
+																"not_in",
+																"includes",
+																"not_includes",
+																"includes_any",
+																"includes_all",
+																"greater_than",
+																"less_than",
+																"is_set",
+																"is_not_set"
+															],
+															"type": "string"
+														},
+														"value": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "array",
+																	"items": {
+																		"type": "string"
+																	}
+																}
+															]
+														}
+													},
+													"required": [
+														"type",
+														"field",
+														"operator"
+													]
+												},
+												{
+													"type": "object",
+													"properties": {
+														"type": {
+															"const": "group"
+														},
+														"match": {
+															"enum": [
+																"all",
+																"any"
+															],
+															"type": "string"
+														},
+														"rules": {
+															"type": "array",
+															"items": {
+																"$ref": "#/$defs/4"
+															}
+														}
+													},
+													"required": [
+														"type",
+														"match",
+														"rules"
+													]
+												}
+											]
+										}
+									}
 								}
 							}
 						}

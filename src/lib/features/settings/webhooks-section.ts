@@ -1,5 +1,10 @@
 // Webhook management: register an endpoint, see whether it is healthy, send a
 // test delivery, and read the delivery log when an integration goes quiet.
+//
+// The dialog does double duty. Creating and editing differ only in which verb
+// they end in and whether the URL is still settable, and keeping them one
+// component is what stops the events list, the headers and the conditions from
+// drifting between the two.
 import {
 	Div,
 	ForEach,
@@ -15,7 +20,7 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Copy, Plus, Send, Trash2, Webhook as WebhookIcon } from "@implementjs/lucide";
+import { Copy, Pencil, Plus, Send, Trash2, Webhook as WebhookIcon } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
@@ -30,8 +35,11 @@ import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label } from "@/lib/components/ui/label";
 import type { Webhook, WebhookDelivery } from "@/lib/domain/schemas";
+import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
 	DEFAULT_WEBHOOK_EVENTS,
+	MAX_CUSTOM_HEADERS,
+	validateHeaders,
 	WEBHOOK_EVENT_GROUPS,
 	WEBHOOK_EVENT_HINTS,
 	WEBHOOK_EVENT_LABELS,
@@ -40,6 +48,8 @@ import {
 } from "@/lib/domain/webhooks";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
+import { ConditionsEditor } from "./webhook-conditions";
 
 const inputClass =
 	"h-8 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring";
@@ -49,6 +59,8 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 	const loading = signal(true);
 	const open = signal(false);
 	const secret = signal("");
+	/** The webhook the dialog is editing, or null when it is creating one. */
+	const editing = signal<Webhook | null>(null);
 
 	/** Which webhook's delivery log is expanded, and its rows. */
 	const openLog = signal("");
@@ -124,6 +136,16 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 		await showLog(id);
 	};
 
+	const edit = (hook: Webhook) => {
+		editing.set(hook);
+		open.set(true);
+	};
+
+	const create = () => {
+		editing.set(null);
+		open.set(true);
+	};
+
 	return Div(
 		{ class: "flex flex-col gap-3" },
 		ImplementLifecycle({ onMount: () => void load() }),
@@ -139,7 +161,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 				),
 			),
 			Button(
-				{ size: "sm", class: "gap-1.5", onClick: () => open.set(true) },
+				{ size: "sm", class: "gap-1.5", onClick: create },
 				Plus({ class: "size-3.5" }),
 				"Create webhook",
 			),
@@ -195,6 +217,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 											value.events.map((event) => WEBHOOK_EVENT_LABELS[event]).join(" · "),
 										),
 									),
+									ConditionSummary(hook),
 								),
 								Button(
 									{
@@ -213,6 +236,15 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 										onClick: () => void sendTest(hook.get().id),
 									},
 									Send({ class: "size-3.5" }),
+								),
+								Button(
+									{
+										size: "icon-sm",
+										variant: "ghost",
+										title: "Edit",
+										onClick: () => edit(hook.get()),
+									},
+									Pencil({ class: "size-3.5" }),
 								),
 								Button(
 									{
@@ -255,72 +287,173 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			),
 		),
 
-		CreateWebhookDialog(open, slug, (created, signingSecret) => {
-			hooks.push(created);
+		WebhookDialog(open, slug, editing, (saved, signingSecret) => {
+			if (signingSecret === null) {
+				hooks.set(hooks.get().map((entry) => (entry.id === saved.id ? saved : entry)));
+				return;
+			}
+			hooks.push(saved);
 			secret.set(signingSecret);
 		}),
 	);
 }
 
-function CreateWebhookDialog(
+/** The conditions line under a webhook, so the list says what it actually sends. */
+function ConditionSummary(hook: Readable<Webhook>) {
+	const summary = hook.bind((value) => describeFilter(value.filter));
+	const headerCount = hook.bind((value) => Object.keys(value.headers).length);
+
+	return Div(
+		{ class: "flex min-w-0 items-center gap-2" },
+		If(
+			summary.bind((text) => text !== ""),
+			Span(
+				{ class: "truncate text-[11px] text-muted-foreground" },
+				Span({ class: "text-foreground/70" }, "when "),
+				summary,
+			),
+		),
+		If(
+			headerCount.bind((count) => count > 0),
+			Span(
+				{ class: "shrink-0 text-[11px] text-muted-foreground" },
+				headerCount.bind((count) => `${count} custom header${count === 1 ? "" : "s"}`),
+			),
+		),
+	);
+}
+
+// ---------------------------------------------------------------------------
+// The create / edit dialog
+// ---------------------------------------------------------------------------
+
+interface HeaderRow {
+	id: string;
+	name: string;
+	value: string;
+}
+
+let headerCounter = 0;
+const newHeaderRow = (name = "", value = ""): HeaderRow => ({
+	id: `header-${(headerCounter += 1)}`,
+	name,
+	value,
+});
+
+/** The rows as a header map, or the first thing wrong with them. */
+function collectHeaders(rows: HeaderRow[]): {
+	headers: Record<string, string>;
+	error: string | null;
+} {
+	const headers: Record<string, string> = {};
+	for (const row of rows) {
+		const name = row.name.trim();
+		// A blank row is someone who clicked "Add header" and changed their mind.
+		if (name === "" && row.value.trim() === "") continue;
+		if (name === "") return { headers, error: "a header needs a name" };
+		if (Object.keys(headers).some((existing) => existing.toLowerCase() === name.toLowerCase())) {
+			return { headers, error: `${name} is set twice` };
+		}
+		headers[name] = row.value;
+	}
+	return { headers, error: validateHeaders(headers) };
+}
+
+function WebhookDialog(
 	open: Signal<boolean>,
 	slug: Readable<string>,
-	onCreated: (hook: Webhook, secret: string) => void,
+	editing: Readable<Webhook | null>,
+	onSaved: (hook: Webhook, secret: string | null) => void,
 ) {
 	const url = signal("");
 	const description = signal("");
-	const creating = signal(false);
+	const saving = signal(false);
 	const cells = eventCells();
-	const chosenCount = signal(DEFAULT_WEBHOOK_EVENTS.length);
+	const chosen = signal<WebhookEvent[]>([...DEFAULT_WEBHOOK_EVENTS]);
+	const headers = signal<HeaderRow[]>([]);
+	const match = signal<FilterMatch>("all");
+	const rules = signal<BuilderNode[]>([]);
 
-	const recount = () => {
-		chosenCount.set(
-			WEBHOOK_EVENTS.reduce((total, event) => total + (cells[event].get() ? 1 : 0), 0),
-		);
-	};
+	const recount = () => chosen.set(collect(cells));
 
 	const reset = () => {
-		url.set("");
-		description.set("");
+		const hook = editing.get();
+		url.set(hook?.url ?? "");
+		description.set(hook?.description ?? "");
 		for (const event of WEBHOOK_EVENTS) {
-			cells[event].set(DEFAULT_WEBHOOK_EVENTS.includes(event));
+			cells[event].set(
+				hook === null ? DEFAULT_WEBHOOK_EVENTS.includes(event) : hook.events.includes(event),
+			);
 		}
 		recount();
-	};
 
-	const setEvent = (event: WebhookEvent, value: boolean) => {
-		cells[event].set(value);
-		recount();
-	};
+		headers.set(
+			Object.entries(hook?.headers ?? {}).map(([name, value]) => newHeaderRow(name, value)),
+		);
 
-	const selectAll = () => {
-		for (const event of WEBHOOK_EVENTS) cells[event].set(true);
-		recount();
+		const builder = toBuilder(hook?.filter ?? null);
+		match.set(builder.match);
+		rules.set(builder.rules);
 	};
 
 	const submit = async () => {
 		const target = url.get().trim();
-		if (target === "" || chosenCount.get() === 0) return;
+		const hook = editing.get();
+		if (chosen.get().length === 0) return;
+		if (hook === null && target === "") return;
 
-		creating.set(true);
-		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/webhooks", {
-			params: { slug: slug.get() },
-			body: {
-				url: target,
-				description: description.get().trim(),
-				events: collect(cells),
-			},
-		});
-		creating.set(false);
-
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not create the webhook"));
+		const { headers: collected, error: headerError } = collectHeaders(headers.get());
+		if (headerError !== null) {
+			toastError(headerError);
 			return;
 		}
 
-		onCreated(data.webhook, data.secret);
+		const filter = fromBuilder(match.get(), rules.get());
+
+		saving.set(true);
+		const result =
+			hook === null
+				? await api.POST("/api/v1/workspaces/[slug]/webhooks", {
+						params: { slug: slug.get() },
+						body: {
+							url: target,
+							description: description.get().trim(),
+							events: chosen.get(),
+							headers: collected,
+							filter,
+						},
+					})
+				: await api.PATCH("/api/v1/workspaces/[slug]/webhooks/[id]", {
+						params: { slug: slug.get(), id: hook.id },
+						body: {
+							description: description.get().trim(),
+							events: chosen.get(),
+							headers: collected,
+							filter,
+						},
+					});
+		saving.set(false);
+
+		if (result.error !== undefined) {
+			toastError(
+				messageOf(
+					result.error,
+					hook === null ? "Could not create the webhook" : "Could not save the webhook",
+				),
+			);
+			return;
+		}
+
+		if (hook === null) {
+			const created = result.data as { webhook: Webhook; secret: string };
+			onSaved(created.webhook, created.secret);
+		} else {
+			onSaved(result.data as Webhook, null);
+		}
 		open.set(false);
 	};
+
+	const isEdit = editing.bind((hook) => hook !== null);
 
 	return Dialog(
 		{ open },
@@ -328,15 +461,21 @@ function CreateWebhookDialog(
 			if (isOpen) reset();
 		}),
 		DialogContent(
-			{ class: "max-w-md gap-0 p-0" },
+			{ class: "flex max-h-[85vh] max-w-lg flex-col gap-0 p-0" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
-				DialogTitle({ class: "text-[15px] font-semibold" }, "Create webhook"),
-				DialogDescription({ class: "text-[12px]" }, "Where to POST, and which events to send."),
+				DialogTitle(
+					{ class: "text-[15px] font-semibold" },
+					isEdit.bind((editing) => (editing ? "Edit webhook" : "Create webhook")),
+				),
+				DialogDescription(
+					{ class: "text-[12px]" },
+					"Where to POST, which events to send, and when.",
+				),
 			),
 
 			Div(
-				{ class: "flex flex-col gap-4 px-4 py-4" },
+				{ class: "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4" },
 				Div(
 					{ class: "flex flex-col gap-1.5" },
 					Label({ for: "webhook-url", class: "text-[13px]" }, "URL"),
@@ -346,11 +485,21 @@ function CreateWebhookDialog(
 						type: "url",
 						placeholder: "https://example.com/hooks/tracker",
 						autofocus: true,
-						class: inputClass,
+						// The URL is what the signing secret was issued against, so it
+						// is fixed once the webhook exists — make a new one instead.
+						disabled: isEdit,
+						class: cn(inputClass, "disabled:opacity-60"),
 						onKeydown: (event) => {
 							if (event.key === "Enter") void submit();
 						},
 					}),
+					If(
+						isEdit,
+						P(
+							{ class: "text-[11px] text-muted-foreground" },
+							"The URL is fixed once a webhook exists. Create a new one to point somewhere else.",
+						),
+					),
 				),
 
 				Div(
@@ -367,86 +516,183 @@ function CreateWebhookDialog(
 					}),
 				),
 
-				Div(
-					{ class: "flex flex-col gap-1.5" },
-					Div(
-						{ class: "flex items-center justify-between gap-2" },
-						Span({ class: "text-[13px] font-medium" }, "Events"),
-						Button(
-							{
-								size: "xs",
-								variant: "ghost",
-								type: "button",
-								class: "text-[11px] text-muted-foreground",
-								onClick: selectAll,
-							},
-							"Select all",
-						),
-					),
-					Div(
-						{
-							class: "flex max-h-64 flex-col overflow-y-auto rounded-md border border-border",
-						},
-						...WEBHOOK_EVENT_GROUPS.flatMap((group, index) => [
-							Div(
-								{
-									class: cn(
-										"sticky top-0 bg-secondary/80 px-3 py-1.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm",
-										index > 0 && "border-t border-border",
-									),
-								},
-								group.label,
-							),
-							...group.events.map((event) =>
-								Div(
-									{
-										class: "flex items-start gap-2.5 px-3 py-2",
-									},
-									Checkbox({
-										id: `webhook-event-${event}`,
-										checked: cells[event],
-										"aria-label": WEBHOOK_EVENT_LABELS[event],
-										onCheckedChange: (value) => setEvent(event, value),
-									}),
-									Label(
-										{
-											for: `webhook-event-${event}`,
-											class: "flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5",
-										},
-										Span({ class: "text-[13px] font-normal" }, WEBHOOK_EVENT_LABELS[event]),
-										Span(
-											{ class: "text-[11px] font-normal text-muted-foreground" },
-											WEBHOOK_EVENT_HINTS[event],
-										),
-									),
-								),
-							),
-						]),
-					),
-				),
+				EventPicker(cells, recount),
+				HeadersEditor(headers),
+				ConditionsEditor(match, rules, chosen),
 			),
 
 			Div(
 				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
 				Span(
 					{ class: "mr-auto text-[11px] text-muted-foreground" },
-					chosenCount.bind((count) =>
-						count === 0 ? "Choose at least one event" : `${count} selected`,
+					chosen.bind((events) =>
+						events.length === 0 ? "Choose at least one event" : `${events.length} events`,
 					),
 				),
 				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
 				Button(
 					{
 						size: "sm",
-						loading: creating,
+						loading: saving,
 						disabled: derived(
-							[url, chosenCount],
-							(value, count) => value.trim() === "" || count === 0,
+							[url, chosen, isEdit],
+							(value, events, editing) => events.length === 0 || (!editing && value.trim() === ""),
 						),
 						onClick: () => void submit(),
 					},
-					"Create webhook",
+					isEdit.bind((editing) => (editing ? "Save changes" : "Create webhook")),
 				),
+			),
+		),
+	);
+}
+
+function EventPicker(cells: EventCells, recount: () => void) {
+	const selectAll = () => {
+		for (const event of WEBHOOK_EVENTS) cells[event].set(true);
+		recount();
+	};
+
+	const setEvent = (event: WebhookEvent, value: boolean) => {
+		cells[event].set(value);
+		recount();
+	};
+
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Div(
+			{ class: "flex items-center justify-between gap-2" },
+			Span({ class: "text-[13px] font-medium" }, "Events"),
+			Button(
+				{
+					size: "xs",
+					variant: "ghost",
+					type: "button",
+					class: "text-[11px] text-muted-foreground",
+					onClick: selectAll,
+				},
+				"Select all",
+			),
+		),
+		Div(
+			{ class: "flex max-h-64 flex-col overflow-y-auto rounded-md border border-border" },
+			...WEBHOOK_EVENT_GROUPS.flatMap((group, index) => [
+				Div(
+					{
+						class: cn(
+							"sticky top-0 bg-secondary/80 px-3 py-1.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm",
+							index > 0 && "border-t border-border",
+						),
+					},
+					group.label,
+				),
+				...group.events.map((event) =>
+					Div(
+						{ class: "flex items-start gap-2.5 px-3 py-2" },
+						Checkbox({
+							id: `webhook-event-${event}`,
+							checked: cells[event],
+							"aria-label": WEBHOOK_EVENT_LABELS[event],
+							onCheckedChange: (value) => setEvent(event, value),
+						}),
+						Label(
+							{
+								for: `webhook-event-${event}`,
+								class: "flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5",
+							},
+							Span({ class: "text-[13px] font-normal" }, WEBHOOK_EVENT_LABELS[event]),
+							Span(
+								{ class: "text-[11px] font-normal text-muted-foreground" },
+								WEBHOOK_EVENT_HINTS[event],
+							),
+						),
+					),
+				),
+			]),
+		),
+	);
+}
+
+/**
+ * Extra headers on every delivery — a bearer token for whatever sits in front
+ * of the receiver, a tenant id, a routing key. The pipeline's own headers are
+ * not editable here; they always win at send time.
+ */
+function HeadersEditor(headers: Signal<HeaderRow[]>) {
+	const full = headers.bind((rows) => rows.length >= MAX_CUSTOM_HEADERS);
+
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Div(
+			{ class: "flex items-center justify-between gap-2" },
+			Span({ class: "text-[13px] font-medium" }, "Custom headers"),
+			Span(
+				{ class: "text-[11px] text-muted-foreground" },
+				headers.bind((rows) =>
+					rows.length === 0 ? "" : `${rows.length} of ${MAX_CUSTOM_HEADERS}`,
+				),
+			),
+		),
+
+		If(
+			headers.bind((rows) => rows.length > 0),
+			Div(
+				{ class: "flex flex-col gap-1.5" },
+				ForEach(
+					headers,
+					(row) => row.id,
+					(row) =>
+						Div(
+							{ class: "flex items-center gap-1.5" },
+							Input({
+								value: row.bind("name"),
+								placeholder: "Authorization",
+								spellcheck: false,
+								autocapitalize: "off",
+								"aria-label": "Header name",
+								class: cn(inputClass, "w-[9rem] shrink-0 font-mono text-[12px]"),
+							}),
+							Input({
+								value: row.bind("value"),
+								placeholder: "Bearer …",
+								spellcheck: false,
+								autocapitalize: "off",
+								"aria-label": "Header value",
+								class: cn(inputClass, "min-w-0 flex-1 font-mono text-[12px]"),
+							}),
+							Button(
+								{
+									size: "icon-sm",
+									variant: "ghost",
+									type: "button",
+									title: "Remove header",
+									onClick: () =>
+										headers.update((rows) => rows.filter((entry) => entry.id !== row.get().id)),
+								},
+								Trash2({ class: "size-3.5" }),
+							),
+						),
+				),
+			),
+		),
+
+		Div(
+			{ class: "flex items-center gap-2" },
+			Button(
+				{
+					size: "xs",
+					variant: "outline",
+					type: "button",
+					class: "gap-1 text-[11px]",
+					disabled: full,
+					onClick: () => headers.push(newHeaderRow()),
+				},
+				Plus({ class: "size-3" }),
+				"Add header",
+			),
+			Span(
+				{ class: "text-[11px] text-muted-foreground" },
+				"Sent with every delivery. Values are readable by workspace admins.",
 			),
 		),
 	);
