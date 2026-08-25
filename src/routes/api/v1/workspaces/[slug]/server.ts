@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { UpdateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { claimImageKey, discardImage } from "@/lib/server/images.server";
 import { feedback, workspace } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
 import { handler } from "./$types";
@@ -21,8 +22,18 @@ export const PATCH = handler({
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
 
+		// `null` clears the picture, a key replaces it, absent leaves it alone —
+		// which is why this is a three-way check rather than a truthiness one.
+		const image =
+			body.imageKey === undefined
+				? undefined
+				: body.imageKey === null
+					? null
+					: await claimImageKey(membership.user.id, body.imageKey);
+
 		const patch = {
 			...(body.name === undefined ? {} : { name: body.name }),
+			...(image === undefined ? {} : { image }),
 			...(body.feedbackIntake === undefined ? {} : { feedbackIntake: body.feedbackIntake }),
 			...(body.feedbackBoard === undefined ? {} : { feedbackBoard: body.feedbackBoard }),
 		};
@@ -41,6 +52,12 @@ export const PATCH = handler({
 				.update(feedback)
 				.set({ visibility: "private", updatedAt: new Date() })
 				.where(eq(feedback.workspaceId, membership.workspace.id));
+		}
+
+		// The object the workspace used to point at is now unreachable; drop it
+		// after the row is safely updated, never before.
+		if (image !== undefined && membership.workspace.image !== null) {
+			await discardImage(membership.workspace.image);
 		}
 
 		return toWorkspace({ ...membership.workspace, ...patch }, membership.role);

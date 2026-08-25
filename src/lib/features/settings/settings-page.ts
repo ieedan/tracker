@@ -20,6 +20,7 @@ import { Button } from "@/lib/components/ui/button";
 import type { ApiKey, Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { relativeTime } from "@/lib/format";
+import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
 import { FeedbackSection } from "./feedback-section";
 import { WebhooksSection } from "./webhooks-section";
 
@@ -46,6 +47,7 @@ export function SettingsPage({
 			{ class: "min-h-0 flex-1 overflow-y-auto px-6 py-6" },
 			Div(
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
+				WorkspaceSection(data, params),
 				MembersSection(data, params),
 				LabelsSection(data, params),
 				FeedbackSection(
@@ -68,6 +70,65 @@ function Section(title: string, description: string, ...children: Child[]) {
 			P({ class: "text-[12px] text-muted-foreground" }, description),
 		),
 		...children,
+	);
+}
+
+/** Name and picture — the two things that identify a workspace on screen. */
+function WorkspaceSection(data: Readable<PageData>, params: { slug: Readable<string> }) {
+	const workspace = data.get().workspace;
+	const picture = imageChoice(workspace.image);
+	const name = signal(workspace.name);
+	data.onChange((next) => {
+		name.set(next.workspace.name);
+		picture.preview.set(next.workspace.image ?? "");
+	});
+
+	const save = async (patch: { name?: string; imageKey?: string | null }) => {
+		const { error } = await api.PATCH("/api/v1/workspaces/[slug]", {
+			params: { slug: params.slug.get() },
+			body: patch,
+		});
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not save that"));
+			return false;
+		}
+		return true;
+	};
+
+	const commitName = async () => {
+		const next = name.get().trim();
+		if (next === "" || next === data.get().workspace.name) return;
+		if (await save({ name: next })) toastSuccess("Workspace renamed");
+	};
+
+	return Section(
+		"Workspace",
+		"How this workspace appears in the sidebar and the switcher.",
+
+		Div(
+			{ class: "flex flex-col gap-4 rounded-md border border-border p-3" },
+			ImagePicker({
+				choice: picture,
+				fallback: name,
+				label: "Upload a picture",
+				// Saved on choose rather than behind a button: there is no other
+				// field on this control to batch it with.
+				onChange: (key) => void save({ imageKey: key }),
+			}),
+			Div(
+				{ class: "flex flex-col gap-1.5" },
+				Span({ class: "text-[12px] font-medium" }, "Name"),
+				Input({
+					value: name,
+					class:
+						"h-8 max-w-xs rounded-md border border-input bg-background px-2.5 text-[13px] outline-none focus:border-ring",
+					onBlur: () => void commitName(),
+					onKeydown: (event) => {
+						if (event.key === "Enter") void commitName();
+					},
+				}),
+			),
+		),
 	);
 }
 

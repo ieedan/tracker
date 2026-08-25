@@ -2,8 +2,10 @@ import { router } from "$implement/router";
 import {
 	Aside,
 	Div,
+	Dynamic,
 	ForEach,
 	If,
+	Img,
 	ImplementLifecycle,
 	Main,
 	Span,
@@ -154,13 +156,7 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 				variant: "ghost",
 				class: "h-9 w-full justify-start gap-2 px-2 hover:bg-accent",
 			},
-			Div(
-				{ class: "flex size-5 items-center justify-center rounded-[5px] bg-primary" },
-				Span(
-					{ class: "text-[10px] font-bold text-primary-foreground" },
-					current.bind((workspace) => (workspace?.name ?? "?").slice(0, 1).toUpperCase()),
-				),
-			),
+			WorkspaceTile(current),
 			Span(
 				{ class: "truncate text-[13px] font-medium" },
 				current.bind((workspace) => workspace?.name ?? "No workspace"),
@@ -179,6 +175,7 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 							{
 								onSelect: () => router.navigate("/app/:slug", { slug: workspace.get().slug }),
 							},
+							WorkspaceTile(workspace),
 							Span({ class: "truncate" }, workspace.bind("name")),
 						),
 				),
@@ -190,6 +187,30 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 				"Create workspace",
 			),
 		),
+	);
+}
+
+/**
+ * The workspace's picture, or the initial on a coloured tile.
+ *
+ * `Dynamic` rather than `If`, because the two branches are different elements
+ * and swapping between them is exactly what `Dynamic` is for.
+ */
+function WorkspaceTile(workspace: Readable<Workspace | undefined>) {
+	return Dynamic([workspace], (value) =>
+		value?.image != null && value.image !== ""
+			? Img({
+					src: value.image,
+					alt: "",
+					class: "size-5 shrink-0 rounded-[5px] object-cover",
+				})
+			: Div(
+					{ class: "flex size-5 shrink-0 items-center justify-center rounded-[5px] bg-primary" },
+					Span(
+						{ class: "text-[10px] font-bold text-primary-foreground" },
+						(value?.name ?? "?").slice(0, 1).toUpperCase(),
+					),
+				),
 	);
 }
 

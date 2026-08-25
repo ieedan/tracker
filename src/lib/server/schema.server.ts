@@ -34,6 +34,13 @@ export const workspace = sqliteTable("workspace", {
 	id: text("id").primaryKey(),
 	name: text("name").notNull(),
 	slug: text("slug").notNull().unique(),
+	/**
+	 * Object key for the workspace picture, or null for the letter tile.
+	 *
+	 * The key rather than a URL: a URL to private storage expires, and one to
+	 * public storage would make the bucket public.
+	 */
+	image: text("image"),
 	/** Who may POST to `/api/v1/workspaces/<slug>/user-feedback`. */
 	feedbackIntake: text("feedbackIntake").$type<FeedbackIntake>().notNull().default("api_key"),
 	/** Whether `/<slug>/public/feedback` is readable without signing in. */

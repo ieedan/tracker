@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
+import { claimImageKey } from "@/lib/server/images.server";
 import { requireUser } from "@/lib/server/guards.server";
 import { label, workspace, workspaceMember } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
@@ -31,11 +32,17 @@ export const POST = handler({
 	async handle({ locals, body }) {
 		const user = requireUser(locals);
 
+		// Claimed before the insert: if the key is not this user's, or nothing was
+		// ever uploaded to it, the workspace should not come into existence at all
+		// rather than exist with a broken picture.
+		const image = body.imageKey === undefined ? null : await claimImageKey(user.id, body.imageKey);
+
 		const slug = await uniqueSlug(slugify(body.name));
 		const row = {
 			id: nanoid(),
 			name: body.name,
 			slug,
+			image,
 			createdAt: new Date(),
 			// Feedback intake starts closed to anonymous callers and the public
 			// board starts off. Both are switches an admin flips deliberately.

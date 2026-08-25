@@ -36,6 +36,13 @@
 			"when": 1787656490214,
 			"tag": "0004_feedback",
 			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "6",
+			"when": 1787658797535,
+			"tag": "0005_workspace_image",
+			"breakpoints": true
 		}
 	]
 }

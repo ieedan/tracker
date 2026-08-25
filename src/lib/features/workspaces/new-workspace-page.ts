@@ -1,12 +1,14 @@
 import { Div, H1, Input, Label, P, Span, derived, signal } from "@implementjs/core";
 import { api, messageOf } from "@/lib/client/api";
 import { Button } from "@/lib/components/ui/button";
+import { ImagePicker, imageChoice } from "./image-picker";
 import { slugPreview } from "./slug-preview";
 
 export function NewWorkspacePage() {
 	const name = signal("");
 	const failure = signal("");
 	const creating = signal(false);
+	const picture = imageChoice();
 
 	// What the URL will read once this exists. The server still has the last
 	// word — it appends `-2` if the slug is taken — but showing it here is what
@@ -18,8 +20,12 @@ export function NewWorkspacePage() {
 		failure.set("");
 		creating.set(true);
 
+		const chosen = picture.key.get();
 		const { data, error } = await api.POST("/api/v1/workspaces", {
-			body: { name: name.get().trim() },
+			body: {
+				name: name.get().trim(),
+				...(chosen === "" ? {} : { imageKey: chosen }),
+			},
 		});
 		creating.set(false);
 
@@ -45,6 +51,15 @@ export function NewWorkspacePage() {
 
 			Div(
 				{ class: "flex flex-col gap-3.5" },
+
+				// The picture uploads the moment it is chosen, so by the time the
+				// name is typed there is already a key to submit with it.
+				ImagePicker({
+					choice: picture,
+					fallback: name,
+					label: "Add a picture",
+				}),
+
 				Div(
 					{ class: "flex flex-col gap-1.5" },
 					Label({ class: "text-[13px] font-medium", htmlFor: "name" }, "Name"),
@@ -78,7 +93,10 @@ export function NewWorkspacePage() {
 					{
 						class: "mt-1 w-full",
 						loading: creating,
-						disabled: name.bind((value) => value.trim() === ""),
+						disabled: derived(
+							[name, picture.uploading],
+							(value, uploading) => value.trim() === "" || uploading,
+						),
 						onClick: () => void create(),
 					},
 					"Create workspace",

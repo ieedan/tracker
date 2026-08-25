@@ -34,6 +34,8 @@ export const WorkspaceSchema = v.object({
 	name: v.string(),
 	slug: v.string(),
 	role: WorkspaceRoleSchema,
+	/** App URL for the workspace picture, or null. Redirects to storage. */
+	image: v.nullable(v.string()),
 	/** Who may POST feedback to this workspace. */
 	feedbackIntake: FeedbackIntakeSchema,
 	/** Whether the public feedback board is readable without signing in. */
@@ -197,6 +199,8 @@ const trimmed = (min: number, max: number) =>
 
 export const CreateWorkspaceBody = v.object({
 	name: trimmed(1, 60),
+	/** A key from `POST /api/v1/uploads/image`, uploaded before this existed. */
+	imageKey: v.optional(v.string()),
 });
 
 export const CreateTeamBody = v.object({
@@ -345,6 +349,8 @@ export const SubscribeFeedbackBody = v.object({
 export const UpdateWorkspaceBody = v.partial(
 	v.object({
 		name: trimmed(1, 60),
+		/** A key from `POST /api/v1/uploads/image`. Null clears the picture. */
+		imageKey: v.nullable(v.string()),
 		feedbackIntake: FeedbackIntakeSchema,
 		feedbackBoard: FeedbackBoardSchema,
 	}),

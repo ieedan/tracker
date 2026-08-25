@@ -73,6 +73,26 @@ export function attachmentKey(workspaceId: string, filename: string): string {
 	return `workspaces/${workspaceId}/${nanoid(21)}.${extension}`;
 }
 
+/**
+ * The object key for a picture uploaded before it has anywhere to live.
+ *
+ * A workspace image is chosen on the form that creates the workspace, so at
+ * upload time there is no workspace to namespace it under — only the person
+ * doing it. Putting their id in the key is what lets the server later check
+ * that whoever claims a key is the person it was issued to: an unforgeable
+ * prefix plus 21 random characters, so a key cannot be guessed and cannot be
+ * claimed on someone else's behalf.
+ */
+export function userImageKey(userId: string, filename: string): string {
+	const extension = /\.([a-zA-Z0-9]{1,8})$/.exec(filename)?.[1]?.toLowerCase() ?? "bin";
+	return `users/${userId}/${nanoid(21)}.${extension}`;
+}
+
+/** Whether this key was issued to this user — see `userImageKey`. */
+export function ownsImageKey(userId: string, key: string): boolean {
+	return key.startsWith(`users/${userId}/`);
+}
+
 /** A URL the browser may PUT exactly this file to, for the next few minutes. */
 export async function presignUpload(options: {
 	key: string;
@@ -100,7 +120,8 @@ export async function presignUpload(options: {
 export async function presignDownload(options: {
 	key: string;
 	filename: string;
-	contentType: string;
+	/** Omit to serve back whatever type storage recorded on the object. */
+	contentType?: string;
 	inline: boolean;
 }): Promise<string> {
 	const disposition = options.inline ? "inline" : "attachment";
@@ -108,7 +129,7 @@ export async function presignDownload(options: {
 		Bucket: env.S3_BUCKET,
 		Key: options.key,
 		ResponseContentDisposition: `${disposition}; filename="${sanitizeFilename(options.filename)}"`,
-		ResponseContentType: options.contentType,
+		...(options.contentType === undefined ? {} : { ResponseContentType: options.contentType }),
 	});
 	return forBrowser(await getSignedUrl(s3(), command, { expiresIn: 900 }));
 }

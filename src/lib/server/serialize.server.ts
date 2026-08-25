@@ -43,6 +43,9 @@ export function toWorkspace(row: WorkspaceRow, role: WorkspaceRole): Workspace {
 		name: row.name,
 		slug: row.slug,
 		role,
+		// An app URL, not a storage URL: a presigned one expires while the page
+		// is still open. The route behind this mints a fresh one per request.
+		image: row.image === null ? null : `/api/v1/workspaces/${row.slug}/image`,
 		feedbackIntake: row.feedbackIntake,
 		feedbackBoard: row.feedbackBoard,
 		createdAt: row.createdAt.toISOString(),
