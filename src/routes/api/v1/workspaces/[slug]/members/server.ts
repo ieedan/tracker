@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { AddMemberBody, MemberSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { user, workspaceMember } from "@/lib/server/schema.server";
 import { toMember } from "@/lib/server/serialize.server";
 import { handler, json } from "./$types";
@@ -13,6 +13,7 @@ export const GET = handler({
 	response: v.array(MemberSchema),
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "members", "read");
 		const rows = await db
 			.select({ member: workspaceMember, user })
 			.from(workspaceMember)
@@ -34,6 +35,7 @@ export const POST = handler({
 	response: MemberSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "members", "write");
 
 		const found = await db
 			.select()

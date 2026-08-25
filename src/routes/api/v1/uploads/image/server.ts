@@ -1,7 +1,7 @@
 import { error } from "@implementjs/kit/server";
 import * as v from "valibot";
 import { MAX_IMAGE_BYTES, isAllowedImageType } from "@/lib/domain/images";
-import { requireUser } from "@/lib/server/guards.server";
+import { requirePermission, requireUser } from "@/lib/server/guards.server";
 import { presignUpload, storageConfigured, userImageKey } from "@/lib/server/storage.server";
 import { handler, json } from "./$types";
 
@@ -28,6 +28,9 @@ export const POST = handler({
 	}),
 	async handle({ locals, body }) {
 		const user = requireUser(locals);
+		// Not tied to a workspace yet, but the only thing an image is *for* is
+		// one — so it scopes with the workspace rather than inventing a resource.
+		requirePermission(locals, "workspace", "write");
 
 		if (!storageConfigured()) error(503, "image storage is not configured on this server");
 		if (!isAllowedImageType(body.contentType)) {

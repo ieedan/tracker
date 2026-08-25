@@ -1,5 +1,5 @@
 import { error, redirect } from "@implementjs/kit/server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { presignDownload } from "@/lib/server/storage.server";
 import type { RequestEvent } from "./$types";
 
@@ -12,6 +12,8 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
 	const { workspace } = await requireMembership(event.locals, event.params.slug);
+	requirePermission(event.locals, "workspace", "read");
+
 	if (workspace.image === null) error(404, "this workspace has no picture");
 
 	const url = await presignDownload({

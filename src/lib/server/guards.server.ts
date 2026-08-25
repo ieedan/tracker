@@ -1,5 +1,6 @@
 import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
+import { hasPermission, type ApiKeyAction, type ApiKeyResource } from "@/lib/domain/api-keys";
 import type { WorkspaceRole } from "@/lib/domain/issues";
 import { db } from "./db.server";
 import { workspace, workspaceMember } from "./schema.server";
@@ -54,4 +55,21 @@ export function requireInteractiveSession(locals: App.Locals): App.SessionUser {
 		error(403, "this endpoint requires a signed-in session, not an API key");
 	}
 	return user;
+}
+
+/**
+ * Scopes an API key to a resource and action. Sessions skip this: they already
+ * have the owner's full access, and membership / admin checks still apply.
+ *
+ * Call after `requireUser` / `requireMembership` so an unauthenticated request
+ * is still a 401 rather than a 403 about a key that was never presented.
+ */
+export function requirePermission(
+	locals: App.Locals,
+	resource: ApiKeyResource,
+	action: ApiKeyAction,
+): void {
+	if (locals.authVia !== "api-key") return;
+	if (hasPermission(locals.apiKeyPermissions, resource, action)) return;
+	error(403, `this API key cannot ${action} ${resource}`);
 }

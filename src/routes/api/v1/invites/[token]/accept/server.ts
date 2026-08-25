@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireUser } from "@/lib/server/guards.server";
+import { requireUser, requirePermission } from "@/lib/server/guards.server";
 import { workspace, workspaceInvite, workspaceMember } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
 import { handler } from "./$types";
@@ -12,6 +12,7 @@ export const POST = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, params }) {
 		const user = requireUser(locals);
+		requirePermission(locals, "members", "write");
 
 		const rows = await db
 			.select({ invite: workspaceInvite, workspace })

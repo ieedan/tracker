@@ -68,6 +68,71 @@
 														"type": "null"
 													}
 												]
+											},
+											"expiresAt": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"permissions": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"issues": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															},
+															"workspace": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															},
+															"members": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															},
+															"webhooks": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															},
+															"feedback": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															},
+															"notifications": {
+																"type": "array",
+																"items": {
+																	"enum": ["read", "write"],
+																	"type": "string"
+																}
+															}
+														},
+														"required": []
+													},
+													{
+														"type": "null"
+													}
+												]
 											}
 										},
 										"required": [
@@ -77,7 +142,9 @@
 											"prefix",
 											"enabled",
 											"createdAt",
-											"lastRequest"
+											"lastRequest",
+											"expiresAt",
+											"permissions"
 										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
@@ -101,9 +168,62 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 60
+									},
+									"permissions": {
+										"type": "object",
+										"properties": {
+											"issues": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											},
+											"workspace": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											},
+											"members": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											},
+											"webhooks": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											},
+											"feedback": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											},
+											"notifications": {
+												"type": "array",
+												"items": {
+													"enum": ["read", "write"],
+													"type": "string"
+												}
+											}
+										},
+										"required": []
+									},
+									"expiresIn": {
+										"type": "integer",
+										"minimum": 86400,
+										"maximum": 31536000
 									}
 								},
-								"required": ["name"],
+								"required": ["name", "permissions"],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -168,6 +288,71 @@
 															"type": "null"
 														}
 													]
+												},
+												"expiresAt": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"permissions": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"issues": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																},
+																"workspace": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																},
+																"members": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																},
+																"webhooks": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																},
+																"feedback": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																},
+																"notifications": {
+																	"type": "array",
+																	"items": {
+																		"enum": ["read", "write"],
+																		"type": "string"
+																	}
+																}
+															},
+															"required": []
+														},
+														{
+															"type": "null"
+														}
+													]
 												}
 											},
 											"required": [
@@ -177,7 +362,9 @@
 												"prefix",
 												"enabled",
 												"createdAt",
-												"lastRequest"
+												"lastRequest",
+												"expiresAt",
+												"permissions"
 											]
 										},
 										"plaintext": {
@@ -255,6 +442,16 @@
 											"enum": ["admin", "member"],
 											"type": "string"
 										},
+										"image": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedbackIntake": {
 											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
@@ -272,6 +469,7 @@
 										"name",
 										"slug",
 										"role",
+										"image",
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
@@ -524,6 +722,68 @@
 				}
 			}
 		},
+		"/api/v1/uploads/image": {
+			"post": {
+				"operationId": "postApiV1UploadsImage",
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"filename": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 200
+									},
+									"contentType": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 120
+									},
+									"size": {
+										"type": "integer",
+										"minimum": 1
+									}
+								},
+								"required": ["filename", "contentType", "size"],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"key": {
+											"type": "string"
+										},
+										"uploadUrl": {
+											"type": "string"
+										},
+										"contentType": {
+											"type": "string"
+										}
+									},
+									"required": ["key", "uploadUrl", "contentType"],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces": {
 			"get": {
 				"operationId": "getApiV1Workspaces",
@@ -551,6 +811,16 @@
 												"enum": ["admin", "member"],
 												"type": "string"
 											},
+											"image": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"feedbackIntake": {
 												"enum": ["disabled", "api_key", "public"],
 												"type": "string"
@@ -568,6 +838,7 @@
 											"name",
 											"slug",
 											"role",
+											"image",
 											"feedbackIntake",
 											"feedbackBoard",
 											"createdAt"
@@ -594,6 +865,9 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 60
+									},
+									"imageKey": {
+										"type": "string"
 									}
 								},
 								"required": ["name"],
@@ -623,6 +897,16 @@
 											"enum": ["admin", "member"],
 											"type": "string"
 										},
+										"image": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedbackIntake": {
 											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
@@ -640,6 +924,7 @@
 										"name",
 										"slug",
 										"role",
+										"image",
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
@@ -689,6 +974,16 @@
 											"enum": ["admin", "member"],
 											"type": "string"
 										},
+										"image": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedbackIntake": {
 											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
@@ -706,6 +1001,7 @@
 										"name",
 										"slug",
 										"role",
+										"image",
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
@@ -740,6 +1036,16 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 60
+									},
+									"imageKey": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
 									},
 									"feedbackIntake": {
 										"enum": ["disabled", "api_key", "public"],
@@ -777,6 +1083,16 @@
 											"enum": ["admin", "member"],
 											"type": "string"
 										},
+										"image": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"feedbackIntake": {
 											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
@@ -794,6 +1110,7 @@
 										"name",
 										"slug",
 										"role",
+										"image",
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"

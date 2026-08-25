@@ -4,7 +4,6 @@ import {
 	H1,
 	H2,
 	If,
-	ImplementLifecycle,
 	Input,
 	P,
 	Span,
@@ -12,15 +11,15 @@ import {
 	type Child,
 	type Readable,
 } from "@implementjs/core";
-import { Copy, Plus, Trash2 } from "@implementjs/lucide";
+import { Copy } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
-import type { ApiKey, Label, Member, Workspace } from "@/lib/domain/schemas";
+import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
-import { relativeTime } from "@/lib/format";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
+import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
 import { WebhooksSection } from "./webhooks-section";
 
@@ -54,8 +53,8 @@ export function SettingsPage({
 					data.bind((value) => value.workspace),
 					params,
 				),
-				WebhooksSectionBlock(params),
-				ApiKeysSection(),
+				WebhooksSection(params.slug, copy),
+				ApiKeysSection(copy),
 			),
 		),
 	);
@@ -325,151 +324,6 @@ function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string
 			}),
 			Button({ size: "sm", loading: creating, onClick: () => void create() }, "Add label"),
 		),
-	);
-}
-
-/**
- * API keys belong to the person, not the workspace, but this is where someone
- * goes looking for them. Fetched in the browser so a freshly minted key's
- * plaintext never lands in a server-rendered payload.
- */
-function ApiKeysSection() {
-	const keys = signal<ApiKey[]>([]);
-	const name = signal("");
-	const creating = signal(false);
-	const plaintext = signal("");
-
-	const load = async () => {
-		const { data, error } = await api.GET("/api/v1/api-keys");
-		if (error === undefined) keys.set(data);
-	};
-
-	const create = async () => {
-		const trimmed = name.get().trim();
-		if (trimmed === "") return;
-
-		creating.set(true);
-		const { data, error } = await api.POST("/api/v1/api-keys", { body: { name: trimmed } });
-		creating.set(false);
-
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not create the key"));
-			return;
-		}
-		keys.push(data.key);
-		plaintext.set(data.plaintext);
-		name.set("");
-	};
-
-	const revoke = async (id: string) => {
-		const before = keys.get();
-		keys.set(before.filter((key) => key.id !== id));
-		const { error } = await api.DELETE("/api/v1/api-keys/[id]", { params: { id } });
-		if (error !== undefined) {
-			keys.set(before);
-			toastError(messageOf(error, "Could not revoke the key"));
-		}
-	};
-
-	return Section(
-		"API keys",
-		"Authenticate the REST API with an Authorization: Bearer header.",
-
-		ImplementLifecycle({ onMount: () => void load() }),
-
-		If(
-			plaintext.bind((value) => value !== ""),
-			Div(
-				{ class: "rounded-md border border-primary/40 bg-primary/5 p-3" },
-				P(
-					{ class: "mb-2 text-[12px] font-medium" },
-					"Copy this now — it is stored hashed and cannot be shown again.",
-				),
-				Div(
-					{ class: "flex items-center gap-2" },
-					Span({ class: "min-w-0 flex-1 truncate font-mono text-[11px]" }, plaintext),
-					Button(
-						{
-							size: "icon-sm",
-							variant: "ghost",
-							title: "Copy key",
-							onClick: () => void copy(plaintext.get()),
-						},
-						Copy({ class: "size-3.5" }),
-					),
-				),
-			),
-		),
-
-		If(
-			keys.bind((list) => list.length > 0),
-			Div(
-				{ class: "flex flex-col divide-y divide-border rounded-md border border-border" },
-				ForEach(
-					keys,
-					(key) => key.id,
-					(key) =>
-						Div(
-							{ class: "flex items-center gap-3 px-3 py-2.5" },
-							Div(
-								{ class: "min-w-0 flex-1" },
-								Div(
-									{ class: "truncate text-[13px]" },
-									key.bind((value) => value.name ?? "Key"),
-								),
-								Div(
-									{ class: "font-mono text-[11px] text-muted-foreground" },
-									key.bind((value) => `${value.start ?? value.prefix ?? "trk_"}…`),
-								),
-							),
-							Span(
-								{ class: "text-[11px] text-muted-foreground" },
-								key.bind((value) =>
-									value.lastRequest === null
-										? "never used"
-										: `used ${relativeTime(value.lastRequest)}`,
-								),
-							),
-							Button(
-								{
-									size: "icon-sm",
-									variant: "ghost",
-									title: "Revoke",
-									onClick: () => void revoke(key.get().id),
-								},
-								Trash2({ class: "size-3.5" }),
-							),
-						),
-				),
-			),
-		),
-
-		Div(
-			{ class: "flex gap-2" },
-			Input({
-				value: name,
-				placeholder: "Key name (e.g. CI)",
-				class:
-					"h-8 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
-				onKeydown: (event) => {
-					if (event.key === "Enter") void create();
-				},
-			}),
-			Button(
-				{ size: "sm", loading: creating, class: "gap-1.5", onClick: () => void create() },
-				Plus({ class: "size-3.5" }),
-				"Create key",
-			),
-		),
-	);
-}
-
-/** Only admins can manage webhooks, so the section is theirs alone. */
-function WebhooksSectionBlock(params: { slug: Readable<string> }) {
-	return Section(
-		"Webhooks",
-		"Get a signed POST whenever something happens in this workspace.",
-		WebhooksSection(params.slug, copy),
 	);
 }
 

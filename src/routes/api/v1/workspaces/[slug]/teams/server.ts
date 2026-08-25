@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateTeamBody, TeamSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { team } from "@/lib/server/schema.server";
 import { toTeam } from "@/lib/server/serialize.server";
 import {
@@ -18,6 +18,7 @@ export const GET = handler({
 	response: v.array(TeamSchema),
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "workspace", "read");
 		return await listTeams(workspace.id);
 	},
 });
@@ -27,6 +28,7 @@ export const POST = handler({
 	response: TeamSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "workspace", "write");
 
 		const requested = body.key === undefined || body.key === "" ? teamKeyFrom(body.name) : body.key;
 		const key = assertValidTeamKey(requested);

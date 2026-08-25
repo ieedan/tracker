@@ -2,7 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { eq } from "drizzle-orm";
 import { UpdateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { claimImageKey, discardImage } from "@/lib/server/images.server";
 import { feedback, workspace } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
@@ -12,6 +12,7 @@ export const GET = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, params }) {
 		const membership = await requireMembership(locals, params.slug);
+		requirePermission(locals, "workspace", "read");
 		return toWorkspace(membership.workspace, membership.role);
 	},
 });
@@ -21,6 +22,7 @@ export const PATCH = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "workspace", "write");
 
 		// `null` clears the picture, a key replaces it, absent leaves it alone —
 		// which is why this is a three-way check rather than a truthiness one.

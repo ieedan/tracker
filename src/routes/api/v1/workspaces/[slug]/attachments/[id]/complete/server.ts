@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { AttachmentSchema } from "@/lib/domain/schemas";
 import { toAttachment } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { attachment, user } from "@/lib/server/schema.server";
 import { headObject } from "@/lib/server/storage.server";
 import { handler } from "./$types";
@@ -20,6 +20,7 @@ export const POST = handler({
 	response: AttachmentSchema,
 	async handle({ locals, params }) {
 		const { workspace, user: actor } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 
 		const rows = await db
 			.select()

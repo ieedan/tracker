@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateInviteBody, WorkspaceRoleSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { workspaceInvite } from "@/lib/server/schema.server";
 import { handler, json } from "./$types";
 
@@ -22,6 +22,7 @@ export const GET = handler({
 	response: v.array(InviteSchema),
 	async handle({ locals, params, url }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "members", "read");
 		const rows = await db
 			.select()
 			.from(workspaceInvite)
@@ -45,6 +46,7 @@ export const POST = handler({
 	response: InviteSchema,
 	async handle({ locals, params, body, url }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "members", "write");
 
 		const row = {
 			id: nanoid(),

@@ -12,7 +12,7 @@ import {
 	getFeedbackById,
 	labelIdsFor,
 } from "@/lib/server/feedback.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import {
 	assertMember,
 	getIssueById,
@@ -42,6 +42,8 @@ export const POST = handler({
 	response: IssueSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "feedback", "write");
+		requirePermission(locals, "issues", "write");
 
 		const row = await findFeedbackRow(workspace.id, params.id);
 		if (row === undefined) error(404, "no such feedback");

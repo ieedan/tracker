@@ -5,6 +5,7 @@ import { FEEDBACK_RATE_LIMITS } from "@/lib/domain/feedback";
 import { SubscribeFeedbackBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { subscribeToFeedback } from "@/lib/server/feedback.server";
+import { requirePermission } from "@/lib/server/guards.server";
 import { clientAddress, consume } from "@/lib/server/rate-limit.server";
 import { feedback, workspace as workspaceTable, workspaceMember } from "@/lib/server/schema.server";
 import { handler } from "./$types";
@@ -39,6 +40,9 @@ export const POST = handler({
 		const openToPublic =
 			row.feedback.visibility === "public" && row.workspace.feedbackBoard === "public";
 		if (!isMember && !openToPublic) error(404, "no such feedback");
+		// Members using a key still need the scope. Anonymous public-board
+		// subscribe is the point of this route, so it stays unscoped.
+		if (isMember) requirePermission(locals, "feedback", "write");
 
 		if (!isMember) {
 			const budget = FEEDBACK_RATE_LIMITS.public;

@@ -4,7 +4,7 @@ import * as v from "valibot";
 import { parseIdentifier, STATUS_LABELS } from "@/lib/domain/issues";
 import { IssueSchema, UpdateIssueBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import {
 	assertMember,
 	getIssueById,
@@ -42,6 +42,7 @@ export const GET = handler({
 	response: IssueSchema,
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "read");
 		const { key, number } = split(params.identifier);
 
 		const found = await getIssueByIdentifier(workspace.id, key, number);
@@ -56,6 +57,7 @@ export const PATCH = handler({
 	response: IssueSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 		const { key, number } = split(params.identifier);
 
 		const rows = await db
@@ -203,6 +205,7 @@ export const DELETE = handler({
 	params: IdentifierParams,
 	async handle({ locals, params }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 		const { key, number } = split(params.identifier);
 
 		const owningTeam = await requireTeam(workspace.id, key);

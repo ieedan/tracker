@@ -1,11 +1,14 @@
 import { defaultKeyHasher } from "@better-auth/api-key";
 import { eq } from "drizzle-orm";
+import { parsePermissions, type ApiKeyPermissions } from "@/lib/domain/api-keys";
 import { db } from "./db.server";
 import { apikey, user } from "./schema.server";
 
 export interface ApiKeyPrincipal {
 	user: App.SessionUser;
 	keyId: string;
+	/** `null` on keys minted before scopes existed — unrestricted. */
+	permissions: ApiKeyPermissions | null;
 }
 
 /** The key a request is presenting, from either accepted header. */
@@ -70,5 +73,6 @@ export async function resolveApiKey(presented: string): Promise<ApiKeyPrincipal 
 			image: row.owner.image ?? null,
 		},
 		keyId: row.key.id,
+		permissions: parsePermissions(row.key.permissions),
 	};
 }

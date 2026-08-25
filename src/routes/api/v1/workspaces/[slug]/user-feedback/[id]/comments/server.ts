@@ -7,7 +7,7 @@ import { CreateFeedbackCommentBody, FeedbackCommentSchema } from "@/lib/domain/s
 import { db } from "@/lib/server/db.server";
 import { emitFeedbackEvent } from "@/lib/server/events.server";
 import { getFeedbackById, listFeedbackComments, touchFeedback } from "@/lib/server/feedback.server";
-import { requireUser } from "@/lib/server/guards.server";
+import { requirePermission, requireUser } from "@/lib/server/guards.server";
 import { consume } from "@/lib/server/rate-limit.server";
 import {
 	feedback,
@@ -63,6 +63,7 @@ export const GET = handler({
 	response: v.array(FeedbackCommentSchema),
 	async handle({ locals, params }) {
 		const context = await resolve(locals, params.slug, params.id);
+		requirePermission(locals, "feedback", "read");
 		return await listFeedbackComments(context.feedback.id, context.isMember ? "member" : "public");
 	},
 });
@@ -73,6 +74,7 @@ export const POST = handler({
 	response: FeedbackCommentSchema,
 	async handle({ locals, params, body }) {
 		const context = await resolve(locals, params.slug, params.id);
+		requirePermission(locals, "feedback", "write");
 
 		// An internal note from someone outside the workspace is refused, not
 		// quietly turned into a public reply — the two have very different

@@ -2,7 +2,7 @@ import { error, redirect } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { isInline } from "@/lib/domain/attachments";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { attachment } from "@/lib/server/schema.server";
 import { deleteObject, presignDownload } from "@/lib/server/storage.server";
 import type { RequestEvent } from "./$types";
@@ -16,6 +16,7 @@ import type { RequestEvent } from "./$types";
  */
 export async function GET(event: RequestEvent): Promise<Response> {
 	const { workspace } = await requireMembership(event.locals, event.params.slug);
+	requirePermission(event.locals, "issues", "read");
 
 	const rows = await db
 		.select()
@@ -45,6 +46,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
 export async function DELETE(event: RequestEvent): Promise<Response> {
 	const { workspace, user } = await requireMembership(event.locals, event.params.slug);
+	requirePermission(event.locals, "issues", "write");
 
 	const rows = await db
 		.select()

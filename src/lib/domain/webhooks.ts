@@ -16,6 +16,34 @@ export const WEBHOOK_EVENTS = [
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
+/** What a new webhook listens for until the creator changes it. */
+export const DEFAULT_WEBHOOK_EVENTS: WebhookEvent[] = ["issue.created", "issue.updated"];
+
+export const WEBHOOK_EVENT_GROUPS: { label: string; events: readonly WebhookEvent[] }[] = [
+	{
+		label: "Issues",
+		events: [
+			"issue.created",
+			"issue.updated",
+			"issue.assigned",
+			"issue.status_changed",
+			"issue.deleted",
+			"comment.created",
+		],
+	},
+	{
+		label: "Feedback",
+		events: [
+			"feedback.created",
+			"feedback.updated",
+			"feedback.status_changed",
+			"feedback.converted",
+			"feedback.comment_created",
+			"feedback.deleted",
+		],
+	},
+];
+
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = {
 	"issue.created": "Issue created",
 	"issue.updated": "Issue updated",
