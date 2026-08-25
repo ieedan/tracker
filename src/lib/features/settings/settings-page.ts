@@ -21,6 +21,7 @@ import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
 import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
+import { RepositoriesSection } from "./repositories-section";
 import { WebhooksSection } from "./webhooks-section";
 
 interface PageData {
@@ -49,6 +50,7 @@ export function SettingsPage({
 				WorkspaceSection(data, params),
 				MembersSection(data, params),
 				LabelsSection(data, params),
+				RepositoriesSection(params),
 				FeedbackSection(
 					data.bind((value) => value.workspace),
 					params,
