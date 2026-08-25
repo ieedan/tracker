@@ -25,6 +25,8 @@ type CommentRow = typeof schema.comment.$inferSelect;
 type WorkspaceRow = typeof schema.workspace.$inferSelect;
 type TeamRow = typeof schema.team.$inferSelect;
 type FeedbackRow = typeof schema.feedback.$inferSelect;
+type RepositoryRow = typeof schema.repository.$inferSelect;
+type PullRequestRow = typeof schema.pullRequest.$inferSelect;
 
 export const iso = (value: Date | null): string | null =>
 	value === null ? null : value.toISOString();
@@ -80,6 +82,9 @@ export function toIssue(
 		commentCount: number;
 		/** The feedback this was converted from, when there is one. */
 		feedback?: Pick<FeedbackRow, "id" | "number" | "title"> | null;
+		/** The repository this issue is scoped to, when it is scoped to one. */
+		repository?: Pick<RepositoryRow, "id" | "owner" | "name" | "provider"> | null;
+		pullRequest?: Pick<PullRequestRow, "id" | "number" | "title" | "state" | "url"> | null;
 	},
 ): Issue {
 	return {
@@ -95,6 +100,24 @@ export function toIssue(
 		creator: toUser(context.creator),
 		labels: context.labels.map(toLabel),
 		commentCount: context.commentCount,
+		repository:
+			context.repository === undefined || context.repository === null
+				? null
+				: {
+						id: context.repository.id,
+						fullName: `${context.repository.owner}/${context.repository.name}`,
+						provider: context.repository.provider,
+					},
+		pullRequest:
+			context.pullRequest === undefined || context.pullRequest === null
+				? null
+				: {
+						id: context.pullRequest.id,
+						number: context.pullRequest.number,
+						title: context.pullRequest.title,
+						state: context.pullRequest.state,
+						url: context.pullRequest.url,
+					},
 		feedback:
 			context.feedback === undefined || context.feedback === null
 				? null

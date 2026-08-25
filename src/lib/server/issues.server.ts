@@ -8,6 +8,8 @@ import {
 	comment,
 	feedback,
 	issue,
+	pullRequest,
+	repository,
 	issueLabel,
 	label,
 	team,
@@ -28,6 +30,8 @@ export interface IssueFilters {
 	search?: string;
 	/** Restrict to one team, by its key (`ENG`). */
 	teamKey?: string;
+	/** Restrict to one linked repository. */
+	repositoryId?: string;
 }
 
 /**
@@ -43,6 +47,8 @@ const baseSelect = {
 	// never — a left join costs less than a second query that usually finds
 	// nothing.
 	feedback,
+	repository,
+	pullRequest,
 };
 
 type IssueRows = Array<{
@@ -51,6 +57,8 @@ type IssueRows = Array<{
 	assignee: typeof user.$inferSelect | null;
 	creator: typeof user.$inferSelect;
 	feedback: typeof feedback.$inferSelect | null;
+	repository: typeof repository.$inferSelect | null;
+	pullRequest: typeof pullRequest.$inferSelect | null;
 }>;
 
 const withJoins = () =>
@@ -60,7 +68,9 @@ const withJoins = () =>
 		.innerJoin(team, eq(team.id, issue.teamId))
 		.leftJoin(assigneeUser, eq(assigneeUser.id, issue.assigneeId))
 		.innerJoin(creatorUser, eq(creatorUser.id, issue.creatorId))
-		.leftJoin(feedback, eq(feedback.id, issue.feedbackId));
+		.leftJoin(feedback, eq(feedback.id, issue.feedbackId))
+		.leftJoin(repository, eq(repository.id, issue.repositoryId))
+		.leftJoin(pullRequest, eq(pullRequest.issueId, issue.id));
 
 /**
  * Attaches labels and comment counts to a page of issue rows.
@@ -104,6 +114,8 @@ async function hydrate(rows: IssueRows): Promise<Issue[]> {
 			),
 			commentCount: countsByIssue.get(row.issue.id) ?? 0,
 			feedback: row.feedback,
+			repository: row.repository,
+			pullRequest: row.pullRequest,
 		}),
 	);
 }
@@ -126,6 +138,9 @@ export async function listIssues(
 		conditions.push(isNull(issue.assigneeId));
 	} else if (filters.assigneeId !== undefined) {
 		conditions.push(eq(issue.assigneeId, filters.assigneeId));
+	}
+	if (filters.repositoryId !== undefined) {
+		conditions.push(eq(issue.repositoryId, filters.repositoryId));
 	}
 	if (filters.search !== undefined && filters.search.trim() !== "") {
 		const term = `%${filters.search.trim().toLowerCase()}%`;

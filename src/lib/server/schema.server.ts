@@ -19,6 +19,7 @@ import type {
 	NotificationType,
 	WorkspaceRole,
 } from "@/lib/domain/issues";
+import type { GitProviderId, IndexState, PullRequestState } from "@/lib/domain/providers";
 import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
@@ -252,6 +253,104 @@ export const rateLimit = sqliteTable(
 	(table) => [index("rate_limit_reset").on(table.resetAt)],
 );
 
+/**
+ * A grant of access to repositories — a GitHub App installation.
+ *
+ * Separate from `repository` because one installation covers many, and because
+ * revoking it should take every repository with it. The token is deliberately
+ * absent: an installation token lives an hour, so it is minted on demand rather
+ * than stored where it would mostly be stale.
+ */
+export const providerInstallation = sqliteTable(
+	"provider_installation",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		provider: text("provider").$type<GitProviderId>().notNull(),
+		/** The provider's id for the grant — GitHub's installation id. */
+		externalId: text("externalId").notNull(),
+		/** The org or user the App was installed on, for showing who granted what. */
+		account: text("account").notNull().default(""),
+		createdBy: text("createdBy")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("installation_unique").on(table.workspaceId, table.provider, table.externalId),
+		index("installation_workspace").on(table.workspaceId),
+	],
+);
+
+/**
+ * A repository linked to a workspace. Any number per workspace.
+ *
+ * `owner`/`name` are stored alongside `externalId` because every API path needs
+ * them, but the external id is what identity means here — a rename changes the
+ * first two and not the third.
+ */
+export const repository = sqliteTable(
+	"repository",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		installationId: text("installationId")
+			.notNull()
+			.references(() => providerInstallation.id, { onDelete: "cascade" }),
+		provider: text("provider").$type<GitProviderId>().notNull(),
+		externalId: text("externalId").notNull(),
+		owner: text("owner").notNull(),
+		name: text("name").notNull(),
+		defaultBranch: text("defaultBranch").notNull().default("main"),
+		private: integer("private", { mode: "boolean" }).notNull().default(true),
+		url: text("url").notNull(),
+		description: text("description").notNull().default(""),
+
+		// --- file index ------------------------------------------------------
+		indexState: text("indexState").$type<IndexState>().notNull().default("never"),
+		/** The ref the current index was built from. */
+		indexRef: text("indexRef").notNull().default(""),
+		indexedFileCount: integer("indexedFileCount").notNull().default(0),
+		/** True when the provider capped the tree and the index is partial. */
+		indexTruncated: integer("indexTruncated", { mode: "boolean" }).notNull().default(false),
+		indexedAt: timestamp("indexedAt"),
+		indexError: text("indexError").notNull().default(""),
+
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("repository_unique").on(table.workspaceId, table.provider, table.externalId),
+		index("repository_workspace").on(table.workspaceId),
+	],
+);
+
+/**
+ * One row per file path, so `@` has something to autocomplete against.
+ *
+ * Paths only. Contents would make this a clone, and every use — a link, a
+ * mention, a scope — needs only the path.
+ */
+export const repositoryFile = sqliteTable(
+	"repository_file",
+	{
+		id: text("id").primaryKey(),
+		repositoryId: text("repositoryId")
+			.notNull()
+			.references(() => repository.id, { onDelete: "cascade" }),
+		path: text("path").notNull(),
+		/** Basename, stored so a search for `schema.ts` does not scan every path. */
+		name: text("name").notNull(),
+	},
+	(table) => [
+		uniqueIndex("repository_file_unique").on(table.repositoryId, table.path),
+		index("repository_file_name").on(table.repositoryId, table.name),
+	],
+);
+
 export const issue = sqliteTable(
 	"issue",
 	{
@@ -276,6 +375,13 @@ export const issue = sqliteTable(
 		 * of duplicate issues — the second attempt finds the first.
 		 */
 		feedbackId: text("feedbackId").references(() => feedback.id, { onDelete: "set null" }),
+		/**
+		 * Which repository this issue is about, when it is about one.
+		 *
+		 * `set null` rather than cascade: unlinking a repository should not delete
+		 * the work that referenced it.
+		 */
+		repositoryId: text("repositoryId").references(() => repository.id, { onDelete: "set null" }),
 		createdAt: now(),
 		updatedAt: timestamp("updatedAt")
 			.notNull()
@@ -285,7 +391,46 @@ export const issue = sqliteTable(
 		uniqueIndex("issue_number_unique").on(table.teamId, table.number),
 		index("issue_team").on(table.teamId),
 		index("issue_assignee").on(table.assigneeId),
+		index("issue_repository").on(table.repositoryId),
 		uniqueIndex("issue_feedback_unique").on(table.feedbackId),
+	],
+);
+
+/**
+ * The pull request an issue is being solved by — at most one, each way.
+ *
+ * Both columns are unique, which is what makes the relationship 1:1 rather than
+ * a convention everyone has to remember. State is kept as a snapshot rather than
+ * fetched on render, so an issue list does not become a burst of API calls.
+ */
+export const pullRequest = sqliteTable(
+	"pull_request",
+	{
+		id: text("id").primaryKey(),
+		issueId: text("issueId")
+			.notNull()
+			.references(() => issue.id, { onDelete: "cascade" }),
+		repositoryId: text("repositoryId")
+			.notNull()
+			.references(() => repository.id, { onDelete: "cascade" }),
+		externalId: text("externalId").notNull(),
+		number: integer("number").notNull(),
+		title: text("title").notNull(),
+		state: text("state").$type<PullRequestState>().notNull().default("open"),
+		url: text("url").notNull(),
+		authorLogin: text("authorLogin").notNull().default(""),
+		/** When the provider last said it changed. */
+		remoteUpdatedAt: timestamp("remoteUpdatedAt"),
+		/** When we last asked. */
+		syncedAt: timestamp("syncedAt"),
+		linkedBy: text("linkedBy")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("pull_request_issue_unique").on(table.issueId),
+		uniqueIndex("pull_request_unique").on(table.repositoryId, table.number),
 	],
 );
 
@@ -460,6 +605,8 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
 	labels: many(label),
 	webhooks: many(webhook),
 	feedback: many(feedback),
+	installations: many(providerInstallation),
+	repositories: many(repository),
 }));
 
 export const feedbackRelations = relations(feedback, ({ one, many }) => ({
@@ -501,10 +648,45 @@ export const workspaceMemberRelations = relations(workspaceMember, ({ one }) => 
 export const issueRelations = relations(issue, ({ one, many }) => ({
 	team: one(team, { fields: [issue.teamId], references: [team.id] }),
 	feedback: one(feedback, { fields: [issue.feedbackId], references: [feedback.id] }),
+	repository: one(repository, { fields: [issue.repositoryId], references: [repository.id] }),
+	pullRequest: one(pullRequest, { fields: [issue.id], references: [pullRequest.issueId] }),
 	assignee: one(user, { fields: [issue.assigneeId], references: [user.id] }),
 	creator: one(user, { fields: [issue.creatorId], references: [user.id] }),
 	labels: many(issueLabel),
 	comments: many(comment),
+}));
+
+export const providerInstallationRelations = relations(providerInstallation, ({ one, many }) => ({
+	workspace: one(workspace, {
+		fields: [providerInstallation.workspaceId],
+		references: [workspace.id],
+	}),
+	repositories: many(repository),
+}));
+
+export const repositoryRelations = relations(repository, ({ one, many }) => ({
+	workspace: one(workspace, { fields: [repository.workspaceId], references: [workspace.id] }),
+	installation: one(providerInstallation, {
+		fields: [repository.installationId],
+		references: [providerInstallation.id],
+	}),
+	files: many(repositoryFile),
+	issues: many(issue),
+}));
+
+export const repositoryFileRelations = relations(repositoryFile, ({ one }) => ({
+	repository: one(repository, {
+		fields: [repositoryFile.repositoryId],
+		references: [repository.id],
+	}),
+}));
+
+export const pullRequestRelations = relations(pullRequest, ({ one }) => ({
+	issue: one(issue, { fields: [pullRequest.issueId], references: [issue.id] }),
+	repository: one(repository, {
+		fields: [pullRequest.repositoryId],
+		references: [repository.id],
+	}),
 }));
 
 export const issueLabelRelations = relations(issueLabel, ({ one }) => ({

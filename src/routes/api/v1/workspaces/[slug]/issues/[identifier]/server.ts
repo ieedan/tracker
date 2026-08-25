@@ -15,6 +15,7 @@ import {
 } from "@/lib/server/issues.server";
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
 import { notify } from "@/lib/server/notifications.server";
+import { requireRepository } from "@/lib/server/repositories.server";
 import { issue, team } from "@/lib/server/schema.server";
 import { identifierFor } from "@/lib/server/serialize.server";
 import { requireTeam } from "@/lib/server/teams.server";
@@ -81,6 +82,12 @@ export const PATCH = handler({
 		if (body.status !== undefined) changes.status = body.status;
 		if (body.priority !== undefined) changes.priority = body.priority;
 		if (body.assigneeId !== undefined) changes.assigneeId = body.assigneeId;
+		if (body.repositoryId !== undefined) {
+			if (body.repositoryId !== null && body.repositoryId !== "") {
+				await requireRepository(workspace.id, body.repositoryId);
+			}
+			changes.repositoryId = body.repositoryId === "" ? null : body.repositoryId;
+		}
 
 		// Moving teams changes the identifier: numbers are unique per team, so the
 		// issue takes the next free number in its new home rather than keeping one
@@ -161,6 +168,9 @@ export const PATCH = handler({
 		}
 		if (body.status !== undefined && body.status !== before.status) {
 			diff.status = { from: before.status, to: body.status };
+		}
+		if (body.repositoryId !== undefined && body.repositoryId !== before.repositoryId) {
+			diff.repositoryId = { from: before.repositoryId, to: body.repositoryId };
 		}
 		if (body.assigneeId !== undefined && body.assigneeId !== before.assigneeId) {
 			diff.assigneeId = { from: before.assigneeId, to: body.assigneeId };

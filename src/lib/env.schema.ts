@@ -58,4 +58,29 @@ export const serverEnvSchema = {
 	/** OAuth app, for "Sign in with GitHub". Leave blank to hide the button. */
 	GITHUB_CLIENT_ID: v.optional(v.string(), ""),
 	GITHUB_CLIENT_SECRET: v.optional(v.string(), ""),
+	/**
+	 * GitHub App, for reading repositories. Leave blank and repository linking
+	 * stays unavailable rather than half-working.
+	 *
+	 * The private key is the PEM GitHub hands you at creation. Newlines survive
+	 * `.env` badly, so `\n` escapes are accepted and unescaped on read.
+	 */
+	GITHUB_APP_ID: v.optional(v.string(), ""),
+	GITHUB_APP_PRIVATE_KEY: v.optional(v.string(), ""),
+	/** The App's URL slug, used to build its installation link. */
+	GITHUB_APP_SLUG: v.optional(v.string(), ""),
+	/** Signs the webhooks GitHub sends back. Blank refuses every delivery. */
+	GITHUB_APP_WEBHOOK_SECRET: v.optional(v.string(), ""),
+	/**
+	 * A personal access token used *instead of* an App installation.
+	 *
+	 * Only for development, where creating and installing a real App to try the
+	 * feature is a poor trade. Ignored whenever an App is configured.
+	 */
+	GITHUB_DEV_TOKEN: v.optional(v.string(), ""),
+	/**
+	 * The API root. Point this at `https://<host>/api/v3` for GitHub Enterprise
+	 * Server; the default is github.com.
+	 */
+	GITHUB_API_URL: v.optional(v.string(), "https://api.github.com"),
 };

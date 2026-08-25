@@ -5,8 +5,10 @@ import * as v from "valibot";
 import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
+import { GIT_PROVIDERS, INDEX_STATES, PULL_REQUEST_STATES } from "./providers";
 import { DELIVERY_STATUSES, WEBHOOK_EVENTS } from "./webhooks";
 
+export const GitProviderSchema = v.picklist(GIT_PROVIDERS);
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
 export const IssuePrioritySchema = v.picklist(ISSUE_PRIORITIES);
 export const WorkspaceRoleSchema = v.picklist(WORKSPACE_ROLES);
@@ -78,6 +80,20 @@ export const IssueSchema = v.object({
 	creator: UserSummary,
 	labels: v.array(LabelSchema),
 	commentCount: v.number(),
+	/** The repository this issue is scoped to, when it is scoped to one. */
+	repository: v.nullable(
+		v.object({ id: v.string(), fullName: v.string(), provider: GitProviderSchema }),
+	),
+	/** The pull request solving it — at most one, and at most one issue per PR. */
+	pullRequest: v.nullable(
+		v.object({
+			id: v.string(),
+			number: v.number(),
+			title: v.string(),
+			state: v.picklist(PULL_REQUEST_STATES),
+			url: v.string(),
+		}),
+	),
 	/** Set when this issue was converted from a piece of user feedback. */
 	feedback: v.nullable(
 		v.object({ id: v.string(), number: v.number(), identifier: v.string(), title: v.string() }),
@@ -195,6 +211,82 @@ export const ApiKeyPermissionsSchema = v.partial(
 	}),
 );
 
+// --- repositories ---------------------------------------------------------
+
+/** How complete the `@`-mention index is, and why not, when it is not. */
+export const RepositoryIndexSchema = v.object({
+	state: v.picklist(INDEX_STATES),
+	/** The ref the index was built from. */
+	ref: v.string(),
+	fileCount: v.number(),
+	/** True when the provider capped the tree — the index is real but partial. */
+	truncated: v.boolean(),
+	indexedAt: v.nullable(v.string()),
+	error: v.string(),
+});
+
+export const RepositorySchema = v.object({
+	id: v.string(),
+	provider: GitProviderSchema,
+	owner: v.string(),
+	name: v.string(),
+	/** `owner/name`, which is how people say it. */
+	fullName: v.string(),
+	defaultBranch: v.string(),
+	private: v.boolean(),
+	url: v.string(),
+	description: v.string(),
+	index: RepositoryIndexSchema,
+	createdAt: v.string(),
+});
+export type Repository = v.InferOutput<typeof RepositorySchema>;
+
+/** A repository the installation can see but the workspace has not linked. */
+export const AvailableRepositorySchema = v.object({
+	externalId: v.string(),
+	owner: v.string(),
+	name: v.string(),
+	fullName: v.string(),
+	private: v.boolean(),
+	description: v.string(),
+	/** True when it is already linked, so the picker can say so rather than fail. */
+	linked: v.boolean(),
+});
+
+export const PullRequestSchema = v.object({
+	id: v.string(),
+	number: v.number(),
+	title: v.string(),
+	state: v.picklist(PULL_REQUEST_STATES),
+	url: v.string(),
+	authorLogin: v.string(),
+	repository: v.object({ id: v.string(), fullName: v.string() }),
+	syncedAt: v.nullable(v.string()),
+	createdAt: v.string(),
+});
+export type PullRequest = v.InferOutput<typeof PullRequestSchema>;
+
+/** One entry in the `@` file picker. */
+export const RepositoryFileSchema = v.object({
+	repositoryId: v.string(),
+	fullName: v.string(),
+	path: v.string(),
+	url: v.string(),
+});
+
+export const LinkRepositoryBody = v.object({
+	/** From the available list. */
+	externalId: v.optional(v.string()),
+	/** Or name it directly, for a repository the picker did not show. */
+	owner: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100))),
+	name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+});
+
+export const LinkPullRequestBody = v.object({
+	/** A URL, `owner/name#12`, or `#12` when the issue already has a repository. */
+	reference: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(400)),
+});
+
 export const ApiKeySchema = v.object({
 	id: v.string(),
 	name: v.nullable(v.string()),
@@ -230,6 +322,8 @@ export const CreateTeamBody = v.object({
 });
 
 export const CreateIssueBody = v.object({
+	/** Scope the issue to one of the workspace's linked repositories. */
+	repositoryId: v.optional(v.nullable(v.string())),
 	/** Which team files it — decides the identifier prefix. */
 	teamKey: v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6)),
 	title: trimmed(1, 200),
@@ -242,6 +336,7 @@ export const CreateIssueBody = v.object({
 
 export const UpdateIssueBody = v.partial(
 	v.object({
+		repositoryId: v.nullable(v.string()),
 		/** Moving between teams reallocates the number, so the identifier changes. */
 		teamKey: v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6)),
 		title: trimmed(1, 200),
