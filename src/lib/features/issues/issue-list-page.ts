@@ -11,9 +11,11 @@ import {
 	derived,
 	signal,
 	type Readable,
+	type Signal,
 } from "@implementjs/core";
 import { Plus, Search } from "@implementjs/lucide";
 import { navigateTo } from "@implementjs/core";
+import { isTyping } from "@/lib/client/is-typing";
 import { StatusIcon } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import {
@@ -94,6 +96,8 @@ export function IssueListPage({
 	});
 
 	const searchRef = signal<HTMLInputElement | null>(null);
+	const hoveredId = signal<string | null>(null);
+	const rowMenu = signal<{ id: string; field: "status" | "priority" | "assignee" } | null>(null);
 
 	return Div(
 		{ class: "flex min-h-0 flex-1 flex-col" },
@@ -119,17 +123,34 @@ export function IssueListPage({
 		ImplementDocument({
 			onKeydown: (event) => {
 				if (isTyping(event.target)) return;
-				if (event.key === "c" && !event.metaKey && !event.ctrlKey) {
+				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				const key = event.key.toLowerCase();
+				if (key === "c") {
 					event.preventDefault();
 					openCreateIssue(params.slug.get(), data.get().team?.key);
+					return;
 				}
-				if (event.key === "/") {
+				if (key === "/") {
 					event.preventDefault();
 					searchRef.get()?.focus();
+					return;
 				}
-				if (event.key === "f" && !event.metaKey && !event.ctrlKey) {
+				if (key === "f") {
 					event.preventDefault();
 					addFilterOpen.set(true);
+					return;
+				}
+				const hovered = hoveredId.get();
+				if (hovered === null) return;
+				if (key === "s") {
+					event.preventDefault();
+					rowMenu.set({ id: hovered, field: "status" });
+				} else if (key === "p") {
+					event.preventDefault();
+					rowMenu.set({ id: hovered, field: "priority" });
+				} else if (key === "a") {
+					event.preventDefault();
+					rowMenu.set({ id: hovered, field: "assignee" });
 				}
 			},
 		}),
@@ -153,7 +174,9 @@ export function IssueListPage({
 				visible.bind((list) => list.length === 0),
 				EmptyState(query, params, data, filters, applyFilters),
 			),
-			...ISSUE_STATUSES.map((status) => StatusGroup(status, visible, issues, data, params)),
+			...ISSUE_STATUSES.map((status) =>
+				StatusGroup(status, visible, issues, data, params, hoveredId, rowMenu),
+			),
 		),
 	);
 }
@@ -269,6 +292,8 @@ function StatusGroup(
 	issues: ReturnType<typeof signal<Issue[]>>,
 	data: Readable<PageData>,
 	params: { slug: Readable<string> },
+	hoveredId: ReturnType<typeof signal<string | null>>,
+	rowMenu: Signal<{ id: string; field: "status" | "priority" | "assignee" } | null>,
 ) {
 	const rows = derived([visible], (list) =>
 		list
@@ -300,7 +325,7 @@ function StatusGroup(
 			ForEach(
 				rows,
 				(issue) => issue.id,
-				(issue) => IssueRow(issue, issues, data, params),
+				(issue) => IssueRow(issue, issues, data, params, hoveredId, rowMenu),
 			),
 		),
 	);
@@ -311,6 +336,8 @@ function IssueRow(
 	issues: ReturnType<typeof signal<Issue[]>>,
 	data: Readable<PageData>,
 	params: { slug: Readable<string> },
+	hoveredId: ReturnType<typeof signal<string | null>>,
+	rowMenu: Signal<{ id: string; field: "status" | "priority" | "assignee" } | null>,
 ) {
 	const slug = params.slug;
 	const id = issue.get().id;
@@ -322,10 +349,14 @@ function IssueRow(
 		{
 			class:
 				"row-hover group flex h-10 items-center gap-2 border-b border-border/40 px-4 text-[13px]",
+			onMouseenter: () => hoveredId.set(id),
+			onMouseleave: () => hoveredId.set(null),
 		},
 
-		PriorityPicker(issue.bind("priority"), (priority) =>
-			update({ priority }, (value) => ({ ...value, priority })),
+		PriorityPicker(
+			issue.bind("priority"),
+			(priority) => update({ priority }, (value) => ({ ...value, priority })),
+			{ open: menuOpen(rowMenu, id, "priority") },
 		),
 
 		Span(
@@ -333,8 +364,10 @@ function IssueRow(
 			issue.bind("identifier"),
 		),
 
-		StatusPicker(issue.bind("status"), (status) =>
-			update({ status }, (value) => ({ ...value, status })),
+		StatusPicker(
+			issue.bind("status"),
+			(status) => update({ status }, (value) => ({ ...value, status })),
+			{ open: menuOpen(rowMenu, id, "status") },
 		),
 
 		router.Link(
@@ -375,14 +408,19 @@ function IssueRow(
 							: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
 								value.assignee),
 				})),
+			{ open: menuOpen(rowMenu, id, "assignee") },
 		),
 	);
 }
 
-/** True when the key event came from a field, so shortcuts stay out of the way. */
-export function isTyping(target: EventTarget | null): boolean {
-	if (!(target instanceof HTMLElement)) return false;
-	if (target.isContentEditable) return true;
-	const tag = target.tagName;
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+function menuOpen(
+	menu: Signal<{ id: string; field: "status" | "priority" | "assignee" } | null>,
+	id: string,
+	field: "status" | "priority" | "assignee",
+): Signal<boolean> {
+	return menu.bind(
+		(current) => current?.id === id && current?.field === field,
+		(current, open) =>
+			open ? { id, field } : current?.id === id && current?.field === field ? null : current,
+	);
 }

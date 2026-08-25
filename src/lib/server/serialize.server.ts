@@ -31,8 +31,17 @@ type PullRequestRow = typeof schema.pullRequest.$inferSelect;
 export const iso = (value: Date | null): string | null =>
 	value === null ? null : value.toISOString();
 
-export function toUser(row: Pick<UserRow, "id" | "name" | "email" | "image">): UserSummary {
-	return { id: row.id, name: row.name, email: row.email, image: row.image ?? null };
+/** The user columns every serializer needs. `type` badges bot members. */
+export type UserFields = Pick<UserRow, "id" | "name" | "email" | "image" | "type">;
+
+export function toUser(row: UserFields): UserSummary {
+	return {
+		id: row.id,
+		name: row.name,
+		email: row.email,
+		image: row.image ?? null,
+		type: row.type,
+	};
 }
 
 export function toLabel(row: Pick<LabelRow, "id" | "name" | "color">): Label {
@@ -77,7 +86,7 @@ export function toIssue(
 	context: {
 		team: Pick<TeamRow, "id" | "name" | "key">;
 		assignee: UserRow | null;
-		creator: Pick<UserRow, "id" | "name" | "email" | "image">;
+		creator: UserFields;
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;
 		commentCount: number;
 		/** The feedback this was converted from, when there is one. */
@@ -134,7 +143,7 @@ export function toIssue(
 
 export function toComment(
 	row: CommentRow,
-	author: Pick<UserRow, "id" | "name" | "email" | "image">,
+	author: UserFields,
 	attachments: Comment["attachments"] = [],
 ): Comment {
 	return {
@@ -149,7 +158,7 @@ export function toComment(
 
 export function toMember(
 	row: typeof schema.workspaceMember.$inferSelect,
-	user: Pick<UserRow, "id" | "name" | "email" | "image">,
+	user: UserFields,
 ): Member {
 	return {
 		id: row.id,
@@ -177,7 +186,7 @@ export function toFeedback(
 	row: FeedbackRow,
 	context: {
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;
-		submitter: Pick<UserRow, "id" | "name" | "email" | "image"> | null;
+		submitter: UserFields | null;
 		commentCount: number;
 		subscriberCount: number;
 		issue: { id: string; identifier: string; title: string } | null;
@@ -218,7 +227,7 @@ export function toFeedback(
  */
 export function toFeedbackComment(
 	row: FeedbackCommentRow,
-	author: Pick<UserRow, "id" | "name" | "email" | "image">,
+	author: UserFields,
 	audience: "member" | "public" = "member",
 ): FeedbackComment {
 	return {

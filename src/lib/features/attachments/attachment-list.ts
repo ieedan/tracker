@@ -26,7 +26,9 @@ import { Button } from "@/lib/components/ui/button";
 import { formatBytes, isAudio, isImage, isVideo } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
-import { rejectionReason, startUpload, type Upload } from "./uploader";
+import { beginUploads, filesFromList } from "./file-drop";
+import { ImageLightbox } from "./image-lightbox";
+import type { Upload } from "./uploader";
 
 /** Attachments already saved, plus any still going up. */
 export function AttachmentGrid(options: {
@@ -36,6 +38,19 @@ export function AttachmentGrid(options: {
 	/** Omitted on read-only views such as the public feedback board. */
 	onRemove?: (attachment: Attachment) => void;
 }) {
+	const viewerOpen = signal(false);
+	const viewerIndex = signal(0);
+	const images = derived([options.attachments], (list) =>
+		list.filter((attachment) => isImage(attachment.contentType)),
+	);
+
+	const openImage = (id: string) => {
+		const i = images.get().findIndex((attachment) => attachment.id === id);
+		if (i < 0) return;
+		viewerIndex.set(i);
+		viewerOpen.set(true);
+	};
+
 	return Div(
 		{ class: "flex flex-col gap-2" },
 
@@ -46,10 +61,16 @@ export function AttachmentGrid(options: {
 				ForEach(
 					options.attachments,
 					(attachment) => attachment.id,
-					(attachment) => AttachmentCard(attachment, options.onRemove),
+					(attachment) =>
+						AttachmentCard(attachment, {
+							onRemove: options.onRemove,
+							onOpenImage: openImage,
+						}),
 				),
 			),
 		),
+
+		ImageLightbox({ open: viewerOpen, index: viewerIndex, images }),
 
 		options.uploads === undefined
 			? null
@@ -63,12 +84,15 @@ export function AttachmentGrid(options: {
 
 function AttachmentCard(
 	attachment: Readable<Attachment>,
-	onRemove?: (attachment: Attachment) => void,
+	options: {
+		onRemove?: (attachment: Attachment) => void;
+		onOpenImage: (id: string) => void;
+	},
 ) {
 	const current = attachment.get();
 
 	const removeButton =
-		onRemove === undefined
+		options.onRemove === undefined
 			? null
 			: Button(
 					{
@@ -77,7 +101,10 @@ function AttachmentCard(
 						class:
 							"absolute top-1 right-1 z-10 size-5 bg-background/80 opacity-0 backdrop-blur group-hover:opacity-100",
 						title: "Remove attachment",
-						onClick: () => onRemove(attachment.get()),
+						onClick: (event) => {
+							event.stopPropagation();
+							options.onRemove?.(attachment.get());
+						},
 					},
 					X({ class: "size-3" }),
 				);
@@ -86,8 +113,16 @@ function AttachmentCard(
 		return Div(
 			{ class: "group relative overflow-hidden rounded-md border border-border" },
 			removeButton,
-			A(
-				{ href: current.url, target: "_blank", rel: "noreferrer", title: current.filename },
+			Button(
+				{
+					type: "button",
+					variant: "ghost",
+					size: "icon",
+					class: "size-28 cursor-zoom-in rounded-none p-0 hover:bg-transparent",
+					title: current.filename,
+					"aria-haspopup": "dialog",
+					onClick: () => options.onOpenImage(current.id),
+				},
 				Img({
 					src: current.url,
 					// The filename is the only description there is; better than "".
@@ -147,25 +182,27 @@ function AttachmentCard(
 function UploadRow(upload: Readable<Upload>) {
 	const current = upload.get();
 	return Div(
-		{ class: "flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5" },
-		Paperclip({ class: "size-3.5 shrink-0 text-muted-foreground" }),
-		Span({ class: "max-w-[16rem] truncate text-[12px]" }, current.filename),
-		Span({ class: "text-[11px] text-muted-foreground" }, formatBytes(current.size)),
-
-		If(current.status.bind((status) => status === "uploading"))
-			.Then(
+		{ class: "flex flex-col gap-1 rounded-md border border-border px-2.5 py-1.5" },
+		Div(
+			{ class: "flex min-w-0 items-center gap-2" },
+			Paperclip({ class: "size-3.5 shrink-0 text-muted-foreground" }),
+			Span({ class: "min-w-0 truncate text-[12px]" }, current.filename),
+			Span({ class: "shrink-0 text-[11px] text-muted-foreground" }, formatBytes(current.size)),
+			If(
+				current.status.bind((status) => status === "uploading"),
 				Div(
-					{ class: "h-1 w-24 overflow-hidden rounded-full bg-secondary" },
+					{ class: "h-1 w-24 shrink-0 overflow-hidden rounded-full bg-secondary" },
 					Div({
 						class: "h-full bg-primary transition-[width] duration-150",
 						style: { width: current.progress.bind((value) => `${value}%`) },
 					}),
 				),
-			)
-			.ElseIf(
-				current.status.bind((status) => status === "error"),
-				Span({ class: "text-[11px] text-destructive" }, current.error),
 			),
+		),
+		If(
+			current.status.bind((status) => status === "error"),
+			Span({ class: "text-[11px] leading-snug text-destructive" }, current.error),
+		),
 	);
 }
 
@@ -192,30 +229,15 @@ export function DropZone(options: {
 	const depth = signal(0);
 	const over = derived([depth], (value) => value > 0);
 
-	const accept = (files: FileList | null) => {
-		if (files === null) return;
-		for (const file of Array.from(files)) {
-			const reason = rejectionReason(file);
-			if (reason !== null) {
-				toastError(`${file.name}: ${reason}`);
-				continue;
-			}
-
-			const upload = startUpload({
-				file,
-				slug: options.target.slug.get(),
-				issueId: options.target.issueId,
-				commentId: options.target.commentId,
-			});
-			options.uploads.push(upload);
-
-			upload.attachment.onChange((value) => {
-				if (value === null) return;
-				options.onUploaded(value);
-				// Drop it from the in-flight list; it is a real attachment now.
-				options.uploads.update((list) => list.filter((entry) => entry.localId !== upload.localId));
-			});
-		}
+	const accept = (files: FileList | File[] | null) => {
+		beginUploads({
+			files: filesFromList(files),
+			slug: options.target.slug.get(),
+			issueId: options.target.issueId,
+			commentId: options.target.commentId,
+			uploads: options.uploads,
+			onUploaded: options.onUploaded,
+		});
 	};
 
 	return Div(

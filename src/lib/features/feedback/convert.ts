@@ -1,8 +1,8 @@
 /**
  * One click from feedback to issue.
  *
- * The click itself does the whole thing — team defaults to the workspace's
- * first, priority to none — because the point of the button is that triage does
+ * The click itself does the whole thing — team defaults to Engineering,
+ * priority to none — because the point of the button is that triage does
  * not stall on a form. The dropdown beside it is there for the times you
  * already know which team it belongs to.
  */

@@ -1,18 +1,18 @@
-import { error, redirect } from "@implementjs/kit/server";
+import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { isInline } from "@/lib/domain/attachments";
 import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { attachment } from "@/lib/server/schema.server";
-import { deleteObject, presignDownload } from "@/lib/server/storage.server";
+import { deleteObject, streamObject } from "@/lib/server/storage.server";
 import type { RequestEvent } from "./$types";
 
 /**
- * Redirects to a short-lived presigned URL for the object.
+ * Serves the file at a stable app URL.
  *
- * A plain handler rather than a `handler()`, because the answer is a redirect
- * rather than JSON — and this is the indirection that lets a page hold a stable
- * URL while the storage credential behind it lasts minutes.
+ * A plain handler rather than a `handler()`, because the answer is bytes
+ * rather than JSON. The page keeps this URL forever; this route is what
+ * actually talks to storage, so a presigned hop does not have to.
  */
 export async function GET(event: RequestEvent): Promise<Response> {
 	const { workspace } = await requireMembership(event.locals, event.params.slug);
@@ -33,15 +33,15 @@ export async function GET(event: RequestEvent): Promise<Response> {
 	const row = rows[0];
 	if (row === undefined) error(404, "no such attachment");
 
-	const url = await presignDownload({
+	const response = await streamObject({
 		key: row.key,
 		filename: row.filename,
 		contentType: row.contentType,
 		// `?download` forces the save dialog even for an image.
 		inline: isInline(row.contentType) && !event.url.searchParams.has("download"),
 	});
-
-	redirect(302, url);
+	if (response === null) error(404, "file missing from storage");
+	return response;
 }
 
 export async function DELETE(event: RequestEvent): Promise<Response> {

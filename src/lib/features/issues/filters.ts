@@ -147,6 +147,16 @@ export function withFilter(filters: Filter[], next: Filter): Filter[] {
 	return copy;
 }
 
+/** Sets a field's values in one shot, keeping `is` / `is not`. */
+export function setFieldValues(filters: Filter[], field: FilterField, values: string[]): Filter[] {
+	const existing = filters.find((filter) => filter.field === field);
+	return withFilter(filters, {
+		field,
+		negated: existing?.negated ?? false,
+		values,
+	});
+}
+
 export function removeField(filters: Filter[], target: FilterField): Filter[] {
 	return filters.filter((filter) => filter.field !== target);
 }

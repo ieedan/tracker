@@ -40,6 +40,10 @@ function s3(): S3Client {
 		// MinIO and R2 both want path-style addressing; virtual-host style would
 		// need per-bucket DNS.
 		forcePathStyle: true,
+		// AWS SDK v3 signs CRC32 checksums by default. MinIO and R2 reject those
+		// on presigned PUT/GET; only compute them when the API requires it.
+		requestChecksumCalculation: "WHEN_REQUIRED",
+		responseChecksumValidation: "WHEN_REQUIRED",
 	});
 	return client;
 }
@@ -135,6 +139,34 @@ export async function presignDownload(options: {
 }
 
 /** Confirms the object actually landed, and how big it really is. */
+export async function streamObject(options: {
+	key: string;
+	filename: string;
+	contentType: string;
+	inline: boolean;
+}): Promise<Response | null> {
+	try {
+		const result = await s3().send(
+			new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: options.key }),
+		);
+		if (result.Body === undefined) return null;
+
+		const disposition = options.inline ? "inline" : "attachment";
+		const headers = new Headers({
+			"content-type": options.contentType,
+			"content-disposition": `${disposition}; filename="${sanitizeFilename(options.filename)}"`,
+			"cache-control": "private, max-age=120",
+		});
+		if (result.ContentLength !== undefined) {
+			headers.set("content-length", String(result.ContentLength));
+		}
+
+		return new Response(result.Body.transformToWebStream(), { headers });
+	} catch {
+		return null;
+	}
+}
+
 export async function headObject(
 	key: string,
 ): Promise<{ size: number; contentType: string } | null> {

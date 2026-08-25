@@ -1,0 +1,69 @@
+{
+	"$schema": "https://getbizi.dev/schemas/task.config.json",
+	"tasks": {
+		"dev": {
+			"tasks": {
+				"docker": {
+					"color": "cyan",
+					"command": "docker compose up"
+				},
+				"app": {
+					"color": "green",
+					"command": "pnpm dev"
+				}
+			}
+		},
+		"ci": {
+			"tasks": {
+				"format": {
+					"color": "magenta",
+					"command": "pnpm format:check"
+				},
+				"lint": {
+					"color": "yellow",
+					"command": "pnpm lint"
+				},
+				"types": {
+					"color": "blue",
+					"command": "pnpm check"
+				}
+			}
+		},
+		"format": {
+			"color": "magenta",
+			"command": "pnpm format"
+		},
+		"lint:fix": {
+			"color": "yellow",
+			"command": "pnpm lint:fix"
+		},
+		"build": {
+			"color": "green",
+			"command": "pnpm build"
+		},
+		"preview": {
+			"color": "green",
+			"command": "pnpm preview"
+		},
+		"db": {
+			"tasks": {
+				"generate": {
+					"command": "pnpm db:generate",
+					"optional": true
+				},
+				"migrate": {
+					"command": "pnpm db:migrate",
+					"optional": true
+				},
+				"push": {
+					"command": "pnpm db:push",
+					"optional": true
+				},
+				"seed": {
+					"command": "pnpm db:seed",
+					"optional": true
+				}
+			}
+		}
+	}
+}

@@ -10,6 +10,14 @@ interface NotifyInput {
 	/** Who should see it. Silently dropped when this is the actor. */
 	userId: string | null | undefined;
 	actorId: string;
+	/**
+	 * When an agent is acting, the human who authorized it — pass
+	 * `locals.agent?.installedByUserId`.
+	 *
+	 * Their agent doing something on their behalf is still them doing it, so it
+	 * is dropped the same way notifying yourself is.
+	 */
+	onBehalfOfId?: string | null | undefined;
 	workspaceId: string;
 	issueId?: string | null;
 	type: NotificationType;
@@ -21,10 +29,13 @@ interface NotifyInput {
  *
  * Notifying yourself is a no-op — you already know you did it — which is why
  * every caller can pass an assignee straight through without checking first.
+ * That extends to your own agent: it acts on your delegation, so its work does
+ * not come back to you as news.
  */
 export async function notify(input: NotifyInput): Promise<void> {
 	if (input.userId === null || input.userId === undefined) return;
 	if (input.userId === input.actorId) return;
+	if (input.userId === input.onBehalfOfId) return;
 
 	await db.insert(notification).values({
 		id: nanoid(),

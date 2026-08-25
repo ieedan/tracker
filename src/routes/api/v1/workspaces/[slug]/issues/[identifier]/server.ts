@@ -115,6 +115,7 @@ export const PATCH = handler({
 			await notify({
 				userId: body.assigneeId,
 				actorId: user.id,
+				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: before.id,
 				type: "issue_assigned",
@@ -123,6 +124,7 @@ export const PATCH = handler({
 			await notify({
 				userId: before.assigneeId,
 				actorId: user.id,
+				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: before.id,
 				type: "issue_unassigned",
@@ -142,6 +144,7 @@ export const PATCH = handler({
 				await notify({
 					userId,
 					actorId: user.id,
+					onBehalfOfId: locals.agent?.installedByUserId,
 					workspaceId: workspace.id,
 					issueId: before.id,
 					type: "issue_status_changed",

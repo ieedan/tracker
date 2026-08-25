@@ -60,6 +60,11 @@ export const DEFAULT_TEAMS = [
 	{ key: "PRD", name: "Product" },
 ] as const;
 
+/** The team a new issue lands in when the caller does not name one. */
+export function preferDefaultTeam<T extends { key: string }>(teams: T[]): T | undefined {
+	return teams.find((team) => team.key === "ENG") ?? teams[0];
+}
+
 /** Uppercase letters and digits, starting with a letter. 1–6 characters. */
 export const TEAM_KEY_PATTERN = /^[A-Z][A-Z0-9]{0,5}$/;
 

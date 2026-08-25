@@ -193,6 +193,24 @@ export function UserAvatar(user: AvatarUser, className?: string) {
 	);
 }
 
+/**
+ * Marks a bot member wherever a name is shown.
+ *
+ * A person reading a comment should be able to tell at a glance that an agent
+ * wrote it, without having to recognise the name.
+ */
+export function AgentBadge(className?: string) {
+	return Span(
+		{
+			class: cn(
+				"rounded bg-secondary px-1 py-px text-[9px] font-medium tracking-wide text-muted-foreground uppercase",
+				className,
+			),
+		},
+		"Agent",
+	);
+}
+
 /** The dashed ring Linear shows where an assignee would go. */
 export function UnassignedAvatar(className?: string) {
 	return Span({

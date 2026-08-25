@@ -152,7 +152,13 @@ function mappedIpv4(lower: string): string | null {
 export interface EventPayload {
 	event: WebhookEvent;
 	workspace: { id: string; slug: string; name: string };
-	actor: { id: string; name: string; email: string } | null;
+	actor: {
+		id: string;
+		name: string;
+		email: string;
+		type?: "human" | "agent";
+		onBehalfOf?: { id: string; name: string } | null;
+	} | null;
 	data: Record<string, unknown>;
 }
 

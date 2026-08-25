@@ -25,6 +25,7 @@
 		"@aws-sdk/client-s3": "^3.1117.0",
 		"@aws-sdk/s3-request-presigner": "^3.1117.0",
 		"@better-auth/api-key": "^1.7.1",
+		"@better-auth/oauth-provider": "1.7.1",
 		"@implementjs/core": "~0.0.3",
 		"@implementjs/formish": "~0.0.3",
 		"@implementjs/lucide": "~0.0.3",

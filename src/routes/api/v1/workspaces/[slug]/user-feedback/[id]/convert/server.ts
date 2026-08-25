@@ -2,6 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { asc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as v from "valibot";
+import { preferDefaultTeam } from "@/lib/domain/issues";
 import { ConvertFeedbackBody, IssueSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { emitFeedbackEvent, emitIssueEvent } from "@/lib/server/events.server";
@@ -57,7 +58,7 @@ export const POST = handler({
 
 		const owningTeam =
 			body.teamKey === undefined
-				? await firstTeam(workspace.id)
+				? await defaultTeam(workspace.id)
 				: await requireTeam(workspace.id, body.teamKey);
 
 		if (body.assigneeId != null && body.assigneeId !== "") {
@@ -114,15 +115,14 @@ export const POST = handler({
 });
 
 /** The team a conversion lands in when the caller does not name one. */
-async function firstTeam(workspaceId: string): Promise<typeof team.$inferSelect> {
+async function defaultTeam(workspaceId: string): Promise<typeof team.$inferSelect> {
 	const rows = await db
 		.select()
 		.from(team)
 		.where(eq(team.workspaceId, workspaceId))
-		.orderBy(asc(team.createdAt))
-		.limit(1);
+		.orderBy(asc(team.createdAt));
 
-	const found = rows[0];
+	const found = preferDefaultTeam(rows);
 	if (found === undefined) error(400, "this workspace has no teams to file an issue in");
 	return found;
 }
