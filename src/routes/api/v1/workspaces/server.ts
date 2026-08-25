@@ -1,0 +1,122 @@
+import { error } from "@implementjs/kit/server";
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import * as v from "valibot";
+import { CreateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
+import { db } from "@/lib/server/db.server";
+import { requirePermission, requireUser } from "@/lib/server/guards.server";
+import { claimImageKey } from "@/lib/server/images.server";
+import { label, workspace, workspaceMember } from "@/lib/server/schema.server";
+import { toWorkspace } from "@/lib/server/serialize.server";
+import { slugify } from "@/lib/server/slug.server";
+import { createDefaultTeams } from "@/lib/server/teams.server";
+import { handler, json } from "./$types";
+
+export const GET = handler({
+	response: v.array(WorkspaceSchema),
+	async handle({ locals }) {
+		const user = requireUser(locals);
+		requirePermission(locals, "workspace", "read");
+
+		// For an agent this is its *reach*, not where it already has a member row:
+		// a bot only joins a workspace once it acts there, so listing its own
+		// memberships would hide everywhere it could act but has not yet.
+		const subject = locals.agent?.installedByUserId ?? user.id;
+
+		const rows = await db
+			.select({ workspace, role: workspaceMember.role })
+			.from(workspaceMember)
+			.innerJoin(workspace, eq(workspace.id, workspaceMember.workspaceId))
+			.where(eq(workspaceMember.userId, subject))
+			.orderBy(workspace.createdAt);
+
+		return rows.map((row) => toWorkspace(row.workspace, row.role));
+	},
+});
+
+export const POST = handler({
+	body: CreateWorkspaceBody,
+	response: WorkspaceSchema,
+	async handle({ locals, body }) {
+		const user = requireUser(locals);
+		requirePermission(locals, "workspace", "write");
+
+		// Creating a workspace makes the creator its admin, which is the one thing
+		// under `workspace:write` that would hand an agent a role it must never
+		// hold. Everything else that scope covers — labels, images — is member-level.
+		if (locals.agent !== null) error(403, "an agent cannot create a workspace");
+
+		// Claimed before the insert: if the key is not this user's, or nothing was
+		// ever uploaded to it, the workspace should not come into existence at all
+		// rather than exist with a broken picture.
+		const image = body.imageKey === undefined ? null : await claimImageKey(user.id, body.imageKey);
+
+		const slug = await uniqueSlug(slugify(body.name));
+		const row = {
+			id: nanoid(),
+			name: body.name,
+			slug,
+			image,
+			createdAt: new Date(),
+			// Feedback intake starts closed to anonymous callers and the public
+			// board starts off. Both are switches an admin flips deliberately.
+			feedbackIntake: "api_key" as const,
+			feedbackBoard: "private" as const,
+			updatedAt: new Date(),
+		};
+
+		await db.insert(workspace).values(row);
+		await db.insert(workspaceMember).values({
+			id: nanoid(),
+			workspaceId: row.id,
+			userId: user.id,
+			// Whoever creates the workspace administers it.
+			// implement:bug:#2: `valid-role` treats any object property named
+			// `role` as an ARIA role, including a database column in a server-only
+			// file that renders nothing.
+			// oxlint-disable-next-line implementjs/valid-role
+			role: "admin",
+			createdAt: new Date(),
+		});
+
+		// A workspace with no teams has nowhere to file an issue, and one with no
+		// labels is a dead end in the UI. Both are seeded on creation.
+		await createDefaultTeams(row.id);
+		await db.insert(label).values(
+			[
+				{ name: "Bug", color: "#e5484d" },
+				{ name: "Feature", color: "#3e63dd" },
+				{ name: "Improvement", color: "#46a758" },
+			].map((entry) => ({
+				id: nanoid(),
+				workspaceId: row.id,
+				name: entry.name,
+				color: entry.color,
+				createdAt: new Date(),
+			})),
+		);
+
+		return json(toWorkspace(row, "admin"), { status: 201 });
+	},
+});
+
+/**
+ * Static routes beat `[slug]`, so a workspace slugged `new` would be shadowed
+ * by /app/new and unreachable.
+ */
+const RESERVED_SLUGS = new Set(["new", "settings", "inbox", "issue", "api", "app"]);
+
+/** Appends `-2`, `-3`, … until the slug is free. */
+async function uniqueSlug(base: string): Promise<string> {
+	const candidate = base === "" || RESERVED_SLUGS.has(base) ? `${base || "workspace"}-1` : base;
+	for (let suffix = 1; suffix < 100; suffix++) {
+		const slug = suffix === 1 ? candidate : `${candidate}-${suffix}`;
+		const existing = await db
+			.select({ id: workspace.id })
+			.from(workspace)
+			.where(eq(workspace.slug, slug))
+			.limit(1);
+		if (existing.length === 0) return slug;
+	}
+	return `${candidate}-${nanoid(6).toLowerCase()}`;
+}

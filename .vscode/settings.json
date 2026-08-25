@@ -1,0 +1,10 @@
+{
+	"editor.quickSuggestions": {
+		"strings": "on"
+	},
+	"tailwindCSS.classFunctions": ["cn", "tv"],
+	"tailwindCSS.experimental.classRegex": [
+		["(?:class(?:Name)?)\\s*:\\s*['\"`]([^'\"`]*)['\"`]"],
+		["styles\\s*=\\s*\\{([^}]*)\\}", "['\"`]([^'\"`]*)['\"`]"]
+	]
+}

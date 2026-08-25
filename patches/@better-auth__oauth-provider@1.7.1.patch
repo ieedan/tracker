@@ -1,0 +1,47 @@
+diff --git a/dist/authorize-Crqw4_bR.mjs b/dist/authorize-Crqw4_bR.mjs
+index fdd19eb6333102dd77130d5ed142ad73f853b243..821ef693e01468e9604afefbcdce4f9c20acfa76 100644
+--- a/dist/authorize-Crqw4_bR.mjs
++++ b/dist/authorize-Crqw4_bR.mjs
+@@ -1707,7 +1707,14 @@ function validateClientRedirectUri(redirectUri, applicationType) {
+ 		if (!isAllowedNativeHttpLoopback) invalidRedirectUri(`native clients may use http only on the exact loopback hosts localhost, 127.0.0.1, or [::1]: ${redirectUri}`);
+ 		return;
+ 	}
+-	if (FORBIDDEN_NATIVE_REDIRECT_SCHEMES.has(url.protocol) || !isReverseDomainPrivateUseRedirectUri(url)) invalidRedirectUri(`native private-use redirect URI schemes must be well-formed reverse-domain names, omit the naming authority, and must not use a reserved scheme: ${redirectUri}`);
++	if (FORBIDDEN_NATIVE_REDIRECT_SCHEMES.has(url.protocol)) invalidRedirectUri(`native private-use redirect URI schemes must be well-formed reverse-domain names, omit the naming authority, and must not use a reserved scheme: ${redirectUri}`);
++	if (isReverseDomainPrivateUseRedirectUri(url) || isNativeAppSchemeRedirectUri(url)) return;
++	invalidRedirectUri(`native private-use redirect URI schemes must be well-formed reverse-domain names, omit the naming authority, and must not use a reserved scheme: ${redirectUri}`);
++}
++/** Cursor and VS Code register `cursor://anysphere.cursor-mcp/oauth/callback` — a custom scheme with a host, not RFC 8252 reverse-domain. */
++function isNativeAppSchemeRedirectUri(url) {
++	const scheme = url.protocol.slice(0, -1);
++	return url.host.length > 0 && /^[a-z][a-z0-9+.-]*$/i.test(scheme);
+ }
+ function assertValidRegistrationJwks(jwks) {
+ 	const result = validatePublicClientJwks(jwks);
+@@ -1753,7 +1760,7 @@ async function registerEndpoint(ctx, opts) {
+ }
+ async function checkOAuthClient(client, opts, settings) {
+ 	const isClientMetadataDocument = settings?.registrationSource === "clientMetadataDocument";
+-	const clientWithDefaults = applyOAuthClientRegistrationDefaults(client, isClientMetadataDocument ? null : "web");
++	const clientWithDefaults = applyOAuthClientRegistrationDefaults(client, isClientMetadataDocument ? null : "native");
+ 	const tokenEndpointAuthMethod = clientWithDefaults.token_endpoint_auth_method ?? "client_secret_basic";
+ 	if (!new Set(getSupportedAuthMethods(opts, { includeNone: true })).has(tokenEndpointAuthMethod)) throw new APIError("BAD_REQUEST", {
+ 		error: "invalid_client_metadata",
+@@ -1774,7 +1781,7 @@ async function checkOAuthClient(client, opts, settings) {
+ 		error: "invalid_redirect_uri",
+ 		error_description: "Redirect URIs are required for authorization_code and implicit grant types"
+ 	});
+-	for (const uri of clientWithDefaults.redirect_uris ?? []) validateClientRedirectUri(uri, applicationType ?? (isClientMetadataDocument ? "native" : "web"));
++	for (const uri of clientWithDefaults.redirect_uris ?? []) validateClientRedirectUri(uri, applicationType ?? "native");
+ 	const supportedGrantTypes = new Set(getSupportedGrantTypes(opts));
+ 	for (const grantType of grantTypes) if (!supportedGrantTypes.has(grantType)) throw new APIError("BAD_REQUEST", {
+ 		error: "invalid_client_metadata",
+@@ -1911,7 +1918,7 @@ async function persistOAuthClientRegistration(ctx, opts, input) {
+ 	const body = applyOAuthClientRegistrationDefaults(input.registrationSource === "dynamic" && !input.metadata.scope ? {
+ 		...input.metadata,
+ 		scope: (opts.clientRegistrationDefaultScopes ?? opts.scopes)?.join(" ")
+-	} : input.metadata, input.registrationSource === "clientMetadataDocument" ? null : "web");
++	} : input.metadata, input.registrationSource === "clientMetadataDocument" ? null : "native");
+ 	const isPublic = body.token_endpoint_auth_method === "none";
+ 	const isPrivateKeyJwt = body.token_endpoint_auth_method === "private_key_jwt";
+ 	const isExtensionAuthMethod = isExtensionTokenEndpointAuthMethod(opts, body.token_endpoint_auth_method);

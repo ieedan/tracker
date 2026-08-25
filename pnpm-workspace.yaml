@@ -1,0 +1,6 @@
+# esbuild — vite's transformer — downloads its platform binary in a postinstall script.
+# Without this the install fails rather than quietly skipping it.
+allowBuilds:
+  esbuild: true
+patchedDependencies:
+  '@better-auth/oauth-provider@1.7.1': patches/@better-auth__oauth-provider@1.7.1.patch

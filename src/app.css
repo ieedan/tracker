@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/* Inter, self-hosted through @fontsource-variable/inter — no runtime request to
+   Google Fonts, so the app renders the same offline, behind a firewall, and with
+   nothing leaked to a third party. Both files are the weight-axis (`wght`) cut:
+   one variable font covers 100–900 instead of a file per weight. The italic face
+   is a separate @font-face, so the browser only fetches it if italic text is
+   actually rendered. Each subset carries a `unicode-range`, so a latin page
+   downloads the latin file (~48kB) and nothing else. */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter/wght-italic.css";
+
+@source ".";
+
+/* dark mode is a class on <html>, put there by @implementjs/mode-watcher */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+	/* Linear's light surface: near-white page, one step down for panels. */
+	--background: #ffffff;
+	--foreground: #08090a;
+	--card: #ffffff;
+	--card-foreground: #08090a;
+	--popover: #ffffff;
+	--popover-foreground: #08090a;
+	--primary: #5e6ad2;
+	--primary-foreground: #ffffff;
+	--secondary: #f4f5f8;
+	--secondary-foreground: #08090a;
+	--muted: #f4f5f8;
+	--muted-foreground: #6b6f76;
+	--accent: #eef0f3;
+	--accent-foreground: #08090a;
+	--destructive: #e5484d;
+	--border: #e6e7eb;
+	--input: #e6e7eb;
+	--ring: #5e6ad2;
+
+	/* App chrome — the sidebar sits a shade off the page in both themes. */
+	--sidebar: #fbfbfc;
+	--sidebar-border: #e6e7eb;
+	--elevated: #ffffff;
+}
+
+.dark {
+	/* Linear's signature near-black. Not pure #000 — the panels need somewhere to go. */
+	--background: #08090a;
+	--foreground: #f7f8f8;
+	--card: #0f1011;
+	--card-foreground: #f7f8f8;
+	--popover: #131417;
+	--popover-foreground: #f7f8f8;
+	--primary: #5e6ad2;
+	--primary-foreground: #ffffff;
+	--secondary: #1c1d21;
+	--secondary-foreground: #f7f8f8;
+	--muted: #1c1d21;
+	--muted-foreground: #8a8f98;
+	--accent: #1f2023;
+	--accent-foreground: #f7f8f8;
+	--destructive: #e5484d;
+	--border: #23252a;
+	--input: #23252a;
+	--ring: #5e6ad2;
+
+	--sidebar: #0b0c0d;
+	--sidebar-border: #191a1d;
+	--elevated: #131417;
+}
+
+/* Not `inline`: Tailwind's own `--default-font-family` is `var(--font-sans)`, and
+   preflight puts that on <html>. It has to resolve to a real custom property for
+   the whole document — not just `font-sans` — to pick Inter up. `--font-mono` is
+   deliberately left alone; identifiers and secrets keep Tailwind's mono stack. */
+@theme {
+	--font-sans:
+		"Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
+		"Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+		"Apple Color Emoji", "Segoe UI Emoji";
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-elevated: var(--elevated);
+
+	/* Accordion and Collapsible animate to a height the primitive measures onto the element at
+	   runtime. Without these they still open and close, they just snap instead of sliding. */
+	--animate-accordion-down: accordion-down 0.2s ease-out;
+	--animate-accordion-up: accordion-up 0.2s ease-out;
+	--animate-collapsible-down: collapsible-down 0.2s ease-out;
+	--animate-collapsible-up: collapsible-up 0.2s ease-out;
+
+	@keyframes accordion-down {
+		from {
+			height: 0;
+		}
+		to {
+			height: var(--ip-accordion-content-height);
+		}
+	}
+
+	@keyframes accordion-up {
+		from {
+			height: var(--ip-accordion-content-height);
+		}
+		to {
+			height: 0;
+		}
+	}
+
+	@keyframes collapsible-down {
+		from {
+			height: 0;
+		}
+		to {
+			height: var(--ip-collapsible-content-height);
+		}
+	}
+
+	@keyframes collapsible-up {
+		from {
+			height: var(--ip-collapsible-content-height);
+		}
+		to {
+			height: 0;
+		}
+	}
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+
+	html {
+		@apply antialiased;
+	}
+
+	body {
+		@apply min-h-dvh bg-background text-foreground;
+		/* Inter character variants, and now that Inter actually loads they do
+		   something: an alternate one with a base, an open six and an open nine.
+		   They exist to keep digits apart at the 10–12px the identifier, count
+		   and date columns run at. Figures are left proportional — those columns
+		   are already `font-mono`, and the app's prose reads better without
+		   tabular spacing; `tabular-nums` stays a per-use utility. */
+		font-feature-settings: "cv01", "cv03", "cv04";
+	}
+
+	/* Linear is a dense product — the default 16px body is too loose for it. */
+	html {
+		font-size: 15px;
+	}
+
+	/* Thin, self-effacing scrollbars, like the app this is modelled on. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+}
+
+@layer utilities {
+	/* One row of the issue list, and the hover state that makes it feel clickable. */
+	.row-hover {
+		@apply transition-colors duration-75 hover:bg-accent/60;
+	}
+}
