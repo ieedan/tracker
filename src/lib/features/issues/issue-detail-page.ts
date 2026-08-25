@@ -139,7 +139,7 @@ export function IssueDetailPage({
 				Div(
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 					EditableTitle(issue, update),
-					EditableDescription(issue, update),
+					EditableDescription(issue, update, params),
 
 					// The whole body is the drop target, not just a small well —
 					// dragging a screenshot onto the issue is the gesture people try.
@@ -344,11 +344,25 @@ function EditableTitle(
 function EditableDescription(
 	issue: Readable<Issue>,
 	update: (patch: { description: string }, apply: (value: Issue) => Issue) => void,
+	params: { slug: Readable<string> },
 ) {
 	const editing = signal(false);
 	const draft = signal("");
+	const draftRef = signal<HTMLTextAreaElement | null>(null);
+
+	// The same `@` as the composer and the comment box — an issue body is an
+	// issue body whichever screen it is being written on.
+	const mentions = fileMentions({
+		value: draft,
+		slug: () => params.slug.get(),
+		repository: () => issue.get().repository?.id,
+		element: draftRef,
+	});
 
 	const commit = () => {
+		// Picking from the menu blurs the textarea, and committing here would
+		// close the editor out from under the insertion.
+		if (mentions.open.get()) return;
 		const next = draft.get();
 		editing.set(false);
 		if (next === issue.get().description) return;
@@ -357,18 +371,26 @@ function EditableDescription(
 
 	return If(editing)
 		.Then(
-			Textarea({
-				value: draft,
-				autofocus: true,
-				rows: 8,
-				class:
-					"w-full resize-y rounded-md border border-input bg-background p-3 text-[14px] outline-none focus:border-ring",
-				onKeydown: (event) => {
-					if (event.key === "Escape") editing.set(false);
-					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) commit();
-				},
-				onBlur: commit,
-			}),
+			Div(
+				{ class: "relative" },
+				Textarea({
+					this: draftRef,
+					value: draft,
+					autofocus: true,
+					rows: 8,
+					class:
+						"w-full resize-y rounded-md border border-input bg-background p-3 text-[14px] outline-none focus:border-ring",
+					onInput: mentions.onInput,
+					onKeydown: (event) => {
+						mentions.onKeydown(event);
+						if (event.defaultPrevented) return;
+						if (event.key === "Escape") editing.set(false);
+						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) commit();
+					},
+					onBlur: commit,
+				}),
+				MentionMenu(mentions),
+			),
 		)
 		.Else(
 			Div(
@@ -476,7 +498,7 @@ function CommentThread(
 					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void post();
 				},
 			}),
-			MentionMenu(mentions, { class: "top-full left-0" }),
+			MentionMenu(mentions),
 			Div(
 				{ class: "flex items-center justify-end gap-2" },
 				Span({ class: "mr-auto text-[11px] text-muted-foreground" }, "⌘↵ to comment"),

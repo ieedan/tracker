@@ -211,7 +211,7 @@ function UserAvatarOf(current: Readable<UserSummary | null>, className?: string)
 	return UserAvatar(user, className);
 }
 
-/** The coloured pills shown on a row and on the detail page. */
+/** The colored pills shown on a row and on the detail page. */
 export function LabelChips(labels: Readable<Label[]>) {
 	return ForEach(
 		labels,

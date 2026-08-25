@@ -27,7 +27,7 @@ export const PULL_REQUEST_STATE_LABELS: Record<PullRequestState, string> = {
 	draft: "Draft",
 };
 
-/** Tailwind text colours, matching what each provider uses for the same state. */
+/** Tailwind text colors, matching what each provider uses for the same state. */
 export const PULL_REQUEST_STATE_COLORS: Record<PullRequestState, string> = {
 	open: "text-emerald-500",
 	merged: "text-violet-500",

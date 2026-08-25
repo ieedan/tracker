@@ -4,7 +4,7 @@
  * An issue's status ring says how far the work has got. A piece of feedback has
  * not been started or finished — it has been read, or agreed to, or turned
  * down. Reusing the ring would say something untrue at a glance, so this is a
- * dot that changes colour and fills as it is decided.
+ * dot that changes color and fills as it is decided.
  */
 import { derived, Span, Svg, type Readable } from "@implementjs/core";
 import { FEEDBACK_STATUS_LABELS, type FeedbackStatus } from "@/lib/domain/feedback";

@@ -55,6 +55,92 @@ export function activeMention(
 	return { query, start: at };
 }
 
+/**
+ * Where a character sits, in pixels, inside a textarea.
+ *
+ * A textarea has no API for this — you cannot ask it where character 42 is —
+ * so the standard trick is to build an invisible div with the exact same text
+ * layout, put a marker at that offset, and read the marker's position. The
+ * copied properties are the ones that affect where a glyph lands; getting one
+ * wrong shifts the answer, which is why this takes them from the live element
+ * rather than assuming the classes it was given.
+ */
+const MIRRORED = [
+	"boxSizing",
+	"width",
+	"paddingTop",
+	"paddingRight",
+	"paddingBottom",
+	"paddingLeft",
+	"borderTopWidth",
+	"borderRightWidth",
+	"borderBottomWidth",
+	"borderLeftWidth",
+	"fontFamily",
+	"fontSize",
+	"fontWeight",
+	"fontStyle",
+	"letterSpacing",
+	"lineHeight",
+	"textTransform",
+	"textIndent",
+	"whiteSpace",
+	"wordSpacing",
+	"wordBreak",
+	"overflowWrap",
+] as const;
+
+export interface CaretPoint {
+	/** Relative to the textarea's box, which is what an absolute child needs. */
+	left: number;
+	top: number;
+	/** One line's height, so a menu can sit below the line rather than on it. */
+	lineHeight: number;
+	/** The same point in viewport terms, for deciding which way a menu opens. */
+	viewportTop: number;
+}
+
+export function caretPoint(element: HTMLTextAreaElement, offset: number): CaretPoint {
+	const computed = window.getComputedStyle(element);
+
+	const mirror = document.createElement("div");
+	for (const property of MIRRORED) {
+		mirror.style[property] = computed[property];
+	}
+	// Off-screen but laid out, so it wraps exactly as the real one does.
+	mirror.style.position = "absolute";
+	mirror.style.top = "0";
+	mirror.style.left = "-9999px";
+	mirror.style.visibility = "hidden";
+	mirror.style.whiteSpace = "pre-wrap";
+	mirror.style.overflowWrap = "break-word";
+
+	mirror.textContent = element.value.slice(0, offset);
+
+	// A zero-width marker: it has a position but does not push anything along.
+	const marker = document.createElement("span");
+	marker.textContent = "\u200b";
+	mirror.append(marker);
+
+	document.body.append(mirror);
+	const left = marker.offsetLeft;
+	const top = marker.offsetTop;
+	mirror.remove();
+
+	const lineHeight =
+		Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) * 1.2 || 16;
+
+	// The textarea may be scrolled; the caret's screen position is not its
+	// position in the text.
+	const relativeTop = top - element.scrollTop;
+	return {
+		left,
+		top: relativeTop,
+		lineHeight,
+		viewportTop: element.getBoundingClientRect().top + relativeTop,
+	};
+}
+
 /** Markdown, so the reference survives as a link wherever the body is rendered. */
 export function mentionMarkdown(match: FileMatch): string {
 	return `[@${match.path}](${match.url})`;
@@ -63,7 +149,7 @@ export function mentionMarkdown(match: FileMatch): string {
 /**
  * Renders a body's `@file` references as links, leaving everything else alone.
  *
- * Not a markdown renderer — this recognises exactly the shape `mentionMarkdown`
+ * Not a markdown renderer — this recognizes exactly the shape `mentionMarkdown`
  * writes and nothing else. A general renderer here would be a much bigger
  * promise than "the file you referenced is clickable", and would have to answer
  * for every other markdown construct in a field nothing else treats as
@@ -116,6 +202,8 @@ export interface MentionState {
 	open: Readable<boolean>;
 	matches: Readable<FileMatch[]>;
 	highlighted: Signal<number>;
+	/** Where the `@` is, so the menu can sit under it rather than under the box. */
+	anchor: Readable<CaretPoint | null>;
 	/** Wire these into the textarea. */
 	onInput: (event: { target: HTMLTextAreaElement }) => void;
 	onKeydown: (event: KeyboardEvent & { target: HTMLTextAreaElement }) => void;
@@ -139,6 +227,7 @@ export function fileMentions(options: {
 	const matches = signal<FileMatch[]>([]);
 	const query = signal<{ query: string; start: number } | null>(null);
 	const highlighted = signal(0);
+	const anchor = signal<CaretPoint | null>(null);
 	const open = derived([query, matches], (current, list) => current !== null && list.length > 0);
 
 	let sequence = 0;
@@ -160,8 +249,12 @@ export function fileMentions(options: {
 		query.set(found);
 		if (found === null) {
 			matches.set([]);
+			anchor.set(null);
 			return;
 		}
+		// Anchored to the `@` rather than to the caret: the menu should stay put
+		// while the query is typed, not creep right with every character.
+		anchor.set(caretPoint(element, found.start));
 		void search(found.query);
 	};
 
@@ -178,6 +271,7 @@ export function fileMentions(options: {
 		options.value.set(next);
 		query.set(null);
 		matches.set([]);
+		anchor.set(null);
 
 		// Put the caret after what was inserted, so typing carries on naturally.
 		const position = current.start + inserted.length;
@@ -191,6 +285,7 @@ export function fileMentions(options: {
 		open,
 		matches,
 		highlighted,
+		anchor,
 		onInput: (event) => refresh(event.target),
 		onKeydown: (event) => {
 			if (!open.get()) return;
@@ -220,22 +315,69 @@ export function fileMentions(options: {
 				event.stopPropagation();
 				query.set(null);
 				matches.set([]);
+				anchor.set(null);
 			}
 		},
 		choose,
 	};
 }
 
-/** The dropdown itself. Positioned by whatever wraps it. */
+/**
+ * The dropdown, positioned under the `@` that opened it.
+ *
+ * Absolutely placed inside the textarea's own relatively-positioned wrapper, so
+ * the coordinates are the ones `caretPoint` measured.
+ *
+ * Which way it opens is decided from the match count rather than by measuring
+ * the rendered menu. Measuring would mean placing it, letting it lay out, then
+ * moving it — a frame of the menu in the wrong place, and a dependency on
+ * exactly when the element is attached. A row is a known height, so the height
+ * is known before anything renders.
+ */
+const ROW_HEIGHT = 30;
+const MENU_PADDING = 8;
+const MENU_MAX_HEIGHT = 256;
+const MENU_GAP = 4;
+
+function menuHeight(count: number): number {
+	return Math.min(count * ROW_HEIGHT + MENU_PADDING, MENU_MAX_HEIGHT);
+}
+
 export function MentionMenu(state: MentionState, options: { class?: string } = {}) {
+	/** True when there is no room below the line but there is room above it. */
+	const flipped = derived([state.anchor, state.matches], (point, matches) => {
+		if (point === null || typeof window === "undefined") return false;
+		const height = menuHeight(matches.length);
+		const below = window.innerHeight - (point.viewportTop + point.lineHeight);
+		return below < height + MENU_GAP && point.viewportTop > height;
+	});
+
+	// `Styles` takes a bindable per property, so each is derived on its own
+	// rather than the whole object being swapped.
+	const position = {
+		left: derived([state.anchor], (point) =>
+			point === null ? "0" : `${Math.max(0, point.left)}px`,
+		),
+		top: derived([state.anchor, flipped], (point, isFlipped) =>
+			point === null || isFlipped ? "auto" : `${point.top + point.lineHeight + MENU_GAP}px`,
+		),
+		// `bottom` is measured from the container's bottom edge, so putting the
+		// menu's bottom `n` px from its *top* is `calc(100% - n)`. A bare
+		// `-point.top` would hang it below the box instead of above the line.
+		bottom: derived([state.anchor, flipped], (point, isFlipped) =>
+			point !== null && isFlipped ? `calc(100% - ${point.top - MENU_GAP}px)` : "auto",
+		),
+	};
+
 	return If(
 		state.open,
 		Div(
 			{
 				class: cn(
-					"absolute z-50 mt-1 max-h-64 w-[26rem] max-w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md",
+					"absolute z-50 max-h-64 w-[24rem] max-w-[min(24rem,100%)] overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md",
 					options.class,
 				),
+				style: position,
 			},
 			ForEach(
 				state.matches,
@@ -263,7 +405,7 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 							match.bind((value) => value.path.slice(value.path.lastIndexOf("/") + 1)),
 						),
 						Span(
-							{ class: "max-w-[12rem] shrink-0 truncate text-[11px] text-muted-foreground" },
+							{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
 							match.bind((value) => value.path),
 						),
 					);

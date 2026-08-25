@@ -191,7 +191,7 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 }
 
 /**
- * The workspace's picture, or the initial on a coloured tile.
+ * The workspace's picture, or the initial on a colored tile.
  *
  * `Dynamic` rather than `If`, because the two branches are different elements
  * and swapping between them is exactly what `Dynamic` is for.

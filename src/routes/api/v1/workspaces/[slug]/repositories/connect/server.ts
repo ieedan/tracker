@@ -22,6 +22,15 @@ export const GET = handler({
 		installUrl: v.nullable(v.string()),
 		/** The grant already in place, if there is one. */
 		connected: v.nullable(v.object({ account: v.string(), externalId: v.string() })),
+		/**
+		 * Grants this person already made, on other workspaces.
+		 *
+		 * GitHub only installs an App onto an account once. Sending someone to the
+		 * install page a second time lands them on a "configure" screen that never
+		 * redirects back, so without this a second workspace could not be
+		 * connected at all — which is exactly what happened.
+		 */
+		reusable: v.array(v.object({ account: v.string(), externalId: v.string() })),
 	}),
 	async handle({ locals, params }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
@@ -31,10 +40,26 @@ export const GET = handler({
 		const rows = await db
 			.select()
 			.from(providerInstallation)
-			.where(eq(providerInstallation.workspaceId, membership.workspace.id))
-			.limit(1);
+			.where(eq(providerInstallation.workspaceId, membership.workspace.id));
 
 		const existing = rows[0];
+
+		// Only grants this user made themselves. Someone else's installation is
+		// not theirs to attach to a workspace, even one they administer.
+		const mine = await db
+			.selectDistinct({
+				account: providerInstallation.account,
+				externalId: providerInstallation.externalId,
+			})
+			.from(providerInstallation)
+			.where(
+				and(
+					eq(providerInstallation.createdBy, membership.user.id),
+					eq(providerInstallation.provider, "github"),
+				),
+			);
+
+		const here = new Set(rows.map((row) => row.externalId));
 		return {
 			provider: provider.configured() ? provider.id : null,
 			installUrl: provider.configured() ? provider.installUrl(membership.workspace.slug) : null,
@@ -42,6 +67,7 @@ export const GET = handler({
 				existing === undefined
 					? null
 					: { account: existing.account, externalId: existing.externalId },
+			reusable: mine.filter((row) => !here.has(row.externalId)),
 		};
 	},
 });
@@ -67,6 +93,31 @@ export const POST = handler({
 		const provider = providerFor(body.provider);
 		if (!provider.configured()) error(503, `${provider.id} is not configured on this server`);
 
+		const yours = await db
+			.select({ id: providerInstallation.id, account: providerInstallation.account })
+			.from(providerInstallation)
+			.where(
+				and(
+					eq(providerInstallation.createdBy, membership.user.id),
+					eq(providerInstallation.provider, body.provider),
+					eq(providerInstallation.externalId, body.externalId),
+				),
+			)
+			.limit(1);
+
+		// Attaching an installation id grants this workspace every repository
+		// inside it, so an id somebody else established is not yours to move. A
+		// *new* grant comes from the install callback, which is where the provider
+		// has actually vouched for it.
+		//
+		// The exception is a deployment with no App configured, where a server
+		// token stands in for an installation: there is no install flow to come
+		// from, and the id names nothing the token does not already reach.
+		const hasInstallFlow = provider.installUrl(membership.workspace.slug) !== null;
+		if (yours[0] === undefined && hasInstallFlow) {
+			error(403, "that installation was not granted by you — install the app to connect it");
+		}
+
 		const existing = await db
 			.select()
 			.from(providerInstallation)
@@ -83,16 +134,17 @@ export const POST = handler({
 			return { connected: true, account: existing[0].account };
 		}
 
+		const account = body.account === "" ? (yours[0]?.account ?? "") : body.account;
 		await db.insert(providerInstallation).values({
 			id: nanoid(),
 			workspaceId: membership.workspace.id,
 			provider: body.provider,
 			externalId: body.externalId,
-			account: body.account,
+			account,
 			createdBy: membership.user.id,
 			createdAt: new Date(),
 		});
 
-		return { connected: true, account: body.account };
+		return { connected: true, account };
 	},
 });

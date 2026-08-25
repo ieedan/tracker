@@ -28,7 +28,7 @@ export const POST = handler({
 		if (hook === undefined) error(404, "no such webhook");
 
 		// A test uses whichever event the hook actually listens for, so a receiver
-		// that switches on the event name still recognises it.
+		// that switches on the event name still recognizes it.
 		const event = hook.events[0] ?? "issue.created";
 		const ids = await enqueue(
 			{

@@ -53,7 +53,7 @@ export const serverEnvSchema = {
 	// --- GitHub -------------------------------------------------------------
 	// Two separate credentials, deliberately. The OAuth app signs people in and
 	// asks for nothing but their identity. The GitHub App is what reaches
-	// repositories, and it is installed per-organisation by someone who can say
+	// repositories, and it is installed per-organization by someone who can say
 	// yes to that — so signing in never implies handing over your code.
 	/** OAuth app, for "Sign in with GitHub". Leave blank to hide the button. */
 	GITHUB_CLIENT_ID: v.optional(v.string(), ""),

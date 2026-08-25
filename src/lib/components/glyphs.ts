@@ -157,7 +157,7 @@ const AVATAR_COLORS = [
 	"#eb5757",
 ];
 
-/** Stable per-user colour, so the same person is the same colour everywhere. */
+/** Stable per-user color, so the same person is the same color everywhere. */
 export function avatarColor(id: string): string {
 	let hash = 0;
 	for (let index = 0; index < id.length; index++) {

@@ -39,6 +39,7 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 	const repositories = signal<Repository[]>([]);
 	const available = signal<Available[]>([]);
 	const connection = signal<{ account: string } | null>(null);
+	const reusable = signal<Array<{ account: string; externalId: string }>>([]);
 	const installUrl = signal("");
 	const providerReady = signal(false);
 	const loading = signal(true);
@@ -60,6 +61,7 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 			connection.set(
 				state.data.connected === null ? null : { account: state.data.connected.account },
 			);
+			reusable.set(state.data.reusable);
 		}
 		if (linked.error === undefined) repositories.set(linked.data);
 	};
@@ -75,6 +77,27 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 			return;
 		}
 		available.set(data);
+	};
+
+	/**
+	 * Attaches an installation this person already granted elsewhere.
+	 *
+	 * The server still checks it was theirs — this is a convenience, not the
+	 * authority.
+	 */
+	const reuse = async (entry: { account: string; externalId: string }) => {
+		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/repositories/connect", {
+			params: { slug: params.slug.get() },
+			body: { externalId: entry.externalId, account: entry.account },
+		});
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not use that connection"));
+			return;
+		}
+		connection.set({ account: data.account });
+		reusable.set([]);
+		toastSuccess(`Connected to ${data.account || "GitHub"}`);
+		void loadAvailable();
 	};
 
 	const link = async (entry: Available) => {
@@ -170,9 +193,54 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 					Div(
 						{ class: "flex flex-col gap-2 rounded-md border border-border p-3" },
 						Span({ class: "text-[13px] font-medium" }, "Connect GitHub"),
+
+						// Offered first when it applies. GitHub installs an app onto an
+						// account once, so for a second workspace this is the path that
+						// works — the install page would only show a configure screen and
+						// never redirect back.
+						If(
+							reusable.bind((list) => list.length > 0),
+							Div(
+								{ class: "flex flex-col gap-1.5" },
+								Span(
+									{ class: "text-[12px] text-muted-foreground" },
+									"Use an installation you have already granted:",
+								),
+								ForEach(
+									reusable,
+									(entry) => entry.externalId,
+									(entry) =>
+										Div(
+											{
+												class:
+													"flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2.5 py-1.5",
+											},
+											GithubMark({ class: "size-3.5 shrink-0 text-muted-foreground" }),
+											Span(
+												{ class: "min-w-0 flex-1 truncate text-[13px]" },
+												entry.bind((value) => value.account || `Installation ${value.externalId}`),
+											),
+											Button(
+												{
+													size: "sm",
+													variant: "secondary",
+													class: "h-6 px-2 text-[11px]",
+													onClick: () => void reuse(entry.get()),
+												},
+												"Use",
+											),
+										),
+								),
+							),
+						),
+
 						Span(
 							{ class: "text-[12px] text-muted-foreground" },
-							"Install the app on your organisation and choose which repositories it can see.",
+							reusable.bind((list) =>
+								list.length > 0
+									? "Or install it somewhere new:"
+									: "Install the app on your organization and choose which repositories it can see.",
+							),
 						),
 						Div(
 							{ class: "flex items-center gap-2" },

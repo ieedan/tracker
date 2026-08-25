@@ -169,7 +169,7 @@ talking to and adding GitLab is one new file.
 | `GITHUB_APP_ID` / `_SLUG` / `_PRIVATE_KEY` | A GitHub App | The repositories an org admin granted     |
 
 Signing in with GitHub never grants access to code. Repository access comes
-from an App _installation_: installed onto an organisation by somebody with
+from an App _installation_: installed onto an organization by somebody with
 authority over it, scoped to the repositories they picked, and still working
 when that person leaves the company. A user's OAuth token would give you none
 of those three.
@@ -323,7 +323,7 @@ is the full issue; `issue.updated` also carries `data.changes` as
 **Delivery is at-least-once.** Deliveries are written to the database before
 anything is sent, attempted immediately, and retried on a backoff
 (1m → 5m → 30m → 2h, five attempts) by `POST /api/v1/webhooks/drain`. That route
-is authorised by `CRON_SECRET` and 404s when it is unset. `pnpm build`
+is authorized by `CRON_SECRET` and 404s when it is unset. `pnpm build`
 registers it as a Vercel cron automatically; on any other host, schedule it
 yourself. Deduplicate on the delivery id.
 
@@ -347,7 +347,7 @@ src/
 └ routes/
    ├ api/auth/[...all]/  better-auth's own surface
    ├ api/v1/             the documented REST API
-   │  └ webhooks/drain/  cron-authorised delivery retries
+   │  └ webhooks/drain/  cron-authorized delivery retries
    ├ app/[slug]/         the product, behind a session
    │  ├ team/[key]/      one team's issues
    │  ├ feedback/        the triage tab, and FB-12

@@ -10,7 +10,7 @@ import * as schema from "./schema.server";
  *
  * The scopes are deliberately the smallest ones that identify a person. Reading
  * repositories is the GitHub *App*'s job — a separate credential, installed by
- * someone with authority over the organisation — so signing in with GitHub
+ * someone with authority over the organization — so signing in with GitHub
  * never quietly grants this app access to anybody's code.
  */
 function githubSignIn() {

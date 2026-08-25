@@ -133,7 +133,7 @@ function put(
 			else reject(new Error(`storage rejected the upload (${request.status})`));
 		});
 		request.addEventListener("error", () => reject(new Error("could not reach storage")));
-		request.addEventListener("abort", () => reject(new Error("the upload was cancelled")));
+		request.addEventListener("abort", () => reject(new Error("the upload was canceled")));
 
 		request.send(file);
 	});

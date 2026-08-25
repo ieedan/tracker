@@ -104,7 +104,7 @@ export async function presignUpload(options: {
 		Key: options.key,
 		ContentType: options.contentType,
 		// Pinned into the signature: the browser cannot swap in a different type
-		// or a much larger body than the one that was authorised.
+		// or a much larger body than the one that was authorized.
 		ContentLength: options.size,
 	});
 	return forBrowser(await getSignedUrl(s3(), command, { expiresIn: 300 }));

@@ -3,7 +3,7 @@
  *
  * Access comes from a **GitHub App installation**, not from the token of
  * whoever signed in. That distinction is the point: an App is installed onto an
- * organisation by somebody with authority over it, grants only the repositories
+ * organization by somebody with authority over it, grants only the repositories
  * they picked, and keeps working when that person leaves. Reusing a user's
  * OAuth token would mean this app's access to a company's code silently
  * depended on one employee's account.
