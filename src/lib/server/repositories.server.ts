@@ -59,6 +59,69 @@ export function toPullRequest(row: PullRequestRow, repo: RepositoryRow): PullReq
 	};
 }
 
+/** A snapshot older than this is refetched when somebody looks at the issue. */
+const PULL_REQUEST_STALE_MS = 5 * 60_000;
+
+/**
+ * Re-reads a pull request from the provider when the snapshot has aged.
+ *
+ * State is stored rather than fetched per render, so an issue list is one
+ * query rather than a burst of API calls — but a stored state goes stale, and
+ * an issue still reading "Open" after its pull request merged is worse than
+ * slightly slow. This refreshes on the detail page only, where there is exactly
+ * one to check, and treats a provider failure as "keep what we had": a GitHub
+ * outage should not blank the link.
+ */
+export async function refreshPullRequest(
+	row: PullRequestRow,
+	repo: RepositoryRow,
+): Promise<PullRequestRow> {
+	const age = row.syncedAt === null ? Infinity : Date.now() - row.syncedAt.getTime();
+	if (age < PULL_REQUEST_STALE_MS) return row;
+
+	try {
+		const provider = providerFor(repo.provider);
+		const remote = await provider.getPullRequest(
+			await installationFor(repo),
+			{ owner: repo.owner, name: repo.name },
+			row.number,
+		);
+		if (remote === null) {
+			// Deleted, or the installation lost sight of it. Note that we looked, so
+			// this does not retry on every single page view.
+			await db.update(pullRequest).set({ syncedAt: new Date() }).where(eq(pullRequest.id, row.id));
+			return { ...row, syncedAt: new Date() };
+		}
+
+		const patch = {
+			title: remote.title,
+			state: remote.state,
+			url: remote.url,
+			authorLogin: remote.authorLogin,
+			remoteUpdatedAt: new Date(remote.updatedAt),
+			syncedAt: new Date(),
+		};
+		await db.update(pullRequest).set(patch).where(eq(pullRequest.id, row.id));
+		return { ...row, ...patch };
+	} catch {
+		return row;
+	}
+}
+
+/** The pull request on an issue, refreshed if the snapshot has aged. */
+export async function pullRequestForIssue(issueId: string): Promise<PullRequest | null> {
+	const rows = await db
+		.select({ pull: pullRequest, repo: repository })
+		.from(pullRequest)
+		.innerJoin(repository, eq(repository.id, pullRequest.repositoryId))
+		.where(eq(pullRequest.issueId, issueId))
+		.limit(1);
+
+	const row = rows[0];
+	if (row === undefined) return null;
+	return toPullRequest(await refreshPullRequest(row.pull, row.repo), row.repo);
+}
+
 export async function listRepositories(workspaceId: string): Promise<Repository[]> {
 	const rows = await db
 		.select()

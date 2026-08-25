@@ -5,7 +5,7 @@ import { attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
 import { getIssueByIdentifier } from "@/lib/server/issues.server";
-import { listRepositories } from "@/lib/server/repositories.server";
+import { listRepositories, pullRequestForIssue } from "@/lib/server/repositories.server";
 import { comment, user } from "@/lib/server/schema.server";
 import { toComment } from "@/lib/server/serialize.server";
 import type { LoadEvent } from "./$types";
@@ -31,8 +31,24 @@ export default async function load({ locals, params }: LoadEvent) {
 		commentIds: commentRows.map((row) => row.comment.id),
 	});
 
+	// Refreshed here rather than on every list render: this is the one screen
+	// with exactly one pull request to check.
+	const pull = await pullRequestForIssue(found.id);
+
 	return {
-		issue: found,
+		issue: {
+			...found,
+			pullRequest:
+				pull === null
+					? null
+					: {
+							id: pull.id,
+							number: pull.number,
+							title: pull.title,
+							state: pull.state,
+							url: pull.url,
+						},
+		},
 		// The rail's repository picker needs the whole list, not just the one
 		// this issue points at.
 		repositories: await listRepositories(workspace.id),
