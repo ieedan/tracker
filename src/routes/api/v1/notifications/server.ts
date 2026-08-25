@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { MarkNotificationsBody, NotificationSchema } from "@/lib/domain/schemas";
-import { requireUser } from "@/lib/server/guards.server";
+import { requirePermission, requireUser } from "@/lib/server/guards.server";
 import { listNotifications, markRead } from "@/lib/server/notifications.server";
 import { handler } from "./$types";
 
@@ -16,6 +16,7 @@ export const GET = handler({
 	response: v.array(NotificationSchema),
 	async handle({ locals, query }) {
 		const user = requireUser(locals);
+		requirePermission(locals, "notifications", "read");
 		return await listNotifications(user.id, { unreadOnly: query.unread === true });
 	},
 });
@@ -26,6 +27,7 @@ export const POST = handler({
 	response: v.object({ ok: v.boolean() }),
 	async handle({ locals, body }) {
 		const user = requireUser(locals);
+		requirePermission(locals, "notifications", "write");
 		await markRead(user.id, body.ids);
 		return { ok: true };
 	},

@@ -12,6 +12,7 @@ import { auth } from "@/lib/server/auth.server";
 const authenticate: Handle = async ({ event, resolve }) => {
 	event.locals.user = null;
 	event.locals.authVia = null;
+	event.locals.apiKeyPermissions = null;
 
 	const headers = event.request.headers;
 	const key = presentedApiKey(headers);
@@ -21,6 +22,7 @@ const authenticate: Handle = async ({ event, resolve }) => {
 		if (principal !== null) {
 			event.locals.user = principal.user;
 			event.locals.authVia = "api-key";
+			event.locals.apiKeyPermissions = principal.permissions;
 		}
 		return await resolve(event);
 	}

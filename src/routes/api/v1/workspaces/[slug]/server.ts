@@ -2,7 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { eq } from "drizzle-orm";
 import { UpdateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { feedback, workspace } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
 import { handler } from "./$types";
@@ -11,6 +11,7 @@ export const GET = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, params }) {
 		const membership = await requireMembership(locals, params.slug);
+		requirePermission(locals, "workspace", "read");
 		return toWorkspace(membership.workspace, membership.role);
 	},
 });
@@ -20,6 +21,7 @@ export const PATCH = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "workspace", "write");
 
 		const patch = {
 			...(body.name === undefined ? {} : { name: body.name }),

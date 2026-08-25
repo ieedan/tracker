@@ -11,7 +11,7 @@ import {
 	listFeedback,
 	subscribeToFeedback,
 } from "@/lib/server/feedback.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { clientAddress, consume } from "@/lib/server/rate-limit.server";
 import { workspace as workspaceTable } from "@/lib/server/schema.server";
 import { handler, json } from "./$types";
@@ -28,6 +28,7 @@ export const GET = handler({
 	response: v.array(FeedbackSchema),
 	async handle({ locals, params, query }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "feedback", "read");
 		return await listFeedback(workspace.id, {
 			audience: "member",
 			filters: {
@@ -77,6 +78,9 @@ export const POST = handler({
 		if (workspace.feedbackIntake === "api_key" && !viaKey) {
 			error(401, "this workspace requires an API key to submit feedback");
 		}
+		// Sessions skip this. A key presented on a public ingest still has to
+		// hold the scope, the same as on any other write.
+		requirePermission(locals, "feedback", "write");
 
 		const budget = viaKey ? FEEDBACK_RATE_LIMITS.api_key : FEEDBACK_RATE_LIMITS.public;
 		const identity = viaKey

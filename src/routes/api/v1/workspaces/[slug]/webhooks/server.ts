@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateWebhookBody, WebhookSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { webhook } from "@/lib/server/schema.server";
 import { toWebhook } from "@/lib/server/serialize.server";
 import { assertDeliverableUrl, healthOf, newWebhookSecret } from "@/lib/server/webhooks.server";
@@ -14,6 +14,7 @@ export const GET = handler({
 	response: v.array(WebhookSchema),
 	async handle({ locals, params }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "webhooks", "read");
 
 		const rows = await db
 			.select()
@@ -35,6 +36,7 @@ export const POST = handler({
 	response: v.object({ webhook: WebhookSchema, secret: v.string() }),
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "webhooks", "write");
 
 		try {
 			// Rejected here rather than at delivery time, so a bad URL is a 400 on

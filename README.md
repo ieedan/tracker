@@ -101,6 +101,13 @@ they cannot reach better-auth's account endpoints, and they cannot mint more
 keys — that needs a signed-in session. See `src/lib/server/api-key.server.ts`
 for why.
 
+Each key is scoped. At creation you choose read and/or write on **issues**
+(comments and attachments included), **workspace** (the workspace, labels,
+teams), **members**, **webhooks**, **feedback**, and **notifications**. Sessions
+skip those checks; a key without a scope gets 403. Keys minted before scoping
+still have full access. Ingest (`POST …/user-feedback`) needs **feedback**
+write when a key is presented.
+
 ## Attachments
 
 `docker compose up -d` runs MinIO, which speaks S3, so development and a
@@ -157,11 +164,11 @@ Declined — none of which claim anything about progress.
 One endpoint, `POST /api/v1/workspaces/<slug>/user-feedback`, and the workspace
 decides who may call it (**Settings → User feedback → Intake**):
 
-| Mode                         | Who can post                           | Rate limit      |
-| ---------------------------- | -------------------------------------- | --------------- |
-| Closed                       | nobody; the endpoint 404s              | —               |
-| API key required _(default)_ | callers presenting a workspace API key | 120/min per key |
-| Open to anyone               | anyone with the URL                    | 5/min per IP    |
+| Mode                         | Who can post                                     | Rate limit      |
+| ---------------------------- | ------------------------------------------------ | --------------- |
+| Closed                       | nobody; the endpoint 404s                        | —               |
+| API key required _(default)_ | callers presenting a key with **feedback** write | 120/min per key |
+| Open to anyone               | anyone with the URL                              | 5/min per IP    |
 
 A new workspace starts on **API key required**. An open ingest endpoint on a URL
 that is guessable from a workspace slug is something you should have to switch

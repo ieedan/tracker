@@ -11,7 +11,7 @@ import {
 	labelIdsFor,
 	setFeedbackLabels,
 } from "@/lib/server/feedback.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { validLabelIds } from "@/lib/server/issues.server";
 import { feedback } from "@/lib/server/schema.server";
 import { handler } from "./$types";
@@ -23,6 +23,7 @@ export const GET = handler({
 	response: FeedbackSchema,
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "feedback", "read");
 		const row = await findFeedbackRow(workspace.id, params.id);
 		if (row === undefined) error(404, "no such feedback");
 
@@ -45,6 +46,7 @@ export const PATCH = handler({
 	response: FeedbackSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "feedback", "write");
 		const before = await findFeedbackRow(workspace.id, params.id);
 		if (before === undefined) error(404, "no such feedback");
 
@@ -119,6 +121,7 @@ export const DELETE = handler({
 	response: v.object({ deleted: v.boolean() }),
 	async handle({ locals, params }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "feedback", "write");
 		const row = await findFeedbackRow(workspace.id, params.id);
 		if (row === undefined) error(404, "no such feedback");
 

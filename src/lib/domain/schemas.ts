@@ -2,6 +2,7 @@
 // OpenAPI document, and the browser. Kit forbids a client file from importing
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
+import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
 import { DELIVERY_STATUSES, WEBHOOK_EVENTS } from "./webhooks";
@@ -179,6 +180,19 @@ export const UpdateWebhookBody = v.partial(
 	}),
 );
 
+export const ApiKeyActionSchema = v.picklist(API_KEY_ACTIONS);
+
+export const ApiKeyPermissionsSchema = v.partial(
+	v.object({
+		issues: v.array(ApiKeyActionSchema),
+		workspace: v.array(ApiKeyActionSchema),
+		members: v.array(ApiKeyActionSchema),
+		webhooks: v.array(ApiKeyActionSchema),
+		feedback: v.array(ApiKeyActionSchema),
+		notifications: v.array(ApiKeyActionSchema),
+	}),
+);
+
 export const ApiKeySchema = v.object({
 	id: v.string(),
 	name: v.nullable(v.string()),
@@ -187,6 +201,12 @@ export const ApiKeySchema = v.object({
 	enabled: v.boolean(),
 	createdAt: v.string(),
 	lastRequest: v.nullable(v.string()),
+	expiresAt: v.nullable(v.string()),
+	/**
+	 * `null` on keys minted before scopes existed — they can do anything the
+	 * owner can. An empty object is the opposite: explicitly no access.
+	 */
+	permissions: v.nullable(ApiKeyPermissionsSchema),
 });
 export type ApiKey = v.InferOutput<typeof ApiKeySchema>;
 
@@ -350,7 +370,20 @@ export const UpdateWorkspaceBody = v.partial(
 	}),
 );
 
-export const CreateApiKeyBody = v.object({ name: trimmed(1, 60) });
+export const CreateApiKeyBody = v.object({
+	name: trimmed(1, 60),
+	permissions: v.pipe(
+		ApiKeyPermissionsSchema,
+		v.check(
+			(value) => Object.values(value).some((actions) => (actions?.length ?? 0) > 0),
+			"choose at least one permission",
+		),
+	),
+	/** Seconds until the key expires. Omit for a key that does not expire. */
+	expiresIn: v.optional(
+		v.pipe(v.number(), v.integer(), v.minValue(60 * 60 * 24), v.maxValue(60 * 60 * 24 * 365)),
+	),
+});
 
 export const MarkNotificationsBody = v.object({
 	/** Omit to mark every notification read. */

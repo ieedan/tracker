@@ -1,13 +1,14 @@
 import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { workspaceMember } from "@/lib/server/schema.server";
 import { handler } from "./$types";
 
 export const DELETE = handler({
 	async handle({ locals, params }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "members", "write");
 
 		const admins = await db
 			.select({ id: workspaceMember.id })

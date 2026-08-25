@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateWorkspaceBody, WorkspaceSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireUser } from "@/lib/server/guards.server";
+import { requirePermission, requireUser } from "@/lib/server/guards.server";
 import { label, workspace, workspaceMember } from "@/lib/server/schema.server";
 import { toWorkspace } from "@/lib/server/serialize.server";
 import { slugify } from "@/lib/server/slug.server";
@@ -14,6 +14,7 @@ export const GET = handler({
 	response: v.array(WorkspaceSchema),
 	async handle({ locals }) {
 		const user = requireUser(locals);
+		requirePermission(locals, "workspace", "read");
 		const rows = await db
 			.select({ workspace, role: workspaceMember.role })
 			.from(workspaceMember)
@@ -30,6 +31,7 @@ export const POST = handler({
 	response: WorkspaceSchema,
 	async handle({ locals, body }) {
 		const user = requireUser(locals);
+		requirePermission(locals, "workspace", "write");
 
 		const slug = await uniqueSlug(slugify(body.name));
 		const row = {

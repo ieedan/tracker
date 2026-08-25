@@ -6,7 +6,7 @@ import { parseIdentifier } from "@/lib/domain/issues";
 import { CommentSchema, CreateCommentBody } from "@/lib/domain/schemas";
 import { adoptDraftAttachments, attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { emitCommentEvent } from "@/lib/server/events.server";
 import { getIssueById } from "@/lib/server/issues.server";
 import { notify } from "@/lib/server/notifications.server";
@@ -50,6 +50,7 @@ export const GET = handler({
 	response: v.array(CommentSchema),
 	async handle({ locals, params }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "read");
 		const target = await findIssue(workspace.id, params.identifier);
 
 		const rows = await db
@@ -74,6 +75,7 @@ export const POST = handler({
 	response: CommentSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user: author } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 		const target = await findIssue(workspace.id, params.identifier);
 
 		const row = {

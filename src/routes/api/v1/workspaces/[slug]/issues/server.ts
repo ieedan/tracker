@@ -8,7 +8,7 @@ import {
 	IssueStatusSchema,
 } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import {
 	assertMember,
 	getIssueById,
@@ -45,6 +45,7 @@ export const GET = handler({
 	response: v.array(IssueSchema),
 	async handle({ locals, params, query }) {
 		const { workspace } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "read");
 
 		// A key that names no team is a 404 rather than an empty list — otherwise
 		// a typo looks like a team with no work in it.
@@ -66,6 +67,7 @@ export const POST = handler({
 	response: IssueSchema,
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 		const owningTeam = await requireTeam(workspace.id, body.teamKey);
 
 		if (body.assigneeId != null && body.assigneeId !== "") {

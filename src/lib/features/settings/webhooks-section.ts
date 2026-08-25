@@ -3,7 +3,9 @@
 import {
 	Div,
 	ForEach,
+	H2,
 	If,
+	ImplementEffect,
 	ImplementLifecycle,
 	Input,
 	P,
@@ -11,16 +13,22 @@ import {
 	derived,
 	signal,
 	type Readable,
+	type Signal,
 } from "@implementjs/core";
 import { Copy, Plus, Send, Trash2 } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import { Checkbox } from "@/lib/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { Label } from "@/lib/components/ui/label";
 import type { Webhook, WebhookDelivery } from "@/lib/domain/schemas";
 import {
-	WEBHOOK_EVENTS,
+	DEFAULT_WEBHOOK_EVENTS,
+	WEBHOOK_EVENT_GROUPS,
 	WEBHOOK_EVENT_HINTS,
 	WEBHOOK_EVENT_LABELS,
+	WEBHOOK_EVENTS,
 	type WebhookEvent,
 } from "@/lib/domain/webhooks";
 import { relativeTime } from "@/lib/format";
@@ -32,11 +40,7 @@ const inputClass =
 export function WebhooksSection(slug: Readable<string>, copy: (value: string) => Promise<void>) {
 	const hooks = signal<Webhook[]>([]);
 	const loading = signal(true);
-
-	const url = signal("");
-	const description = signal("");
-	const chosen = signal<WebhookEvent[]>(["issue.created", "issue.updated"]);
-	const creating = signal(false);
+	const open = signal(false);
 	const secret = signal("");
 
 	/** Which webhook's delivery log is expanded, and its rows. */
@@ -49,27 +53,6 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 		});
 		loading.set(false);
 		if (error === undefined) hooks.set(data);
-	};
-
-	const create = async () => {
-		const target = url.get().trim();
-		if (target === "" || chosen.get().length === 0) return;
-
-		creating.set(true);
-		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/webhooks", {
-			params: { slug: slug.get() },
-			body: { url: target, description: description.get().trim(), events: chosen.get() },
-		});
-		creating.set(false);
-
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not create the webhook"));
-			return;
-		}
-		hooks.push(data.webhook);
-		secret.set(data.secret);
-		url.set("");
-		description.set("");
 	};
 
 	const remove = async (id: string) => {
@@ -109,7 +92,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			toastError(messageOf(error, "Could not send a test delivery"));
 			return;
 		}
-		if (data.status === "succeeded") toastSuccess(`Delivered — ${data.responseStatus ?? 200}`);
+		if (data.status === "succeeded") toastSuccess(`Delivered (${data.responseStatus ?? 200})`);
 		else toastError(`Test failed: ${data.error ?? "no response"}`);
 
 		await load();
@@ -138,13 +121,30 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 		{ class: "flex flex-col gap-3" },
 		ImplementLifecycle({ onMount: () => void load() }),
 
+		Div(
+			{ class: "flex items-start justify-between gap-3" },
+			Div(
+				{},
+				H2({ class: "text-[14px] font-semibold" }, "Webhooks"),
+				P(
+					{ class: "text-[12px] text-muted-foreground" },
+					"Get a signed POST whenever something happens in this workspace.",
+				),
+			),
+			Button(
+				{ size: "sm", class: "gap-1.5", onClick: () => open.set(true) },
+				Plus({ class: "size-3.5" }),
+				"Create webhook",
+			),
+		),
+
 		If(
 			secret.bind((value) => value !== ""),
 			Div(
 				{ class: "rounded-md border border-primary/40 bg-primary/5 p-3" },
 				P(
 					{ class: "mb-2 text-[12px] font-medium" },
-					"Copy this signing secret now — it is not shown again.",
+					"Copy this signing secret now. It is not shown again.",
 				),
 				Div(
 					{ class: "flex items-center gap-2" },
@@ -161,7 +161,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 				),
 				P(
 					{ class: "mt-2 text-[11px] text-muted-foreground" },
-					"Every request carries x-tracker-signature: sha256=… — an HMAC of the raw body with this secret.",
+					"Every request carries x-tracker-signature: sha256=…, an HMAC of the raw body with this secret.",
 				),
 			),
 		),
@@ -240,67 +240,217 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			derived([loading, hooks], (busy, list) => !busy && list.length === 0),
 			P(
 				{ class: "text-[12px] text-muted-foreground" },
-				"No webhooks yet. Add one to get a signed POST whenever these events happen.",
+				"No webhooks yet. Create one to get a signed POST whenever these events happen.",
 			),
 		),
 
-		// --- new webhook ------------------------------------------------------
-		Div(
-			{ class: "flex flex-col gap-2 rounded-md border border-border p-3" },
-			Input({ value: url, placeholder: "https://example.com/hooks/tracker", class: inputClass }),
-			Input({ value: description, placeholder: "What is this for? (optional)", class: inputClass }),
+		CreateWebhookDialog(open, slug, (created, signingSecret) => {
+			hooks.push(created);
+			secret.set(signingSecret);
+		}),
+	);
+}
+
+function CreateWebhookDialog(
+	open: Signal<boolean>,
+	slug: Readable<string>,
+	onCreated: (hook: Webhook, secret: string) => void,
+) {
+	const url = signal("");
+	const description = signal("");
+	const creating = signal(false);
+	const cells = eventCells();
+	const chosenCount = signal(DEFAULT_WEBHOOK_EVENTS.length);
+
+	const recount = () => {
+		chosenCount.set(
+			WEBHOOK_EVENTS.reduce((total, event) => total + (cells[event].get() ? 1 : 0), 0),
+		);
+	};
+
+	const reset = () => {
+		url.set("");
+		description.set("");
+		for (const event of WEBHOOK_EVENTS) {
+			cells[event].set(DEFAULT_WEBHOOK_EVENTS.includes(event));
+		}
+		recount();
+	};
+
+	const setEvent = (event: WebhookEvent, value: boolean) => {
+		cells[event].set(value);
+		recount();
+	};
+
+	const selectAll = () => {
+		for (const event of WEBHOOK_EVENTS) cells[event].set(true);
+		recount();
+	};
+
+	const submit = async () => {
+		const target = url.get().trim();
+		if (target === "" || chosenCount.get() === 0) return;
+
+		creating.set(true);
+		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/webhooks", {
+			params: { slug: slug.get() },
+			body: {
+				url: target,
+				description: description.get().trim(),
+				events: collect(cells),
+			},
+		});
+		creating.set(false);
+
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not create the webhook"));
+			return;
+		}
+
+		onCreated(data.webhook, data.secret);
+		open.set(false);
+	};
+
+	return Dialog(
+		{ open },
+		ImplementEffect([open], (isOpen) => {
+			if (isOpen) reset();
+		}),
+		DialogContent(
+			{ class: "max-w-md gap-0 p-0" },
+			Div(
+				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+				DialogTitle({ class: "text-[15px] font-semibold" }, "Create webhook"),
+				DialogDescription({ class: "text-[12px]" }, "Where to POST, and which events to send."),
+			),
 
 			Div(
-				{ class: "flex flex-wrap gap-1.5 pt-1" },
-				...WEBHOOK_EVENTS.map((event) =>
-					Button(
+				{ class: "flex flex-col gap-4 px-4 py-4" },
+				Div(
+					{ class: "flex flex-col gap-1.5" },
+					Label({ for: "webhook-url", class: "text-[13px]" }, "URL"),
+					Input({
+						id: "webhook-url",
+						value: url,
+						type: "url",
+						placeholder: "https://example.com/hooks/tracker",
+						autofocus: true,
+						class: inputClass,
+						onKeydown: (event) => {
+							if (event.key === "Enter") void submit();
+						},
+					}),
+				),
+
+				Div(
+					{ class: "flex flex-col gap-1.5" },
+					Label({ for: "webhook-description", class: "text-[13px]" }, "Description"),
+					Input({
+						id: "webhook-description",
+						value: description,
+						placeholder: "What is this for? (optional)",
+						class: inputClass,
+						onKeydown: (event) => {
+							if (event.key === "Enter") void submit();
+						},
+					}),
+				),
+
+				Div(
+					{ class: "flex flex-col gap-1.5" },
+					Div(
+						{ class: "flex items-center justify-between gap-2" },
+						Span({ class: "text-[13px] font-medium" }, "Events"),
+						Button(
+							{
+								size: "xs",
+								variant: "ghost",
+								type: "button",
+								class: "text-[11px] text-muted-foreground",
+								onClick: selectAll,
+							},
+							"Select all",
+						),
+					),
+					Div(
 						{
-							size: "sm",
-							variant: "ghost",
-							title: WEBHOOK_EVENT_HINTS[event],
-							class: derived([chosen], (list) =>
-								cn(
-									"h-6 rounded-full border px-2.5 text-[11px]",
-									list.includes(event)
-										? "border-primary bg-primary/10 text-foreground"
-										: "border-border text-muted-foreground",
+							class: "flex max-h-64 flex-col overflow-y-auto rounded-md border border-border",
+						},
+						...WEBHOOK_EVENT_GROUPS.flatMap((group, index) => [
+							Div(
+								{
+									class: cn(
+										"sticky top-0 bg-secondary/80 px-3 py-1.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm",
+										index > 0 && "border-t border-border",
+									),
+								},
+								group.label,
+							),
+							...group.events.map((event) =>
+								Div(
+									{
+										class: "flex items-start gap-2.5 px-3 py-2",
+									},
+									Checkbox({
+										id: `webhook-event-${event}`,
+										checked: cells[event],
+										"aria-label": WEBHOOK_EVENT_LABELS[event],
+										onCheckedChange: (value) => setEvent(event, value),
+									}),
+									Label(
+										{
+											for: `webhook-event-${event}`,
+											class: "flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5",
+										},
+										Span({ class: "text-[13px] font-normal" }, WEBHOOK_EVENT_LABELS[event]),
+										Span(
+											{ class: "text-[11px] font-normal text-muted-foreground" },
+											WEBHOOK_EVENT_HINTS[event],
+										),
+									),
 								),
 							),
-							onClick: () =>
-								chosen.update((list) =>
-									list.includes(event) ? list.filter((entry) => entry !== event) : [...list, event],
-								),
-						},
-						WEBHOOK_EVENT_LABELS[event],
+						]),
 					),
 				),
 			),
 
 			Div(
-				{ class: "flex items-center justify-end gap-2 pt-1" },
+				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
 				Span(
 					{ class: "mr-auto text-[11px] text-muted-foreground" },
-					chosen.bind((list) =>
-						list.length === 0 ? "Choose at least one event" : `${list.length} selected`,
+					chosenCount.bind((count) =>
+						count === 0 ? "Choose at least one event" : `${count} selected`,
 					),
 				),
+				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
 				Button(
 					{
 						size: "sm",
-						class: "gap-1.5",
 						loading: creating,
 						disabled: derived(
-							[url, chosen],
-							(value, list) => value.trim() === "" || list.length === 0,
+							[url, chosenCount],
+							(value, count) => value.trim() === "" || count === 0,
 						),
-						onClick: () => void create(),
+						onClick: () => void submit(),
 					},
-					Plus({ class: "size-3.5" }),
-					"Add webhook",
+					"Create webhook",
 				),
 			),
 		),
 	);
+}
+
+type EventCells = Record<WebhookEvent, Signal<boolean>>;
+
+function eventCells(): EventCells {
+	return Object.fromEntries(
+		WEBHOOK_EVENTS.map((event) => [event, signal(DEFAULT_WEBHOOK_EVENTS.includes(event))]),
+	) as EventCells;
+}
+
+function collect(cells: EventCells): WebhookEvent[] {
+	return WEBHOOK_EVENTS.filter((event) => cells[event].get());
 }
 
 /** Green when the last delivery landed, red when it did not, grey when unused. */

@@ -6,7 +6,7 @@ import { MAX_ATTACHMENT_BYTES, isAllowedType } from "@/lib/domain/attachments";
 import { AttachmentSchema, CreateAttachmentBody } from "@/lib/domain/schemas";
 import { toAttachment } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
-import { requireMembership } from "@/lib/server/guards.server";
+import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { attachment, comment, issue, team } from "@/lib/server/schema.server";
 import { attachmentKey, presignUpload, storageConfigured } from "@/lib/server/storage.server";
 import { handler, json } from "./$types";
@@ -28,6 +28,7 @@ export const POST = handler({
 	}),
 	async handle({ locals, params, body }) {
 		const { workspace, user } = await requireMembership(locals, params.slug);
+		requirePermission(locals, "issues", "write");
 
 		if (!storageConfigured()) {
 			error(503, "attachment storage is not configured on this server");

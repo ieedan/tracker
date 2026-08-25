@@ -19,6 +19,8 @@ export const auth = betterAuth({
 	plugins: [
 		apiKey({
 			defaultPrefix: "trk_",
+			// Matches CreateApiKeyBody — the plugin's own default is 32.
+			maximumNameLength: 60,
 			// `enableSessionForAPIKeys` stays off (its default). Keys are resolved
 			// directly in `hooks.server.ts` instead — see api-key.server.ts for why.
 		}),

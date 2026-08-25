@@ -2,7 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { UpdateWebhookBody, WebhookSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership } from "@/lib/server/guards.server";
+import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { webhook } from "@/lib/server/schema.server";
 import { toWebhook } from "@/lib/server/serialize.server";
 import { healthOf } from "@/lib/server/webhooks.server";
@@ -13,6 +13,7 @@ export const PATCH = handler({
 	response: WebhookSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "webhooks", "write");
 
 		const changes: Partial<typeof webhook.$inferInsert> = {};
 		if (body.description !== undefined) changes.description = body.description;
@@ -36,6 +37,7 @@ export const PATCH = handler({
 export const DELETE = handler({
 	async handle({ locals, params }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		requirePermission(locals, "webhooks", "write");
 
 		const deleted = await db
 			.delete(webhook)
