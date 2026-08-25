@@ -2,7 +2,9 @@ import { apiKey } from "@better-auth/api-key";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import type { OAuth2Tokens, OAuth2UserInfo } from "better-auth/oauth2";
 import { jwt } from "better-auth/plugins";
+import type { GithubProfile } from "better-auth/social-providers";
 import {
 	AGENT_GRANTABLE_SCOPES,
 	AGENT_REGISTRABLE_SCOPES,
@@ -14,13 +16,100 @@ import { API_KEY_PREFIX } from "./api-key.server";
 import { db } from "./db.server";
 import * as schema from "./schema.server";
 
+/** One entry of `GET /user/emails`. */
+interface GithubEmail {
+	email: string;
+	primary: boolean;
+	verified: boolean;
+}
+
+/**
+ * The two requests that identify whoever just signed in.
+ *
+ * This is what better-auth's stock GitHub provider already does, restated here
+ * for one reason: to fail loudly when `GET /user/emails` is refused. A GitHub
+ * App reads that endpoint through the *account* permission "Email addresses",
+ * which is separate from the repository permissions and is not granted
+ * retroactively — add it and everyone who authorised the App beforehand has to
+ * approve it again. The stock provider ignores that request's error, so a 403
+ * arrives as a user with no address and a NOT NULL violation several layers
+ * further down, which reads as a database bug rather than a missing checkbox.
+ *
+ * The host is github.com's rather than `GITHUB_API_URL`, because better-auth
+ * hardcodes github.com for the authorization and token endpoints: the access
+ * token this is handed is always a github.com one, whatever that variable says.
+ */
+async function githubUserInfo(
+	token: OAuth2Tokens,
+): Promise<{ user: OAuth2UserInfo; data: GithubProfile } | null> {
+	const get = (path: string) =>
+		fetch(`https://api.github.com${path}`, {
+			headers: {
+				accept: "application/vnd.github+json",
+				authorization: `Bearer ${token.accessToken}`,
+				"user-agent": "tracker",
+			},
+		});
+
+	const profileResponse = await get("/user");
+	if (!profileResponse.ok) {
+		console.error(`GitHub sign-in: GET /user was refused (${profileResponse.status}).`);
+		return null;
+	}
+	const profile = (await profileResponse.json()) as GithubProfile;
+
+	const emailsResponse = await get("/user/emails");
+	if (!emailsResponse.ok) {
+		console.error(
+			`GitHub sign-in: GET /user/emails was refused (${emailsResponse.status}). ` +
+				'A GitHub App needs the account permission "Email addresses: read-only", ' +
+				"and anyone who authorised it before that was added has to approve it again.",
+		);
+		return null;
+	}
+	const emails = (await emailsResponse.json()) as GithubEmail[];
+
+	// `/user` only carries an address when the account made one public, so the
+	// primary address from `/user/emails` is the usual source.
+	profile.email = profile.email || ((emails.find((e) => e.primary) ?? emails[0])?.email ?? null);
+	if (profile.email === null) {
+		console.error("GitHub sign-in: GitHub returned no address for this account.");
+		return null;
+	}
+
+	// Account linking treats this as the proof that the address is theirs, so it
+	// has to come from GitHub rather than be assumed. See `accountLinking` below.
+	const emailVerified = emails.find((e) => e.email === profile.email)?.verified ?? false;
+
+	return {
+		user: {
+			name: profile.name || profile.login,
+			email: profile.email,
+			image: profile.avatar_url,
+			emailVerified,
+		},
+		data: profile,
+	};
+}
+
 /**
  * GitHub sign-in, only when it has been configured.
  *
- * The scopes are deliberately the smallest ones that identify a person. Reading
- * repositories is the GitHub *App*'s job — a separate credential, installed by
- * someone with authority over the organization — so signing in with GitHub
- * never quietly grants this app access to anybody's code.
+ * These are the *GitHub App's* OAuth credentials — the same App that reaches
+ * repositories through `GITHUB_APP_*`. A GitHub App runs the same
+ * user-to-server flow at the same endpoints an OAuth app does, so better-auth's
+ * stock `github` provider drives it unchanged; the App just has to list
+ * `<origin>/api/auth/callback/github` among its callback URLs and hold the
+ * "Email addresses" account permission.
+ *
+ * Signing in still grants nothing over anybody's code. Repository access comes
+ * from an *installation* token minted against the App's private key (see
+ * `providers/github.server.ts`), and installing the App onto an organization is
+ * a separate decision made by someone with authority over it. Authorising
+ * sign-in does not install anything.
+ *
+ * An OAuth app's credentials still work here unchanged, if you would rather
+ * keep the two separate.
  */
 function githubSignIn() {
 	if (env.GITHUB_CLIENT_ID === "" || env.GITHUB_CLIENT_SECRET === "") return {};
@@ -28,8 +117,11 @@ function githubSignIn() {
 		github: {
 			clientId: env.GITHUB_CLIENT_ID,
 			clientSecret: env.GITHUB_CLIENT_SECRET,
-			// No `scope` here on purpose: better-auth already asks for exactly
-			// `read:user user:email`, and repeating it only sends each twice.
+			// No `scope` here on purpose. better-auth already asks for exactly
+			// `read:user user:email`, and repeating it only sends each twice. A
+			// GitHub App ignores the parameter outright and goes by its own
+			// permissions instead, which is why "Email addresses" is load-bearing.
+			getUserInfo: githubUserInfo,
 		},
 	};
 }

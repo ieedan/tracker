@@ -388,100 +388,60 @@ function existingGithub(existing: Record<string, string>): GithubCreds {
 	};
 }
 
-async function setupGithubSignIn(
+/**
+ * One GitHub App, covering both halves of the integration.
+ *
+ * Its OAuth credentials sign people in; its App ID and private key mint the
+ * installation tokens that read repositories. That is one registration to make
+ * and one place for callback URLs to be wrong, rather than two apps whose
+ * client IDs differ by a single letter. A personal access token stays available
+ * as a development stand-in for the installation, and covers repositories only.
+ */
+async function setupGithub(
 	rl: Interface,
 	existing: GithubCreds,
 	origin: string,
 	appName: string,
-): Promise<Pick<GithubCreds, "GITHUB_CLIENT_ID" | "GITHUB_CLIENT_SECRET">> {
-	const already = filled(existing.GITHUB_CLIENT_ID) && filled(existing.GITHUB_CLIENT_SECRET);
-	const proceed = already
-		? !(await confirm(rl, "\nKeep existing GitHub sign-in?", true))
-		: await confirm(rl, "\nSet up GitHub sign-in?", false);
-
-	if (!proceed) {
-		return {
-			GITHUB_CLIENT_ID: existing.GITHUB_CLIENT_ID,
-			GITHUB_CLIENT_SECRET: existing.GITHUB_CLIENT_SECRET,
-		};
-	}
-
-	console.log(`\n  Open ${cyan("https://github.com/settings/applications/new")}`);
-	console.log();
-	console.log(`    Application name             ${appName}`);
-	console.log(`    Homepage URL                 ${origin}`);
-	console.log(`    Authorization callback URL   ${origin}/api/auth/callback/github`);
-	console.log();
-	console.log(
-		"  Create the app, then paste the Client ID. Generate a client secret and paste that next.",
-	);
-
-	const id = await ask(rl, {
-		key: "GITHUB_CLIENT_ID",
-		blurb: "From the OAuth app page.",
-		schema: v.pipe(v.string(), v.minLength(1, "paste the Client ID")),
-		fallback: existing.GITHUB_CLIENT_ID,
-		origin: filled(existing.GITHUB_CLIENT_ID) ? "current" : undefined,
-	});
-	const secret = await ask(rl, {
-		key: "GITHUB_CLIENT_SECRET",
-		blurb: "Generate a new client secret on the same page.",
-		schema: v.pipe(v.string(), v.minLength(1, "paste the client secret")),
-		fallback: existing.GITHUB_CLIENT_SECRET,
-		secret: true,
-		origin: filled(existing.GITHUB_CLIENT_SECRET) ? "current" : undefined,
-	});
-
-	return { GITHUB_CLIENT_ID: id, GITHUB_CLIENT_SECRET: secret };
-}
-
-async function setupGithubRepos(
-	rl: Interface,
-	existing: GithubCreds,
-	origin: string,
 	/** A personal access token stands in for an App in development only. */
 	allowToken = true,
-): Promise<Omit<GithubCreds, "GITHUB_CLIENT_ID" | "GITHUB_CLIENT_SECRET" | "GITHUB_API_URL">> {
+): Promise<Omit<GithubCreds, "GITHUB_API_URL">> {
+	const unchanged = (): Omit<GithubCreds, "GITHUB_API_URL"> => ({
+		GITHUB_CLIENT_ID: existing.GITHUB_CLIENT_ID,
+		GITHUB_CLIENT_SECRET: existing.GITHUB_CLIENT_SECRET,
+		GITHUB_APP_ID: existing.GITHUB_APP_ID,
+		GITHUB_APP_SLUG: existing.GITHUB_APP_SLUG,
+		GITHUB_APP_PRIVATE_KEY: existing.GITHUB_APP_PRIVATE_KEY,
+		GITHUB_APP_WEBHOOK_SECRET: existing.GITHUB_APP_WEBHOOK_SECRET,
+		GITHUB_DEV_TOKEN: allowToken ? existing.GITHUB_DEV_TOKEN : "",
+	});
+
 	const hasApp = filled(existing.GITHUB_APP_ID) && filled(existing.GITHUB_APP_PRIVATE_KEY);
 	const hasToken = allowToken && filled(existing.GITHUB_DEV_TOKEN);
 
 	if (hasApp) {
-		if (await confirm(rl, "\nKeep existing GitHub App?", true)) {
-			return {
-				GITHUB_APP_ID: existing.GITHUB_APP_ID,
-				GITHUB_APP_SLUG: existing.GITHUB_APP_SLUG,
-				GITHUB_APP_PRIVATE_KEY: existing.GITHUB_APP_PRIVATE_KEY,
-				GITHUB_APP_WEBHOOK_SECRET: existing.GITHUB_APP_WEBHOOK_SECRET,
-				GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN,
-			};
+		// An App configured before sign-in moved onto it has no client credentials,
+		// and nothing else would ever say so — the button is simply missing.
+		if (!filled(existing.GITHUB_CLIENT_ID)) {
+			console.log(
+				`\n  ${dim('This App has no Client ID or secret, so the "Sign in with GitHub" button is hidden. Answer no to add them.')}`,
+			);
 		}
+		if (await confirm(rl, "\nKeep existing GitHub App?", true)) return unchanged();
 	} else if (hasToken) {
 		if (await confirm(rl, "\nKeep existing GitHub personal access token?", true)) {
-			return {
-				GITHUB_APP_ID: "",
-				GITHUB_APP_SLUG: "",
-				GITHUB_APP_PRIVATE_KEY: "",
-				GITHUB_APP_WEBHOOK_SECRET: "",
-				GITHUB_DEV_TOKEN: existing.GITHUB_DEV_TOKEN,
-			};
+			return unchanged();
 		}
-	} else if (!(await confirm(rl, "\nSet up repository linking?", false))) {
-		return {
-			GITHUB_APP_ID: "",
-			GITHUB_APP_SLUG: "",
-			GITHUB_APP_PRIVATE_KEY: "",
-			GITHUB_APP_WEBHOOK_SECRET: "",
-			GITHUB_DEV_TOKEN: "",
-		};
+	} else if (!(await confirm(rl, "\nSet up GitHub sign-in and repository linking?", false))) {
+		return unchanged();
 	}
 
 	const kind = allowToken
 		? await choose(
 				rl,
-				"How should this app reach GitHub repositories?",
+				"How should this app reach GitHub?",
 				[
-					{ label: "GitHub App", hint: "install on an org — what the Settings page uses" },
-					{ label: "Personal access token", hint: "development only" },
+					{ label: "GitHub App", hint: "sign-in and repository access, one registration" },
+					{ label: "Personal access token", hint: "repository access only — development" },
 				],
 				0,
 			)
@@ -497,6 +457,11 @@ async function setupGithubRepos(
 		console.log("    Permissions (read-only)     Contents, Metadata, Pull requests");
 		console.log();
 		console.log("  Generate the token and paste it.");
+		if (!filled(existing.GITHUB_CLIENT_ID)) {
+			console.log(
+				`  ${dim('A token cannot sign anyone in, so the "Sign in with GitHub" button stays hidden.')}`,
+			);
+		}
 
 		const token = await ask(rl, {
 			key: "GITHUB_DEV_TOKEN",
@@ -508,6 +473,10 @@ async function setupGithubRepos(
 		});
 
 		return {
+			// Sign-in credentials are left alone: they belong to whatever app is
+			// already registered, and a token has nothing to say about them.
+			GITHUB_CLIENT_ID: existing.GITHUB_CLIENT_ID,
+			GITHUB_CLIENT_SECRET: existing.GITHUB_CLIENT_SECRET,
 			GITHUB_APP_ID: "",
 			GITHUB_APP_SLUG: "",
 			GITHUB_APP_PRIVATE_KEY: "",
@@ -518,21 +487,42 @@ async function setupGithubRepos(
 
 	console.log(`\n  Open ${cyan("https://github.com/settings/apps/new")}`);
 	console.log();
-	console.log(`    GitHub App name             anything unique`);
+	console.log(`    GitHub App name             ${appName}, or anything else unique on GitHub`);
 	console.log(`    Homepage URL                ${origin}`);
-	console.log(`    Callback URL                ${origin}/api/v1/github/callback`);
+	console.log(`    Callback URL                ${origin}/api/auth/callback/github`);
+	console.log(`    Add callback URL            ${origin}/api/v1/github/callback`);
 	console.log(`    Setup URL                   ${origin}/api/v1/github/callback`);
+	console.log("    Request user authorization (OAuth) during installation    leave unchecked");
 	console.log("    Webhook                     uncheck Active");
+	console.log("    Account permissions         Email addresses — Read-only");
 	console.log("    Repository permissions      Contents, Metadata, Pull requests — all Read-only");
 	console.log("    Where can this GitHub App be installed?    Any account");
 	console.log();
 	console.log(
-		"  Create the app. The App ID is on the next page; the slug is the last part of github.com/apps/<slug>. Generate a private key at the bottom.",
+		`  Both callback URLs are needed: the first is where signing in returns, the second is where installing returns. ${bold("Email addresses")} is what lets sign-in read an address — without it people arrive with none and cannot be created.`,
+	);
+	console.log(
+		"  Create the app. The App ID and Client ID are on the next page; the slug is the last part of github.com/apps/<slug>. Generate a client secret and a private key at the bottom.",
 	);
 
+	const clientId = await ask(rl, {
+		key: "GITHUB_CLIENT_ID",
+		blurb: "The app's Client ID, which starts with Iv23li.",
+		schema: v.pipe(v.string(), v.minLength(1, "paste the Client ID")),
+		fallback: existing.GITHUB_CLIENT_ID,
+		origin: filled(existing.GITHUB_CLIENT_ID) ? "current" : undefined,
+	});
+	const clientSecret = await ask(rl, {
+		key: "GITHUB_CLIENT_SECRET",
+		blurb: "Generate a client secret on the same page.",
+		schema: v.pipe(v.string(), v.minLength(1, "paste the client secret")),
+		fallback: existing.GITHUB_CLIENT_SECRET,
+		secret: true,
+		origin: filled(existing.GITHUB_CLIENT_SECRET) ? "current" : undefined,
+	});
 	const appId = await ask(rl, {
 		key: "GITHUB_APP_ID",
-		blurb: "A number, shown as App ID on the app page.",
+		blurb: "A number, shown as App ID — not the Client ID.",
 		schema: v.pipe(v.string(), v.regex(/^\d+$/, "the App ID is a number")),
 		fallback: existing.GITHUB_APP_ID,
 		origin: filled(existing.GITHUB_APP_ID) ? "current" : undefined,
@@ -551,11 +541,14 @@ async function setupGithubRepos(
 			: existing.GITHUB_APP_WEBHOOK_SECRET;
 
 	return {
+		GITHUB_CLIENT_ID: clientId,
+		GITHUB_CLIENT_SECRET: clientSecret,
 		GITHUB_APP_ID: appId,
 		GITHUB_APP_SLUG: slug,
 		GITHUB_APP_PRIVATE_KEY: privateKey,
 		GITHUB_APP_WEBHOOK_SECRET: webhookSecret,
-		GITHUB_DEV_TOKEN: allowToken ? existing.GITHUB_DEV_TOKEN : "",
+		// The App supersedes the stand-in, and leaving both set is only confusing.
+		GITHUB_DEV_TOKEN: "",
 	};
 }
 
@@ -699,8 +692,7 @@ async function setupDev(): Promise<void> {
 		const previousGithub = existingGithub(existing);
 		const github: GithubCreds = {
 			...previousGithub,
-			...(await setupGithubSignIn(rl, previousGithub, origin, values.PUBLIC_APP_NAME ?? "tracker")),
-			...(await setupGithubRepos(rl, previousGithub, origin)),
+			...(await setupGithub(rl, previousGithub, origin, values.PUBLIC_APP_NAME ?? "tracker")),
 		};
 
 		// Local MinIO (`docker compose up -d`). Kept if already set, so a
@@ -1343,8 +1335,7 @@ async function setupProd(): Promise<void> {
 		} else {
 			github = {
 				...previousGithub,
-				...(await setupGithubSignIn(rl, previousGithub, origin, appName)),
-				...(await setupGithubRepos(rl, previousGithub, origin, false)),
+				...(await setupGithub(rl, previousGithub, origin, appName, false)),
 				GITHUB_DEV_TOKEN: "",
 			};
 		}

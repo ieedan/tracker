@@ -51,16 +51,28 @@ export const serverEnvSchema = {
 	S3_PUBLIC_ENDPOINT: v.optional(v.string(), ""),
 
 	// --- GitHub -------------------------------------------------------------
-	// Two separate credentials, deliberately. The OAuth app signs people in and
-	// asks for nothing but their identity. The GitHub App is what reaches
-	// repositories, and it is installed per-organization by someone who can say
-	// yes to that — so signing in never implies handing over your code.
-	/** OAuth app, for "Sign in with GitHub". Leave blank to hide the button. */
+	// One GitHub App covers both halves of this block. Its OAuth credentials
+	// sign people in; its App ID and private key mint the installation tokens
+	// that read repositories. The two are still different grants: authorising
+	// sign-in hands over an identity, while installing the App onto an
+	// organization is a separate decision, made by someone with authority over
+	// it, that names the repositories it covers.
+	//
+	// Either half can be left blank — blank credentials hide the sign-in button,
+	// a blank App leaves repository linking unavailable rather than half-working.
+	/**
+	 * The App's OAuth credentials, for "Sign in with GitHub". Leave blank to
+	 * hide the button.
+	 *
+	 * A GitHub App's client ID starts with `Iv23li`; an OAuth app's starts with
+	 * `Ov23li`. Both work here, but each is only valid for the callback URLs
+	 * registered against *that* app — mixing them up is what produces GitHub's
+	 * "The redirect_uri is not associated with this application" page.
+	 */
 	GITHUB_CLIENT_ID: v.optional(v.string(), ""),
 	GITHUB_CLIENT_SECRET: v.optional(v.string(), ""),
 	/**
-	 * GitHub App, for reading repositories. Leave blank and repository linking
-	 * stays unavailable rather than half-working.
+	 * The same App, identified the way the installation API wants it.
 	 *
 	 * The private key is the PEM GitHub hands you at creation. Newlines survive
 	 * `.env` badly, so `\n` escapes are accepted and unescaped on read.

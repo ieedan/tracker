@@ -48,9 +48,9 @@ going back and forth between dashboards:
 3. **A bucket** — Cloudflare R2, or anything else speaking S3. It prints the
    exact CORS policy to paste, with your origin already in it; the browser PUTs
    straight to the bucket, so uploads fail without it.
-4. **GitHub** — the OAuth app for sign-in and the GitHub App for repositories,
-   with the callback URLs spelled out. Both are optional; skipping one leaves
-   that feature off rather than half-working.
+4. **GitHub** — one GitHub App, covering both sign-in and repositories, with
+   its two callback URLs and its permissions spelled out. It is optional;
+   skipping it leaves both features off rather than half-working.
 
 It ends by writing `.env.production`, pushing every value to Vercel (via the
 `vercel` CLI, if installed), then offering the two irreversible steps last:
@@ -196,18 +196,31 @@ implementation, but everything goes through a provider adapter
 (`src/lib/server/providers/`), so the routes never learn which host they are
 talking to and adding GitLab is one new file.
 
-### Two credentials, on purpose
+### One app, two grants
 
-|                                            | What it is   | What it reaches                           |
-| ------------------------------------------ | ------------ | ----------------------------------------- |
-| `GITHUB_CLIENT_ID` / `_SECRET`             | An OAuth app | Someone's name and email, to sign them in |
-| `GITHUB_APP_ID` / `_SLUG` / `_PRIVATE_KEY` | A GitHub App | The repositories an org admin granted     |
+|                                            | What it is              | What it reaches                           |
+| ------------------------------------------ | ----------------------- | ----------------------------------------- |
+| `GITHUB_CLIENT_ID` / `_SECRET`             | The App's OAuth client  | Someone's name and email, to sign them in |
+| `GITHUB_APP_ID` / `_SLUG` / `_PRIVATE_KEY` | The same App's identity | The repositories an org admin granted     |
 
-Signing in with GitHub never grants access to code. Repository access comes
-from an App _installation_: installed onto an organization by somebody with
-authority over it, scoped to the repositories they picked, and still working
-when that person leaves the company. A user's OAuth token would give you none
-of those three.
+Both halves are one GitHub App. It runs the same user-to-server flow an OAuth
+app does, so it signs people in from `/api/auth/callback/github`, and its
+private key mints the installation tokens that read code. The App needs the
+account permission **Email addresses (read)** for sign-in to learn an address
+at all — without it people arrive with none.
+
+Sharing a registration does not merge the two grants. Signing in with GitHub
+still never grants access to code: repository access comes from an App
+_installation_, installed onto an organization by somebody with authority over
+it, scoped to the repositories they picked, and still working when that person
+leaves the company. Authorising sign-in installs nothing. A user's own OAuth
+token would give you none of those three.
+
+Two separate apps still work, if you would rather keep the registrations apart:
+put an OAuth app's `Ov23li…` credentials in `GITHUB_CLIENT_ID` / `_SECRET` and
+leave the App to `GITHUB_APP_*`. Each client ID is only valid for the callback
+URLs registered against its own app — mixing them up is what produces GitHub's
+"redirect_uri is not associated with this application" page.
 
 Installation tokens live an hour, so they are minted on demand and cached
 in-process — never stored.
