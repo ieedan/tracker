@@ -246,12 +246,7 @@ export function BulkActionsDialog({
 		// back after that pass so typing goes into search.
 		focusFrame = requestAnimationFrame(() => {
 			focusFrame = undefined;
-			const node = searchRef.get();
-			if (node instanceof HTMLInputElement) {
-				node.focus();
-				return;
-			}
-			node?.querySelector("input")?.focus();
+			searchRef.get()?.focus();
 		});
 	};
 
