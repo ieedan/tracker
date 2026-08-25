@@ -3,6 +3,29 @@ import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/domain/issues";
 import { cn } from "@/lib/utils";
 
+/**
+ * One glyph size for every inline chip — a picker trigger, a filter pill, a
+ * composer chip.
+ *
+ * The glyphs disagree by default: the status ring is a 16px box around a 14px
+ * SVG, the priority bars are a 16px column, an avatar is 20px, and the lucide
+ * icons are 14px. Side by side in a row of chips that reads as five different
+ * controls rather than one row.
+ *
+ * `cn` runs these through tailwind-merge, so a `size-*` here beats the one baked
+ * into the glyph. Two need more than that: the status ring carries width/height
+ * attributes on its markup, which only the `[&_svg]:` variant overrides, and the
+ * priority bars are a column of fixed heights rather than one box, so the column
+ * is resized and centred inside the same square as everything else.
+ */
+export const CHIP_GLYPH = {
+	status: "size-3.5 [&_svg]:size-3.5",
+	priority: "size-3.5 justify-center [&>div]:h-3.5",
+	avatar: "size-3.5 text-[8px]",
+	dot: "size-2",
+	icon: "size-3.5",
+} as const;
+
 const STATUS_COLOR: Record<IssueStatus, string> = {
 	backlog: "#8a8f98",
 	todo: "#8a8f98",

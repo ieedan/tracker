@@ -11,7 +11,13 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
-import { PriorityIcon, StatusIcon, UnassignedAvatar, UserAvatar } from "@/lib/components/glyphs";
+import {
+	CHIP_GLYPH,
+	PriorityIcon,
+	StatusIcon,
+	UnassignedAvatar,
+	UserAvatar,
+} from "@/lib/components/glyphs";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -34,7 +40,7 @@ export function StatusPicker(
 	return DropdownMenu(
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Status" },
-			StatusIcon(current),
+			StatusIcon(current, CHIP_GLYPH.status),
 			options.showLabel === true
 				? Span(
 						{},
@@ -67,7 +73,7 @@ export function PriorityPicker(
 	return DropdownMenu(
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Priority" },
-			PriorityIcon(current),
+			PriorityIcon(current, CHIP_GLYPH.priority),
 			options.showLabel === true
 				? Span(
 						{},
@@ -101,7 +107,7 @@ export function AssigneePicker(
 	return DropdownMenu(
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Assignee" },
-			AssigneeAvatar(current),
+			AssigneeAvatar(current, CHIP_GLYPH.avatar),
 			options.showLabel === true
 				? Span(
 						{},
@@ -147,7 +153,7 @@ export function LabelPicker(
 	return DropdownMenu(
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Labels" },
-			Tag({ class: "size-3.5" }),
+			Tag({ class: CHIP_GLYPH.icon }),
 			Span(
 				{},
 				selected.bind((labels) =>
@@ -184,7 +190,7 @@ function Tick(shown: Readable<boolean>): Child {
 }
 
 /** The assignee's avatar, or the dashed placeholder when there is none. */
-export function AssigneeAvatar(current: Readable<UserSummary | null>) {
+export function AssigneeAvatar(current: Readable<UserSummary | null>, className?: string) {
 	return Div(
 		{ class: "flex items-center" },
 		If(current.bind((user) => user !== null))
@@ -192,17 +198,17 @@ export function AssigneeAvatar(current: Readable<UserSummary | null>) {
 				Div(
 					{ class: "contents" },
 					// `current` is non-null inside this branch; bind reads it safely.
-					UserAvatarOf(current),
+					UserAvatarOf(current, className),
 				),
 			)
-			.Else(UnassignedAvatar()),
+			.Else(UnassignedAvatar(className)),
 	);
 }
 
-function UserAvatarOf(current: Readable<UserSummary | null>) {
+function UserAvatarOf(current: Readable<UserSummary | null>, className?: string) {
 	const user = current.get();
-	if (user === null) return UnassignedAvatar();
-	return UserAvatar(user);
+	if (user === null) return UnassignedAvatar(className);
+	return UserAvatar(user, className);
 }
 
 /** The coloured pills shown on a row and on the detail page. */
@@ -235,7 +241,7 @@ export function TeamPicker(
 	return DropdownMenu(
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Team" },
-			Users({ class: "size-3.5" }),
+			Users({ class: CHIP_GLYPH.icon }),
 			Span(
 				{ class: options.showLabel === true ? "" : "font-mono" },
 				current.bind((team) => team?.key ?? "Team"),

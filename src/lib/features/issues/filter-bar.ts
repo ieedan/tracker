@@ -37,7 +37,13 @@ import {
 } from "@/lib/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/lib/components/ui/popover";
 import { Button } from "@/lib/components/ui/button";
-import { PriorityIcon, StatusIcon, UnassignedAvatar, UserAvatar } from "@/lib/components/glyphs";
+import {
+	CHIP_GLYPH,
+	PriorityIcon,
+	StatusIcon,
+	UnassignedAvatar,
+	UserAvatar,
+} from "@/lib/components/glyphs";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -73,30 +79,15 @@ interface FilterOption {
 	icon?: Child;
 }
 
-/**
- * Glyph sizes differ by where they are shown. In the menu they sit beside 13px
- * rows and match the issue list; in a 24px chip that same 20px avatar all but
- * fills it, so chips get their own smaller set.
- *
- * `cn` runs these through tailwind-merge, so a `size-*` here beats the one baked
- * into the glyph. The status ring additionally needs the `[&_svg]:` variant —
- * its markup carries width/height attributes, and only CSS overrides those.
- */
-const COMPACT = {
-	status: "size-3.5 [&_svg]:size-3.5",
-	avatar: "size-3.5 text-[8px]",
-	dot: "size-2",
-} as const;
-
 function optionsFor(field: FilterField, context: FilterContext, compact = false): FilterOption[] {
-	const avatar = compact ? COMPACT.avatar : undefined;
+	const avatar = compact ? CHIP_GLYPH.avatar : undefined;
 
 	switch (field) {
 		case "status":
 			return ISSUE_STATUSES.map((status) => ({
 				value: status,
 				label: STATUS_LABELS[status],
-				icon: StatusIcon(status, compact ? COMPACT.status : undefined),
+				icon: StatusIcon(status, compact ? CHIP_GLYPH.status : undefined),
 			}));
 		case "priority":
 			return ISSUE_PRIORITIES.map((priority) => ({
@@ -104,7 +95,7 @@ function optionsFor(field: FilterField, context: FilterContext, compact = false)
 				label: PRIORITY_LABELS[priority],
 				// The priority bars are fixed heights rather than one box, so they
 				// shrink by scaling instead of by a size class.
-				icon: PriorityIcon(priority, compact ? "scale-90" : undefined),
+				icon: PriorityIcon(priority, compact ? CHIP_GLYPH.priority : undefined),
 			}));
 		case "assignee":
 			return [
@@ -126,7 +117,7 @@ function optionsFor(field: FilterField, context: FilterContext, compact = false)
 				value: label.id,
 				label: label.name,
 				icon: Span({
-					class: cn("shrink-0 rounded-full", compact ? COMPACT.dot : "size-2.5"),
+					class: cn("shrink-0 rounded-full", compact ? CHIP_GLYPH.dot : "size-2.5"),
 					style: { backgroundColor: label.color },
 				}),
 			}));

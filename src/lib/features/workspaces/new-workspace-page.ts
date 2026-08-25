@@ -1,19 +1,17 @@
-import { Div, H1, Input, Label, P, Span, signal } from "@implementjs/core";
+import { Div, H1, Input, Label, P, Span, derived, signal } from "@implementjs/core";
 import { api, messageOf } from "@/lib/client/api";
 import { Button } from "@/lib/components/ui/button";
-import { workspaceKeyPreview } from "./key-preview";
+import { slugPreview } from "./slug-preview";
 
 export function NewWorkspacePage() {
 	const name = signal("");
-	const key = signal("");
 	const failure = signal("");
 	const creating = signal(false);
 
-	// The key follows the name until someone types one of their own.
-	const keyTouched = signal(false);
-	name.onChange((value) => {
-		if (!keyTouched.get()) key.set(workspaceKeyPreview(value));
-	});
+	// What the URL will read once this exists. The server still has the last
+	// word — it appends `-2` if the slug is taken — but showing it here is what
+	// makes "this name becomes an address" obvious before you commit to it.
+	const slug = derived([name], (value) => slugPreview(value));
 
 	const create = async () => {
 		if (name.get().trim() === "") return;
@@ -34,13 +32,15 @@ export function NewWorkspacePage() {
 	};
 
 	return Div(
-		{ class: "flex flex-1 items-center justify-center px-4" },
+		// This page has no shell to sit inside, so it takes the viewport height
+		// itself — `flex-1` needs a flex parent, and the root layout is not one.
+		{ class: "flex min-h-dvh items-center justify-center px-4 py-10" },
 		Div(
 			{ class: "w-full max-w-sm" },
 			H1({ class: "mb-1 text-xl font-semibold tracking-tight" }, "Create a workspace"),
 			P(
 				{ class: "mb-6 text-sm text-muted-foreground" },
-				"Workspaces hold issues, labels and people.",
+				"Workspaces hold teams, issues, labels and people.",
 			),
 
 			Div(
@@ -52,33 +52,27 @@ export function NewWorkspacePage() {
 						id: "name",
 						value: name,
 						autofocus: true,
-						placeholder: "Engineering",
+						placeholder: "Acme",
 						class:
 							"h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring",
 						onKeydown: (event) => {
 							if (event.key === "Enter") void create();
 						},
 					}),
-				),
-				Div(
-					{ class: "flex flex-col gap-1.5" },
-					Label({ class: "text-[13px] font-medium", htmlFor: "key" }, "Issue prefix"),
-					Input({
-						id: "key",
-						value: key,
-						placeholder: "ENG",
-						maxLength: 6,
-						class:
-							"h-9 w-28 rounded-md border border-input bg-background px-3 font-mono text-sm uppercase outline-none focus:border-ring",
-						onInput: () => keyTouched.set(true),
-					}),
 					Span(
 						{ class: "text-[12px] text-muted-foreground" },
-						key.bind(
-							(value) => `Issues will be numbered ${(value || "WS").toUpperCase()}-1, -2, …`,
-						),
+						derived([slug], (value) => `tracker.app/${value || "…"}`),
 					),
 				),
+
+				// Deliberately no issue-prefix field. A prefix belongs to a team, not
+				// a workspace — `ENG-42` and `PRD-7` live side by side in here — so
+				// asking for one at this point would be asking the wrong question.
+				P(
+					{ class: "text-[12px] text-muted-foreground" },
+					"You will start with Engineering (ENG) and Product (PRD) teams. Issues take their prefix from the team that owns them.",
+				),
+
 				P({ class: "text-xs text-destructive empty:hidden" }, failure),
 				Button(
 					{
