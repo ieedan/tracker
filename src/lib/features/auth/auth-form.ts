@@ -1,8 +1,9 @@
-import { A, Div, H1, Input, Label, P, Span, signal } from "@implementjs/core";
+import { A, Div, H1, If, Input, Label, P, Span, signal, type Readable } from "@implementjs/core";
 import { createForm, Field, Form } from "@implementjs/formish";
 import * as v from "valibot";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/lib/components/ui/button";
+import { GithubMark } from "@/lib/components/glyphs";
 
 const LoginSchema = v.object({
 	email: v.pipe(v.string(), v.minLength(1, "Enter your email"), v.email("Enter a valid email")),
@@ -30,6 +31,64 @@ const styles = {
 	footer: "mt-6 text-center text-sm text-muted-foreground",
 	link: "text-foreground underline underline-offset-4 hover:text-primary",
 };
+
+export interface AuthPageData {
+	providers: { github: boolean };
+}
+
+/**
+ * The social buttons and the rule that separates them from the form.
+ *
+ * Rendered above the fields rather than below: someone who has an account
+ * through GitHub is looking for the button, and making them read past a
+ * password form to find it is how you get duplicate accounts.
+ */
+function SocialSignIn(data: Readable<AuthPageData>, verb: string) {
+	const busy = signal(false);
+	const failure = signal("");
+
+	const start = async () => {
+		failure.set("");
+		busy.set(true);
+		const { error } = await authClient.signIn.social({
+			provider: "github",
+			callbackURL: destination(),
+		});
+		// Success navigates away, so reaching here at all means it did not.
+		busy.set(false);
+		if (error) {
+			failure.set(
+				error.message !== undefined && error.message !== ""
+					? error.message
+					: "Could not reach GitHub. Try again.",
+			);
+		}
+	};
+
+	return If(
+		data.bind((value) => value.providers.github),
+		Div(
+			{ class: "mb-5 flex flex-col gap-3" },
+			Button(
+				{
+					variant: "secondary",
+					class: "w-full gap-2",
+					loading: busy,
+					onClick: () => void start(),
+				},
+				GithubMark({ class: "size-4" }),
+				`${verb} with GitHub`,
+			),
+			P({ class: styles.error }, failure),
+			Div(
+				{ class: "flex items-center gap-3" },
+				Div({ class: "h-px flex-1 bg-border" }),
+				Span({ class: "text-[11px] tracking-wide text-muted-foreground" }, "OR"),
+				Div({ class: "h-px flex-1 bg-border" }),
+			),
+		),
+	);
+}
 
 /** The wordmark, so both auth screens open the same way. */
 function Wordmark() {
@@ -82,7 +141,7 @@ function destination(): string {
 	return "/app";
 }
 
-export function LoginPage() {
+export function LoginPage(data: Readable<AuthPageData>) {
 	const form = createForm({ schema: LoginSchema });
 	const failure = signal("");
 
@@ -93,6 +152,7 @@ export function LoginPage() {
 			Wordmark(),
 			H1({ class: styles.title }, "Sign in to tracker"),
 			P({ class: styles.subtitle }, "Welcome back. Enter your details to continue."),
+			SocialSignIn(data, "Sign in"),
 			Form(
 				{
 					class: styles.form,
@@ -125,7 +185,7 @@ export function LoginPage() {
 	);
 }
 
-export function SignUpPage() {
+export function SignUpPage(data: Readable<AuthPageData>) {
 	const form = createForm({ schema: SignUpSchema });
 	const failure = signal("");
 
@@ -136,6 +196,7 @@ export function SignUpPage() {
 			Wordmark(),
 			H1({ class: styles.title }, "Create your account"),
 			P({ class: styles.subtitle }, "Track issues with your team in minutes."),
+			SocialSignIn(data, "Continue"),
 			Form(
 				{
 					class: styles.form,
