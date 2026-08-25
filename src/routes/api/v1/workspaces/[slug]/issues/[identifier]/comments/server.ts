@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { parseIdentifier } from "@/lib/domain/issues";
 import { CommentSchema, CreateCommentBody } from "@/lib/domain/schemas";
+import { adoptDraftAttachments, attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
 import { emitCommentEvent } from "@/lib/server/events.server";
@@ -58,7 +59,12 @@ export const GET = handler({
 			.where(eq(comment.issueId, target.issue.id))
 			.orderBy(asc(comment.createdAt));
 
-		return rows.map((row) => toComment(row.comment, row.author));
+		const { byComment } = await attachmentsFor(params.slug, {
+			commentIds: rows.map((row) => row.comment.id),
+		});
+		return rows.map((row) =>
+			toComment(row.comment, row.author, byComment.get(row.comment.id) ?? []),
+		);
 	},
 });
 
@@ -79,6 +85,15 @@ export const POST = handler({
 			updatedAt: new Date(),
 		};
 		await db.insert(comment).values(row);
+
+		// Files uploaded while the comment was being drafted have no parent yet;
+		// claim them now that there is one.
+		await adoptDraftAttachments({
+			ids: body.attachmentIds ?? [],
+			commentId: row.id,
+			workspaceId: workspace.id,
+			userId: author.id,
+		});
 
 		const identifier = identifierFor(target.team.key, target.issue.number);
 		const audience = new Set(
@@ -107,6 +122,7 @@ export const POST = handler({
 			});
 		}
 
-		return json(toComment(row, author), { status: 201 });
+		const { byComment } = await attachmentsFor(params.slug, { commentIds: [row.id] });
+		return json(toComment(row, author, byComment.get(row.id) ?? []), { status: 201 });
 	},
 });

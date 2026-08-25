@@ -92,11 +92,13 @@ export function toIssue(
 export function toComment(
 	row: CommentRow,
 	author: Pick<UserRow, "id" | "name" | "email" | "image">,
+	attachments: Comment["attachments"] = [],
 ): Comment {
 	return {
 		id: row.id,
 		body: row.body,
 		author: toUser(author),
+		attachments,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};

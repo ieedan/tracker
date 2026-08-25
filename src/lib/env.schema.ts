@@ -33,4 +33,20 @@ export const serverEnvSchema = {
 	 * open drain lets anyone make the server fire outbound requests.
 	 */
 	CRON_SECRET: v.optional(v.string(), ""),
+
+	// --- object storage (attachments) ---------------------------------------
+	// MinIO in development, Cloudflare R2 in production. Same S3 API either way.
+	/** `http://localhost:9000` for MinIO, `https://<account>.r2.cloudflarestorage.com` for R2. */
+	S3_ENDPOINT: v.optional(v.string(), ""),
+	/** R2 ignores the region but the SDK insists on one; `auto` is R2's convention. */
+	S3_REGION: v.optional(v.string(), "auto"),
+	S3_BUCKET: v.optional(v.string(), ""),
+	S3_ACCESS_KEY_ID: v.optional(v.string(), ""),
+	S3_SECRET_ACCESS_KEY: v.optional(v.string(), ""),
+	/**
+	 * The endpoint the *browser* should use, when it differs from the one the
+	 * server uses — running the app inside compose makes storage `storage:9000`
+	 * to the server and `localhost:9000` to the browser. Blank means they match.
+	 */
+	S3_PUBLIC_ENDPOINT: v.optional(v.string(), ""),
 };

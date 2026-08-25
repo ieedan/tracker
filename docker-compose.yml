@@ -1,0 +1,47 @@
+# Local object storage for attachments.
+#
+#   docker compose up -d
+#
+# MinIO speaks the S3 API, so the same code path serves development here and
+# Cloudflare R2 in production — only the endpoint and credentials change.
+#
+# Images come from quay.io rather than Docker Hub: it is MinIO's own mirror and
+# it is not subject to Hub's anonymous pull rate limits.
+
+services:
+  storage:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tracker
+      MINIO_ROOT_PASSWORD: tracker-dev-secret
+      # The browser uploads straight to storage with a presigned URL, so the
+      # bucket has to allow cross-origin PUTs from the dev server.
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console — http://localhost:9001
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Creates the bucket once storage is up, then exits. `docker compose up`
+  # leaves it in a completed state; that is expected.
+  storage-init:
+    image: quay.io/minio/minio:latest
+    depends_on:
+      storage:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://storage:9000 tracker tracker-dev-secret &&
+      mc mb --ignore-existing local/tracker-attachments &&
+      echo 'bucket ready'
+      "
+
+volumes:
+  storage-data:

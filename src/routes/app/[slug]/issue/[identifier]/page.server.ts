@@ -1,6 +1,7 @@
 import { error } from "@implementjs/kit/server";
 import { asc, eq } from "drizzle-orm";
 import { parseIdentifier } from "@/lib/domain/issues";
+import { attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
 import { getIssueByIdentifier } from "@/lib/server/issues.server";
@@ -24,8 +25,16 @@ export default async function load({ locals, params }: LoadEvent) {
 		.where(eq(comment.issueId, found.id))
 		.orderBy(asc(comment.createdAt));
 
+	const { byIssue, byComment } = await attachmentsFor(params.slug, {
+		issueIds: [found.id],
+		commentIds: commentRows.map((row) => row.comment.id),
+	});
+
 	return {
 		issue: found,
-		comments: commentRows.map((row) => toComment(row.comment, row.author)),
+		attachments: byIssue.get(found.id) ?? [],
+		comments: commentRows.map((row) =>
+			toComment(row.comment, row.author, byComment.get(row.comment.id) ?? []),
+		),
 	};
 }

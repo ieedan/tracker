@@ -71,10 +71,32 @@ export const IssueSchema = v.object({
 });
 export type Issue = v.InferOutput<typeof IssueSchema>;
 
+export const AttachmentSchema = v.object({
+	id: v.string(),
+	filename: v.string(),
+	contentType: v.string(),
+	size: v.number(),
+	/** Points at this app, which redirects to a short-lived storage URL. */
+	url: v.string(),
+	uploadedBy: UserSummary,
+	createdAt: v.string(),
+});
+export type Attachment = v.InferOutput<typeof AttachmentSchema>;
+
+export const CreateAttachmentBody = v.object({
+	filename: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+	contentType: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120)),
+	size: v.pipe(v.number(), v.integer(), v.minValue(1)),
+	/** Attach to an issue, or to a comment. Neither means a draft upload. */
+	issueId: v.optional(v.string()),
+	commentId: v.optional(v.string()),
+});
+
 export const CommentSchema = v.object({
 	id: v.string(),
 	body: v.string(),
 	author: UserSummary,
+	attachments: v.array(AttachmentSchema),
 	createdAt: v.string(),
 	updatedAt: v.string(),
 });
@@ -194,7 +216,11 @@ export const UpdateIssueBody = v.partial(
 	}),
 );
 
-export const CreateCommentBody = v.object({ body: trimmed(1, 10_000) });
+export const CreateCommentBody = v.object({
+	body: trimmed(1, 10_000),
+	/** Uploads made while drafting, adopted by the comment on submit. */
+	attachmentIds: v.optional(v.array(v.string())),
+});
 
 export const AddMemberBody = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email()),

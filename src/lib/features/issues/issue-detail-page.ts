@@ -17,7 +17,21 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
-import type { Comment, Issue, Label, Member, Team, Workspace } from "@/lib/domain/schemas";
+import type {
+	Attachment,
+	Comment,
+	Issue,
+	Label,
+	Member,
+	Team,
+	Workspace,
+} from "@/lib/domain/schemas";
+import {
+	AttachmentGrid,
+	DropZone,
+	removeAttachment,
+} from "@/lib/features/attachments/attachment-list";
+import type { Upload } from "@/lib/features/attachments/uploader";
 import { fullTime, relativeTime } from "@/lib/format";
 import {
 	AssigneePicker,
@@ -31,6 +45,7 @@ import { patchIssue } from "./issue-store";
 
 interface PageData {
 	issue: Issue;
+	attachments: Attachment[];
 	comments: Comment[];
 	workspace: Workspace;
 	teams: Team[];
@@ -52,6 +67,10 @@ export function IssueDetailPage({
 
 	const comments = signal(data.get().comments);
 	data.onChange((next) => comments.set(next.comments));
+
+	const attachments = signal(data.get().attachments);
+	data.onChange((next) => attachments.set(next.attachments));
+	const uploads = signal<Upload[]>([]);
 
 	const update = (patch: Parameters<typeof patchIssue>[4], apply: (value: Issue) => Issue) =>
 		void patchIssue(
@@ -112,6 +131,22 @@ export function IssueDetailPage({
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 					EditableTitle(issue, update),
 					EditableDescription(issue, update),
+
+					// The whole body is the drop target, not just a small well —
+					// dragging a screenshot onto the issue is the gesture people try.
+					DropZone({
+						target: { slug: params.slug, issueId: data.get().issue.id },
+						uploads,
+						onUploaded: (attachment) => attachments.push(attachment),
+						children: AttachmentGrid({
+							attachments,
+							uploads,
+							slug: params.slug,
+							onRemove: (attachment) =>
+								void removeAttachment(params.slug.get(), attachment, attachments),
+						}),
+					}),
+
 					CommentThread(comments, params),
 				),
 			),

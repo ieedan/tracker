@@ -15,6 +15,7 @@ OpenAPI 3.1 document.
 
 ```sh
 pnpm install
+docker compose up -d      # MinIO, for attachment storage
 pnpm dev:setup            # walks through .env, then offers to migrate and seed
 pnpm dev
 ```
@@ -57,6 +58,8 @@ at a workspace that does not exist.
   click-to-edit on the issue.
 - **Inbox** — assignment, reassignment, status changes and comments land in the
   assignee's and reporter's inbox. You are never notified of your own actions.
+- **Attachments** — drag files onto an issue or pick them; images and video
+  render in place, everything else becomes a chip. Up to 100MB each.
 - **Filters** — `F` (or the Filter button) opens a two-step menu: pick a
   dimension — status, priority, assignee, label, team, creator — then pick
   values. Each active filter becomes a chip you can edit in place: click the
@@ -93,6 +96,28 @@ API keys are deliberately **not** sessions. They authenticate `/api/v1` only:
 they cannot reach better-auth's account endpoints, and they cannot mint more
 keys — that needs a signed-in session. See `src/lib/server/api-key.server.ts`
 for why.
+
+## Attachments
+
+`docker compose up -d` runs MinIO, which speaks S3, so development and a
+Cloudflare R2 deployment share one code path — only the endpoint and credentials
+change. The console is at http://localhost:9001 (`tracker` / `tracker-dev-secret`).
+
+Uploads go **straight from the browser to storage** with a presigned PUT. That
+is not a nicety: a Vercel function caps its request body at a few megabytes, so
+proxying uploads would limit attachments to about one phone photo. Downloads
+mirror it — the app hands out a stable URL and redirects to a short-lived
+presigned GET, so the bucket stays private without this server streaming every
+byte of every video.
+
+Uploadable types are an allowlist. `image/svg+xml` and `text/html` are
+deliberately absent: these files are served back to other people, and either one
+from an untrusted uploader is a stored-XSS delivery mechanism.
+
+For R2, set `S3_ENDPOINT` to `https://<account>.r2.cloudflarestorage.com`,
+`S3_BUCKET`, and an R2 access key pair, then allow `PUT` from your app's origin
+in the bucket's CORS policy — the browser uploads directly, so the bucket has to
+accept cross-origin PUTs.
 
 ## Filters
 

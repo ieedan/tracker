@@ -195,6 +195,49 @@ export const notification = sqliteTable(
 );
 
 /**
+ * An uploaded file. The bytes live in object storage; this row is the record of
+ * what they are, who put them there and what they hang off.
+ *
+ * `status` exists because the upload does not pass through this server: the row
+ * is written when a presigned URL is issued and only becomes `ready` once the
+ * object is confirmed present, so an abandoned upload leaves a `pending` row
+ * rather than a broken attachment.
+ */
+export const attachment = sqliteTable(
+	"attachment",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		/** Object key in the bucket. Generated, never the uploader's filename. */
+		key: text("key").notNull().unique(),
+		/** What the uploader called it — shown in the UI, sent on download. */
+		filename: text("filename").notNull(),
+		contentType: text("contentType").notNull(),
+		size: integer("size").notNull(),
+		status: text("status").$type<"pending" | "ready">().notNull().default("pending"),
+		uploadedBy: text("uploadedBy")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		issueId: text("issueId").references(() => issue.id, { onDelete: "cascade" }),
+		commentId: text("commentId").references(() => comment.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [
+		index("attachment_issue").on(table.issueId),
+		index("attachment_comment").on(table.commentId),
+		index("attachment_workspace").on(table.workspaceId),
+	],
+);
+
+export const attachmentRelations = relations(attachment, ({ one }) => ({
+	workspace: one(workspace, { fields: [attachment.workspaceId], references: [workspace.id] }),
+	issue: one(issue, { fields: [attachment.issueId], references: [issue.id] }),
+	comment: one(comment, { fields: [attachment.commentId], references: [comment.id] }),
+}));
+
+/**
  * A registered endpoint. `secret` signs every delivery so the receiver can tell
  * a real payload from anything else that finds the URL.
  */
