@@ -3,6 +3,7 @@ import { createForm, Field, Form } from "@implementjs/formish";
 import * as v from "valibot";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/lib/components/ui/button";
+import { AppWordmark } from "@/lib/components/app-mark";
 import { GithubMark } from "@/lib/components/glyphs";
 
 const LoginSchema = v.object({
@@ -19,7 +20,7 @@ const SignUpSchema = v.object({
 const styles = {
 	shell: "flex min-h-dvh items-center justify-center bg-background px-4",
 	card: "w-full max-w-sm",
-	mark: "mb-8 flex items-center gap-2",
+	mark: "mb-8",
 	title: "mb-1 text-xl font-semibold tracking-tight",
 	subtitle: "mb-6 text-sm text-muted-foreground",
 	form: "flex flex-col gap-3.5",
@@ -90,18 +91,6 @@ function SocialSignIn(data: Readable<AuthPageData>, verb: string) {
 	);
 }
 
-/** The wordmark, so both auth screens open the same way. */
-function Wordmark() {
-	return Div(
-		{ class: styles.mark },
-		Div(
-			{ class: "flex size-7 items-center justify-center rounded-[7px] bg-primary" },
-			Span({ class: "text-sm font-bold text-primary-foreground" }, "T"),
-		),
-		Span({ class: "text-[15px] font-semibold tracking-tight" }, "tracker"),
-	);
-}
-
 /**
  * Turns better-auth's error into something a person can act on.
  *
@@ -149,7 +138,7 @@ export function LoginPage(data: Readable<AuthPageData>) {
 		{ class: styles.shell },
 		Div(
 			{ class: styles.card },
-			Wordmark(),
+			AppWordmark({ class: styles.mark }),
 			H1({ class: styles.title }, "Sign in to tracker"),
 			P({ class: styles.subtitle }, "Welcome back. Enter your details to continue."),
 			SocialSignIn(data, "Sign in"),
@@ -193,7 +182,7 @@ export function SignUpPage(data: Readable<AuthPageData>) {
 		{ class: styles.shell },
 		Div(
 			{ class: styles.card },
-			Wordmark(),
+			AppWordmark({ class: styles.mark }),
 			H1({ class: styles.title }, "Create your account"),
 			P({ class: styles.subtitle }, "Track issues with your team in minutes."),
 			SocialSignIn(data, "Continue"),

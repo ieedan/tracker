@@ -8,9 +8,16 @@ export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024; // 100MB
  * What may be uploaded.
  *
  * An allowlist rather than a denylist: these files are served back to other
- * people, and `text/html` or `image/svg+xml` from an untrusted uploader is a
- * stored-XSS delivery mechanism the moment a browser renders it at the storage
- * origin. SVG is deliberately absent for that reason.
+ * people from this app's own origin, so anything a browser will execute as a
+ * document is a stored-XSS delivery mechanism rather than a file.
+ *
+ * `image/svg+xml` is on the list only because `streamObject` serves every one
+ * of these under `Content-Security-Policy: sandbox`, which puts the response in
+ * an opaque origin where its script can reach neither the session nor the API.
+ * Remove that header and SVG has to come off this list in the same commit.
+ *
+ * `text/html` stays off regardless. Sandboxed or not, a page that renders as
+ * the app's own chrome is a phishing surface, and nothing here needs it.
  */
 export const ALLOWED_TYPES = [
 	"image/png",
@@ -18,6 +25,7 @@ export const ALLOWED_TYPES = [
 	"image/gif",
 	"image/webp",
 	"image/avif",
+	"image/svg+xml",
 	"video/mp4",
 	"video/webm",
 	"video/quicktime",

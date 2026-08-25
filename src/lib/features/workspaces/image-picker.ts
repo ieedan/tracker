@@ -21,7 +21,7 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { GeneratedWorkspaceAvatar } from "@/lib/components/workspace-avatar";
-import { imageRejectionReason } from "@/lib/domain/images";
+import { ALLOWED_IMAGE_TYPES, imageRejectionReason } from "@/lib/domain/images";
 import { cn } from "@/lib/utils";
 
 export interface ImageChoice {
@@ -118,7 +118,9 @@ export function ImagePicker(options: {
 		Input({
 			this: input,
 			type: "file",
-			accept: "image/png,image/jpeg,image/gif,image/webp,image/avif",
+			// Straight from the allowlist the server enforces, so the picker cannot
+			// drift from it and offer a file that will be refused on reserve.
+			accept: ALLOWED_IMAGE_TYPES.join(","),
 			class: "hidden",
 			onChange: (event) => {
 				void accept(event.target.files?.[0] ?? null);

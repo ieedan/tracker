@@ -162,6 +162,22 @@ export async function streamObject(options: {
 			"content-type": options.contentType ?? result.ContentType ?? "application/octet-stream",
 			"content-disposition": `${disposition}; filename="${sanitizeFilename(options.filename)}"`,
 			"cache-control": "private, max-age=120",
+			// These bytes came from a person, and they are served from this app's
+			// own origin — so a file that a browser will *execute* as a document
+			// would run as the app. `sandbox` with no tokens drops the response
+			// into a unique opaque origin: script inside it cannot read this
+			// origin's storage, cannot use its session, and cannot call the API as
+			// whoever opened it. That is what makes `image/svg+xml` safe to accept
+			// (see `domain/attachments.ts`), and it costs nothing for the types
+			// that were already allowed.
+			//
+			// It does not affect how the app itself renders these files. CSP
+			// sandbox applies to documents, not to subresources, so an `<img>`,
+			// `<video>` or `<audio>` pointing here is untouched — only direct
+			// navigation to the URL lands in the sandbox.
+			"content-security-policy": "sandbox",
+			// Never let a browser sniff its way past the recorded type.
+			"x-content-type-options": "nosniff",
 		});
 		if (result.ContentLength !== undefined) {
 			headers.set("content-length", String(result.ContentLength));

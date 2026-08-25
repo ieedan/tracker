@@ -12,9 +12,14 @@
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
- * Raster only. SVG is absent for the same reason it is absent from
- * attachments — it is a script-execution vector — and it matters more here,
- * because this image is rendered on every page rather than opened deliberately.
+ * Raster, plus SVG — which a logo usually is.
+ *
+ * SVG is a script-execution vector, and this picture is rendered on every page
+ * rather than opened deliberately, so it is worth being precise about why it is
+ * safe: the chrome renders it through an `<img>`, which never runs script, and
+ * `streamObject` serves it under `Content-Security-Policy: sandbox`, which
+ * contains the one case that would — someone opening the URL directly. Both of
+ * those have to hold; see `domain/attachments.ts`.
  */
 export const ALLOWED_IMAGE_TYPES = [
 	"image/png",
@@ -22,6 +27,7 @@ export const ALLOWED_IMAGE_TYPES = [
 	"image/gif",
 	"image/webp",
 	"image/avif",
+	"image/svg+xml",
 ] as const;
 
 export function isAllowedImageType(contentType: string): boolean {
