@@ -1,23 +1,29 @@
 // The four dropdowns that edit an issue in place — status, priority, assignee
 // and labels. The list rows and the detail page share them, which is what keeps
 // "click the status glyph and pick a new one" identical in both places.
-import { Div, ForEach, If, Span, type Child, type Readable } from "@implementjs/core";
-import { Check, Tag, Users } from "@implementjs/lucide";
+import {
+	Div,
+	ForEach,
+	If,
+	ImplementEffect,
+	Span,
+	signal,
+	type Readable,
+	type Signal,
+} from "@implementjs/core";
+import { Tag, Users } from "@implementjs/lucide";
+import { MenuCheckbox, applyIdDiff } from "@/lib/components/ui/menu-checkbox";
 import {
 	DropdownMenu,
+	DropdownMenuCheckboxGroup,
+	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuGroup,
 	DropdownMenuGroupHeading,
-	DropdownMenuItem,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
-import {
-	CHIP_GLYPH,
-	PriorityIcon,
-	StatusIcon,
-	UnassignedAvatar,
-	UserAvatar,
-} from "@/lib/components/glyphs";
+import { PriorityIcon, StatusIcon, UnassignedAvatar, UserAvatar } from "@/lib/components/glyphs";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -32,15 +38,48 @@ import { cn } from "@/lib/utils";
 const triggerClass =
 	"inline-flex h-6 items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 text-[12px] text-muted-foreground hover:bg-accent";
 
+/** Radio items need a string value; no real user id is the empty string. */
+const UNASSIGNED = "";
+
+type PickerOptions = {
+	showLabel?: boolean;
+	class?: string;
+	open?: Signal<boolean>;
+};
+
+/**
+ * Radio/checkbox groups want a writable Signal. Callers often only have a
+ * Readable of the issue, so this is a live view that follows it — the same
+ * shape Settings uses to keep a local list in sync with loaded data.
+ */
+function followRadio<T>(
+	source: Readable<T>,
+	pick: (value: T) => string | null,
+): Signal<string | null> {
+	return signal<string | null>(pick(source.get()));
+}
+
+function syncRadio<T>(
+	source: Readable<T>,
+	value: Signal<string | null>,
+	pick: (value: T) => string | null,
+) {
+	return ImplementEffect([source], (next) => value.set(pick(next)));
+}
+
 export function StatusPicker(
 	current: Readable<IssueStatus>,
 	onPick: (status: IssueStatus) => void,
-	options: { showLabel?: boolean; class?: string } = {},
+	options: PickerOptions = {},
 ) {
+	const value = followRadio(current, (status) => status);
+
 	return DropdownMenu(
+		{ open: options.open },
+		syncRadio(current, value, (status) => status),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Status" },
-			StatusIcon(current, CHIP_GLYPH.status),
+			StatusIcon(current),
 			options.showLabel === true
 				? Span(
 						{},
@@ -50,14 +89,19 @@ export function StatusPicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-48", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuRadioGroup(
+				{
+					value,
+					onValueChange: (status) => {
+						if (typeof status === "string") onPick(status as IssueStatus);
+					},
+				},
 				DropdownMenuGroupHeading("Status"),
 				...ISSUE_STATUSES.map((status) =>
-					DropdownMenuItem(
-						{ onSelect: () => onPick(status) },
+					DropdownMenuRadioItem(
+						{ value: status },
 						StatusIcon(status),
 						Span({ class: "flex-1" }, STATUS_LABELS[status]),
-						Tick(current.bind((value) => value === status)),
 					),
 				),
 			),
@@ -68,12 +112,16 @@ export function StatusPicker(
 export function PriorityPicker(
 	current: Readable<IssuePriority>,
 	onPick: (priority: IssuePriority) => void,
-	options: { showLabel?: boolean; class?: string } = {},
+	options: PickerOptions = {},
 ) {
+	const value = followRadio(current, (priority) => priority);
+
 	return DropdownMenu(
+		{ open: options.open },
+		syncRadio(current, value, (priority) => priority),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Priority" },
-			PriorityIcon(current, CHIP_GLYPH.priority),
+			PriorityIcon(current),
 			options.showLabel === true
 				? Span(
 						{},
@@ -83,14 +131,19 @@ export function PriorityPicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-48", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuRadioGroup(
+				{
+					value,
+					onValueChange: (priority) => {
+						if (typeof priority === "string") onPick(priority as IssuePriority);
+					},
+				},
 				DropdownMenuGroupHeading("Priority"),
 				...ISSUE_PRIORITIES.map((priority) =>
-					DropdownMenuItem(
-						{ onSelect: () => onPick(priority) },
+					DropdownMenuRadioItem(
+						{ value: priority },
 						PriorityIcon(priority),
 						Span({ class: "flex-1" }, PRIORITY_LABELS[priority]),
-						Tick(current.bind((value) => value === priority)),
 					),
 				),
 			),
@@ -102,12 +155,16 @@ export function AssigneePicker(
 	current: Readable<UserSummary | null>,
 	members: Readable<Member[]>,
 	onPick: (userId: string | null) => void,
-	options: { showLabel?: boolean; class?: string } = {},
+	options: PickerOptions = {},
 ) {
+	const value = followRadio(current, (user) => user?.id ?? UNASSIGNED);
+
 	return DropdownMenu(
+		{ open: options.open },
+		syncRadio(current, value, (user) => user?.id ?? UNASSIGNED),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Assignee" },
-			AssigneeAvatar(current, CHIP_GLYPH.avatar),
+			AssigneeAvatar(current),
 			options.showLabel === true
 				? Span(
 						{},
@@ -117,26 +174,31 @@ export function AssigneePicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-56", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuRadioGroup(
+				{
+					value,
+					onValueChange: (id) => {
+						if (id === null || id === UNASSIGNED) onPick(null);
+						else if (typeof id === "string") onPick(id);
+					},
+				},
 				DropdownMenuGroupHeading("Assign to"),
-				DropdownMenuItem(
-					{ onSelect: () => onPick(null) },
+				DropdownMenuRadioItem(
+					{ value: UNASSIGNED },
 					UnassignedAvatar(),
 					Span({ class: "flex-1" }, "Unassigned"),
-					Tick(current.bind((user) => user === null)),
 				),
 				ForEach(
 					members,
 					(member) => member.id,
 					(member) =>
-						DropdownMenuItem(
-							{ onSelect: () => onPick(member.get().user.id) },
+						DropdownMenuRadioItem(
+							{ value: member.get().user.id },
 							UserAvatar(member.get().user),
 							Span(
 								{ class: "flex-1 truncate" },
 								member.bind((value) => value.user.name),
 							),
-							Tick(current.bind((user) => user?.id === member.get().user.id)),
 						),
 				),
 			),
@@ -148,12 +210,16 @@ export function LabelPicker(
 	selected: Readable<Label[]>,
 	available: Readable<Label[]>,
 	onToggle: (labelId: string) => void,
-	options: { class?: string } = {},
+	options: { class?: string; open?: Signal<boolean> } = {},
 ) {
+	const selectedIds = signal(selected.get().map((label) => label.id));
+
 	return DropdownMenu(
+		{ open: options.open },
+		ImplementEffect([selected], (labels) => selectedIds.set(labels.map((label) => label.id))),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Labels" },
-			Tag({ class: CHIP_GLYPH.icon }),
+			Tag({ class: "size-3.5" }),
 			Span(
 				{},
 				selected.bind((labels) =>
@@ -163,21 +229,32 @@ export function LabelPicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-56", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuCheckboxGroup(
+				{
+					value: selectedIds,
+					onValueChange: (ids) => {
+						applyIdDiff(
+							selected.get().map((label) => label.id),
+							ids,
+							onToggle,
+						);
+					},
+				},
 				DropdownMenuGroupHeading("Labels"),
 				ForEach(
 					available,
 					(label) => label.id,
 					(label) =>
-						DropdownMenuItem(
-							// Labels are multi-select, so the menu stays open between picks.
-							{ closeOnSelect: false, onSelect: () => onToggle(label.get().id) },
+						DropdownMenuCheckboxItem(
+							{
+								value: label.get().id,
+								indicator: MenuCheckbox(selectedIds, label.get().id),
+							},
 							Span({
 								class: "size-2.5 shrink-0 rounded-full",
 								style: { backgroundColor: label.get().color },
 							}),
 							Span({ class: "flex-1 truncate" }, label.bind("name")),
-							Tick(selected.bind((labels) => labels.some((entry) => entry.id === label.get().id))),
 						),
 				),
 			),
@@ -185,12 +262,8 @@ export function LabelPicker(
 	);
 }
 
-function Tick(shown: Readable<boolean>): Child {
-	return If(shown, Check({ class: "size-3.5 shrink-0 text-primary" }));
-}
-
 /** The assignee's avatar, or the dashed placeholder when there is none. */
-export function AssigneeAvatar(current: Readable<UserSummary | null>, className?: string) {
+export function AssigneeAvatar(current: Readable<UserSummary | null>) {
 	return Div(
 		{ class: "flex items-center" },
 		If(current.bind((user) => user !== null))
@@ -198,17 +271,17 @@ export function AssigneeAvatar(current: Readable<UserSummary | null>, className?
 				Div(
 					{ class: "contents" },
 					// `current` is non-null inside this branch; bind reads it safely.
-					UserAvatarOf(current, className),
+					UserAvatarOf(current),
 				),
 			)
-			.Else(UnassignedAvatar(className)),
+			.Else(UnassignedAvatar()),
 	);
 }
 
-function UserAvatarOf(current: Readable<UserSummary | null>, className?: string) {
+function UserAvatarOf(current: Readable<UserSummary | null>) {
 	const user = current.get();
-	if (user === null) return UnassignedAvatar(className);
-	return UserAvatar(user, className);
+	if (user === null) return UnassignedAvatar();
+	return UserAvatar(user);
 }
 
 /** The coloured pills shown on a row and on the detail page. */
@@ -236,39 +309,72 @@ export function TeamPicker(
 	current: Readable<TeamRef | null>,
 	teams: Readable<Team[]>,
 	onPick: (key: string) => void,
-	options: { showLabel?: boolean; class?: string } = {},
+	options: PickerOptions & { crumb?: boolean } = {},
 ) {
+	const value = followRadio(current, (team) => team?.key ?? null);
+
+	const trigger =
+		options.crumb === true
+			? DropdownMenuTrigger(
+					{
+						variant: "ghost",
+						size: "sm",
+						class: cn(
+							"h-auto min-h-0 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
+							options.class,
+						),
+						title: "Team",
+					},
+					Span(
+						{ class: "font-mono leading-none" },
+						current.bind((team) => team?.key ?? "Team"),
+					),
+				)
+			: DropdownMenuTrigger(
+					{
+						variant: "ghost",
+						size: "sm",
+						class: cn(triggerClass, options.class),
+						title: "Team",
+					},
+					Users({ class: "size-3.5" }),
+					Span(
+						{ class: options.showLabel === true ? "" : "font-mono" },
+						current.bind((team) => team?.key ?? "Team"),
+					),
+					options.showLabel === true
+						? Span(
+								{ class: "text-muted-foreground" },
+								current.bind((team) => team?.name ?? ""),
+							)
+						: null,
+				);
+
 	return DropdownMenu(
-		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Team" },
-			Users({ class: CHIP_GLYPH.icon }),
-			Span(
-				{ class: options.showLabel === true ? "" : "font-mono" },
-				current.bind((team) => team?.key ?? "Team"),
-			),
-			options.showLabel === true
-				? Span(
-						{ class: "text-muted-foreground" },
-						current.bind((team) => team?.name ?? ""),
-					)
-				: null,
-		),
+		{ open: options.open },
+		syncRadio(current, value, (team) => team?.key ?? null),
+		trigger,
 		DropdownMenuContent(
 			{ class: "w-56", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuRadioGroup(
+				{
+					value,
+					onValueChange: (key) => {
+						if (typeof key === "string") onPick(key);
+					},
+				},
 				DropdownMenuGroupHeading("Team"),
 				ForEach(
 					teams,
 					(team) => team.id,
 					(team) =>
-						DropdownMenuItem(
-							{ onSelect: () => onPick(team.get().key) },
+						DropdownMenuRadioItem(
+							{ value: team.get().key },
 							Span(
 								{ class: "w-10 shrink-0 font-mono text-[11px] text-muted-foreground" },
 								team.bind("key"),
 							),
 							Span({ class: "flex-1 truncate" }, team.bind("name")),
-							Tick(current.bind((value) => value?.id === team.get().id)),
 						),
 				),
 			),

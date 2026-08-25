@@ -2,27 +2,21 @@ import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { Attachment } from "@/lib/domain/schemas";
 import { db } from "./db.server";
 import { attachment, user } from "./schema.server";
-import { toUser } from "./serialize.server";
+import { toUser, type UserFields } from "./serialize.server";
 
 type Row = typeof attachment.$inferSelect;
-type UserRow = typeof user.$inferSelect;
 
 /**
  * The URL handed to the browser points at *this app*, not at storage.
  *
- * A presigned storage URL expires, so baking one into a page would rot while
- * the page is open. This one is stable; the route behind it mints a fresh
- * presigned URL per request and redirects.
+ * This one is stable and same-origin, so `<img src>` can send the session
+ * cookie. The route behind it streams the object from storage.
  */
 export function attachmentUrl(slug: string, id: string): string {
 	return `/api/v1/workspaces/${slug}/attachments/${id}`;
 }
 
-export function toAttachment(
-	row: Row,
-	uploader: Pick<UserRow, "id" | "name" | "email" | "image">,
-	slug: string,
-): Attachment {
+export function toAttachment(row: Row, uploader: UserFields, slug: string): Attachment {
 	return {
 		id: row.id,
 		filename: row.filename,
@@ -80,15 +74,21 @@ export async function attachmentsFor(
  */
 export async function adoptDraftAttachments(options: {
 	ids: string[];
-	commentId: string;
+	issueId?: string;
+	commentId?: string;
 	workspaceId: string;
 	userId: string;
 }): Promise<void> {
 	if (options.ids.length === 0) return;
 
+	const parent: { issueId?: string; commentId?: string } = {};
+	if (options.issueId !== undefined) parent.issueId = options.issueId;
+	if (options.commentId !== undefined) parent.commentId = options.commentId;
+	if (parent.issueId === undefined && parent.commentId === undefined) return;
+
 	await db
 		.update(attachment)
-		.set({ commentId: options.commentId })
+		.set(parent)
 		.where(
 			and(
 				inArray(attachment.id, options.ids),

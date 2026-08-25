@@ -1,16 +1,19 @@
 // Feedback's inline editors: status, visibility and labels. Same shape as the
 // issue pickers so a member switching between the two tabs never has to relearn
 // the interaction.
-import { ForEach, If, Span, type Child, type Readable } from "@implementjs/core";
-import { Check, Eye, EyeOff, Tag } from "@implementjs/lucide";
+import { ForEach, If, ImplementEffect, Span, signal, type Readable } from "@implementjs/core";
+import { Eye, EyeOff, Tag } from "@implementjs/lucide";
 import {
 	DropdownMenu,
+	DropdownMenuCheckboxGroup,
+	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuGroup,
 	DropdownMenuGroupHeading,
-	DropdownMenuItem,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
+import { MenuCheckbox, applyIdDiff } from "@/lib/components/ui/menu-checkbox";
 import {
 	FEEDBACK_STATUSES,
 	FEEDBACK_STATUS_LABELS,
@@ -29,7 +32,10 @@ export function FeedbackStatusPicker(
 	onPick: (status: FeedbackStatus) => void,
 	options: { showLabel?: boolean; class?: string } = {},
 ) {
+	const value = signal<string | null>(current.get());
+
 	return DropdownMenu(
+		ImplementEffect([current], (status) => value.set(status)),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Status" },
 			FeedbackStatusIcon(current),
@@ -42,14 +48,19 @@ export function FeedbackStatusPicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-48", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuRadioGroup(
+				{
+					value,
+					onValueChange: (status) => {
+						if (typeof status === "string") onPick(status as FeedbackStatus);
+					},
+				},
 				DropdownMenuGroupHeading("Status"),
 				...FEEDBACK_STATUSES.map((status) =>
-					DropdownMenuItem(
-						{ onSelect: () => onPick(status) },
+					DropdownMenuRadioItem(
+						{ value: status },
 						FeedbackStatusIcon(status),
 						Span({ class: "flex-1" }, FEEDBACK_STATUS_LABELS[status]),
-						Tick(current.bind((value) => value === status)),
 					),
 				),
 			),
@@ -75,9 +86,12 @@ export function VisibilityPicker(
 	onPick: (visibility: FeedbackVisibility) => void,
 	options: { class?: string } = {},
 ) {
+	const value = signal<string | null>(current.get());
+
 	return If(boardOpen)
 		.Then(
 			DropdownMenu(
+				ImplementEffect([current], (visibility) => value.set(visibility)),
 				DropdownMenuTrigger(
 					{
 						variant: "ghost",
@@ -88,24 +102,30 @@ export function VisibilityPicker(
 					VisibilityIcon(current),
 					Span(
 						{},
-						current.bind((value) => (value === "public" ? "Public" : "Private")),
+						current.bind((next) => (next === "public" ? "Public" : "Private")),
 					),
 				),
 				DropdownMenuContent(
 					{ class: "w-56", align: "start" },
-					DropdownMenuGroup(
+					DropdownMenuRadioGroup(
+						{
+							value,
+							onValueChange: (visibility) => {
+								if (typeof visibility === "string") {
+									onPick(visibility as FeedbackVisibility);
+								}
+							},
+						},
 						DropdownMenuGroupHeading("Visibility"),
-						DropdownMenuItem(
-							{ onSelect: () => onPick("private") },
+						DropdownMenuRadioItem(
+							{ value: "private" },
 							EyeOff({ class: "size-3.5" }),
 							Span({ class: "flex-1" }, "Private"),
-							Tick(current.bind((value) => value === "private")),
 						),
-						DropdownMenuItem(
-							{ onSelect: () => onPick("public") },
+						DropdownMenuRadioItem(
+							{ value: "public" },
 							Eye({ class: "size-3.5" }),
 							Span({ class: "flex-1" }, "On the public board"),
-							Tick(current.bind((value) => value === "public")),
 						),
 					),
 				),
@@ -135,7 +155,10 @@ export function FeedbackLabelPicker(
 	onToggle: (labelId: string) => void,
 	options: { class?: string } = {},
 ) {
+	const selectedIds = signal(selected.get().map((label) => label.id));
+
 	return DropdownMenu(
+		ImplementEffect([selected], (labels) => selectedIds.set(labels.map((label) => label.id))),
 		DropdownMenuTrigger(
 			{ variant: "ghost", size: "sm", class: cn(triggerClass, options.class), title: "Labels" },
 			Tag({ class: "size-3.5" }),
@@ -148,27 +171,35 @@ export function FeedbackLabelPicker(
 		),
 		DropdownMenuContent(
 			{ class: "w-56", align: "start" },
-			DropdownMenuGroup(
+			DropdownMenuCheckboxGroup(
+				{
+					value: selectedIds,
+					onValueChange: (ids) => {
+						applyIdDiff(
+							selected.get().map((label) => label.id),
+							ids,
+							onToggle,
+						);
+					},
+				},
 				DropdownMenuGroupHeading("Labels"),
 				ForEach(
 					available,
 					(label) => label.id,
 					(label) =>
-						DropdownMenuItem(
-							{ closeOnSelect: false, onSelect: () => onToggle(label.get().id) },
+						DropdownMenuCheckboxItem(
+							{
+								value: label.get().id,
+								indicator: MenuCheckbox(selectedIds, label.get().id),
+							},
 							Span({
 								class: "size-2.5 shrink-0 rounded-full",
 								style: { backgroundColor: label.get().color },
 							}),
 							Span({ class: "flex-1 truncate" }, label.bind("name")),
-							Tick(selected.bind((labels) => labels.some((entry) => entry.id === label.get().id))),
 						),
 				),
 			),
 		),
 	);
-}
-
-function Tick(shown: Readable<boolean>): Child {
-	return If(shown, Check({ class: "size-3.5 shrink-0 text-primary" }));
 }

@@ -698,3 +698,82 @@ export const commentRelations = relations(comment, ({ one }) => ({
 	issue: one(issue, { fields: [comment.issueId], references: [issue.id] }),
 	author: one(user, { fields: [comment.authorId], references: [user.id] }),
 }));
+
+/**
+ * A bot member: one row per (OAuth client, workspace).
+ *
+ * Everyone who authorizes the same client into the same workspace acts as this
+ * one identity — a bot is an identity, not a credential, so it does not need to
+ * be per-person. Which human authorized a given token is recorded on
+ * `agentGrant` instead, and that is what carries the permission ceiling.
+ */
+export const agentIdentity = sqliteTable(
+	"agent_identity",
+	{
+		id: text("id").primaryKey(),
+		/** The bot's own `user` row — this is what lands on `comment.authorId`. */
+		userId: text("userId")
+			.notNull()
+			.unique()
+			.references(() => user.id, { onDelete: "cascade" }),
+		clientId: text("clientId").notNull(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("agent_identity_unique").on(table.clientId, table.workspaceId),
+		index("agent_identity_workspace").on(table.workspaceId),
+	],
+);
+
+/**
+ * One human's authorization of one client into one workspace.
+ *
+ * An agent's effective access is its scopes intersected with what this person
+ * can still do, so the grant is what a token is checked against on every
+ * request: revoke it, or remove the person from the workspace, and the tokens
+ * it backs stop working.
+ */
+export const agentGrant = sqliteTable(
+	"agent_grant",
+	{
+		id: text("id").primaryKey(),
+		agentIdentityId: text("agentIdentityId")
+			.notNull()
+			.references(() => agentIdentity.id, { onDelete: "cascade" }),
+		installedByUserId: text("installedByUserId")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		/** JSON array of the scopes consented to, for display and revocation. */
+		scopes: text("scopes", { mode: "json" }).$type<string[]>().notNull(),
+		lastUsedAt: timestamp("lastUsedAt"),
+		revokedAt: timestamp("revokedAt"),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("agent_grant_unique").on(table.agentIdentityId, table.installedByUserId),
+		index("agent_grant_installer").on(table.installedByUserId),
+	],
+);
+
+export const agentIdentityRelations = relations(agentIdentity, ({ one, many }) => ({
+	user: one(user, { fields: [agentIdentity.userId], references: [user.id] }),
+	workspace: one(workspace, {
+		fields: [agentIdentity.workspaceId],
+		references: [workspace.id],
+	}),
+	grants: many(agentGrant),
+}));
+
+export const agentGrantRelations = relations(agentGrant, ({ one }) => ({
+	identity: one(agentIdentity, {
+		fields: [agentGrant.agentIdentityId],
+		references: [agentIdentity.id],
+	}),
+	installedBy: one(user, {
+		fields: [agentGrant.installedByUserId],
+		references: [user.id],
+	}),
+}));

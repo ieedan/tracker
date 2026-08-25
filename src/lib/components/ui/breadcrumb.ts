@@ -104,7 +104,7 @@ export const BreadcrumbSeparator = createComponent(function BreadcrumbSeparator(
 			"aria-hidden": true,
 			...props,
 			"data-slot": "breadcrumb-separator",
-			class: cn("[&>svg]:size-3.5", className),
+			class: cn("inline-flex items-center [&>svg]:size-3.5", className),
 		},
 		...(children.length > 0 ? children : [ChevronRightIcon()]),
 	);

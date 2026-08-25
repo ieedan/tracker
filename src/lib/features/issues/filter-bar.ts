@@ -3,21 +3,25 @@
  *
  * Two moving parts:
  *
- *   - **Add menu** — a two-step dropdown. Pick a dimension (Status, Assignee, …),
- *     then pick values from it. Both steps are searchable; the value step is
- *     multi-select and stays open so several can be ticked in a row.
+ *   - **Add menu** — a dropdown of dimensions. Hovering a field (or ArrowRight /
+ *     Enter / Space) opens its values in a submenu. Values use the same
+ *     checkbox-or-row pattern as the issue label picker: the box keeps the
+ *     menu open so several can be ticked, the rest of the row toggles and closes.
  *   - **Chips** — one per active filter, reading `Status is Todo, In Progress`.
- *     The operator toggles `is` / `is not` on click, the values reopen the same
- *     value step, and the × removes the filter.
+ *     The operator opens a small menu of `is` / `is not`, the values reopen the
+ *     searchable picker with that same checkbox split, and the × removes the
+ *     filter.
  *
- * Filters themselves live in the URL — see `filters.ts`. Nothing here holds
- * filter state; every interaction hands a new list up to `onChange`.
+ * Filters themselves live in the URL — see `filters.ts`. Checkbox groups
+ * mirror a field's values so they can stay writable; every interaction still
+ * hands a new list up to `onChange`.
  */
 import {
 	Div,
 	Dynamic,
 	ForEach,
 	If,
+	ImplementEffect,
 	Span,
 	derived,
 	signal,
@@ -25,7 +29,7 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Check, ChevronLeft, ListFilter, X } from "@implementjs/lucide";
+import { Check, ListFilter, X } from "@implementjs/lucide";
 import {
 	Command,
 	CommandEmpty,
@@ -35,8 +39,21 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/lib/components/ui/command";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxGroup,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroupHeading,
+	DropdownMenuItem,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from "@/lib/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/lib/components/ui/popover";
 import { Button } from "@/lib/components/ui/button";
+import { MenuCheckbox } from "@/lib/components/ui/menu-checkbox";
 import {
 	CHIP_GLYPH,
 	PriorityIcon,
@@ -58,7 +75,7 @@ import {
 	NO_ASSIGNEE,
 	operatorLabel,
 	removeField,
-	toggleValue,
+	setFieldValues,
 	withFilter,
 	type Filter,
 	type FilterField,
@@ -160,6 +177,50 @@ function iconsFor(filter: Filter, context: FilterContext): Child[] {
 const availableFields = (context: FilterContext): FilterField[] =>
 	FILTER_FIELDS.filter((field) => !(field === "team" && context.hideTeam));
 
+function valuesOf(list: Filter[], field: FilterField): string[] {
+	return list.find((filter) => filter.field === field)?.values ?? [];
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+	if (left.length !== right.length) return false;
+	const set = new Set(left);
+	return right.every((id) => set.has(id));
+}
+
+/**
+ * A writable copy of one field's values, kept in lockstep with the URL.
+ *
+ * The checkbox group (and the command list) need a signal they can write;
+ * filters themselves are derived from the query string. Equality guards stop
+ * the two effects from echoing each other.
+ */
+function bindFilterValues(
+	filters: Readable<Filter[]>,
+	field: FilterField,
+	onChange: (next: Filter[]) => void,
+): { selected: Signal<string[]>; sync: Child[] } {
+	const selected = signal(valuesOf(filters.get(), field));
+
+	return {
+		selected,
+		sync: [
+			ImplementEffect([filters], (list) => {
+				const next = valuesOf(list, field);
+				if (!sameIds(selected.get(), next)) selected.set(next);
+			}),
+			ImplementEffect(
+				[selected],
+				(ids) => {
+					const current = valuesOf(filters.get(), field);
+					if (sameIds(current, ids)) return;
+					onChange(setFieldValues(filters.get(), field, ids));
+				},
+				{ immediate: false },
+			),
+		],
+	};
+}
+
 // ---------------------------------------------------------------------------
 
 export interface FilterBarProps {
@@ -170,7 +231,7 @@ export interface FilterBarProps {
 
 export function FilterBar({ filters, context, onChange }: FilterBarProps) {
 	// Its own open state: the header's button and this one are two separate
-	// popovers, and sharing a signal opens both at once on top of each other.
+	// menus, and sharing a signal opens both at once on top of each other.
 	const inlineOpen = signal(false);
 
 	return If(
@@ -217,6 +278,12 @@ function FilterChip(
 		return `${names.length} ${FILTER_FIELD_LABELS[current.field].toLowerCase()}s`;
 	});
 
+	const setNegated = (negated: boolean) => {
+		const current = filter.get();
+		if (current.negated === negated) return;
+		onChange(withFilter(filters.get(), { ...current, negated }));
+	};
+
 	return Div(
 		{
 			class:
@@ -225,19 +292,35 @@ function FilterChip(
 
 		Span({ class: "px-2 text-muted-foreground" }, FILTER_FIELD_LABELS[field]),
 
-		// The operator is the toggle: one click flips include ⇄ exclude.
-		Button(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: "h-6 rounded-none border-x border-border px-2 text-[11px] font-normal",
-				title: "Switch between is and is not",
-				onClick: () => {
-					const current = filter.get();
-					onChange(withFilter(filters.get(), { ...current, negated: !current.negated }));
+		DropdownMenu(
+			DropdownMenuTrigger(
+				{
+					variant: "ghost",
+					size: "sm",
+					class: "h-6 rounded-none border-x border-border px-2 text-[11px] font-normal",
+					title: "Choose is or is not",
 				},
-			},
-			filter.bind((current) => operatorLabel(current)),
+				filter.bind((current) => operatorLabel(current)),
+			),
+			DropdownMenuContent(
+				{ class: "min-w-28", align: "start" },
+				DropdownMenuItem(
+					{ onSelect: () => setNegated(false) },
+					"is",
+					If(
+						filter.bind((current) => !current.negated),
+						Check({ class: "ml-auto size-3.5 shrink-0 text-primary" }),
+					),
+				),
+				DropdownMenuItem(
+					{ onSelect: () => setNegated(true) },
+					"is not",
+					If(
+						filter.bind((current) => current.negated),
+						Check({ class: "ml-auto size-3.5 shrink-0 text-primary" }),
+					),
+				),
+			),
 		),
 
 		Popover(
@@ -275,10 +358,10 @@ function FilterChip(
 }
 
 /**
- * The add-filter dropdown: dimensions, then that dimension's values.
+ * The add-filter dropdown: hover a dimension to open its values beside it.
  *
- * `step` is null on the first screen and a field on the second. Reset when the
- * popover closes so it always reopens at the top.
+ * Submenus open on hover after the primitive's `openDelay` (100ms), or with
+ * ArrowRight / Enter / Space. The checkbox keeps the menu open; the row closes it.
  */
 export function AddFilterButton(
 	filters: Readable<Filter[]>,
@@ -287,15 +370,9 @@ export function AddFilterButton(
 	open: Signal<boolean>,
 	variant: "primary" | "subtle" = "primary",
 ) {
-	const step = signal<FilterField | null>(null);
-
-	open.onChange((isOpen) => {
-		if (!isOpen) step.set(null);
-	});
-
-	return Popover(
+	return DropdownMenu(
 		{ open },
-		PopoverTrigger(
+		DropdownMenuTrigger(
 			{
 				variant: "ghost",
 				size: "sm",
@@ -307,72 +384,45 @@ export function AddFilterButton(
 			ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
 			variant === "primary" ? "Filter" : "Add filter",
 		),
-		PopoverContent(
-			{ class: "w-64 p-0", align: "start" },
-			// Two screens in one popover; `Dynamic` would remount the Command and
-			// lose focus, so both are mounted and one is shown.
-			If(step.bind((current) => current === null))
-				.Then(FieldStep(context, step))
-				.Else(
-					Div(
-						{ class: "contents" },
-						...FILTER_FIELDS.map((field) =>
-							If(
-								step.bind((current) => current === field),
-								Div(
-									{ class: "contents" },
-									BackRow(step, field),
-									ValueStep(field, filters, context, onChange, open),
-								),
-							),
+		DropdownMenuContent(
+			{ class: "w-44", align: "start" },
+			ForEach(
+				context.bind((ctx) => availableFields(ctx).map((field) => ({ field }))),
+				(entry) => entry.field,
+				(entry) => FieldSubmenu(entry.get().field, filters, context, onChange),
+			),
+		),
+	);
+}
+
+function FieldSubmenu(
+	field: FilterField,
+	filters: Readable<Filter[]>,
+	context: Readable<FilterContext>,
+	onChange: (next: Filter[]) => void,
+) {
+	const { selected, sync } = bindFilterValues(filters, field, onChange);
+
+	return DropdownMenuSub(
+		DropdownMenuSubTrigger(FILTER_FIELD_LABELS[field]),
+		DropdownMenuSubContent(
+			{ class: "max-h-72 w-56 overflow-y-auto", align: "start" },
+			...sync,
+			DropdownMenuCheckboxGroup(
+				{ value: selected },
+				DropdownMenuGroupHeading(FILTER_FIELD_LABELS[field]),
+				ForEach(
+					context.bind((ctx) => optionsFor(field, ctx)),
+					(option) => option.value,
+					(option) =>
+						DropdownMenuCheckboxItem(
+							{
+								value: option.get().value,
+								indicator: MenuCheckbox(selected, option.get().value),
+							},
+							option.get().icon ?? null,
+							Span({ class: "flex-1 truncate" }, option.bind("label")),
 						),
-					),
-				),
-		),
-	);
-}
-
-function BackRow(step: Signal<FilterField | null>, field: FilterField) {
-	return Div(
-		{
-			class:
-				"flex h-8 items-center gap-1.5 border-b border-border px-2 text-[11px] text-muted-foreground",
-		},
-		Button(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: "h-6 gap-1 px-1.5 text-[11px]",
-				onClick: () => step.set(null),
-			},
-			ChevronLeft({ class: "size-3" }),
-			"Back",
-		),
-		Span({ class: "font-medium text-foreground" }, FILTER_FIELD_LABELS[field]),
-	);
-}
-
-/** Screen one: which dimension to filter on. */
-function FieldStep(context: Readable<FilterContext>, step: Signal<FilterField | null>) {
-	return Command(
-		{ label: "Filter by" },
-		CommandInput({ placeholder: "Filter…" }),
-		CommandList(
-			CommandEmpty("No matching filter."),
-			CommandGroup(
-				CommandGroupItems(
-					ForEach(
-						context.bind((ctx) => availableFields(ctx).map((field) => ({ field }))),
-						(entry) => entry.field,
-						(entry) =>
-							CommandItem(
-								{
-									value: FILTER_FIELD_LABELS[entry.get().field],
-									onSelect: () => step.set(entry.get().field),
-								},
-								Span({ class: "flex-1" }, FILTER_FIELD_LABELS[entry.get().field]),
-							),
-					),
 				),
 			),
 		),
@@ -380,10 +430,11 @@ function FieldStep(context: Readable<FilterContext>, step: Signal<FilterField | 
 }
 
 /**
- * Screen two: the values for one dimension, multi-select.
+ * The values for one dimension, multi-select and searchable.
  *
- * Shared with the chips, which is what makes editing a filter and creating one
- * the same interaction.
+ * Same checkbox-or-row split as the add menu and the issue label picker. The
+ * command input is extra, because a chip is often where you hunt through a
+ * long member or label list.
  */
 function ValueStep(
 	field: FilterField,
@@ -392,55 +443,40 @@ function ValueStep(
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
 ) {
-	const current = derived([filters], (list) => list.find((filter) => filter.field === field));
+	const { selected, sync } = bindFilterValues(filters, field, onChange);
 
-	const pick = (value: string) => {
-		const existing = current.get() ?? { field, negated: false, values: [] };
-		onChange(withFilter(filters.get(), toggleValue(existing, value)));
-		// Deliberately left open: picking several values in a row is the norm.
-	};
-
-	return Command(
-		{ label: FILTER_FIELD_LABELS[field] },
-		CommandInput({ placeholder: `${FILTER_FIELD_LABELS[field]}…` }),
-		CommandList(
-			CommandEmpty("Nothing matches."),
-			CommandGroup(
-				CommandGroupItems(
-					ForEach(
-						context.bind((ctx) => optionsFor(field, ctx)),
-						(option) => option.value,
-						(option) =>
-							CommandItem(
-								{
-									value: option.get().label,
-									onSelect: () => pick(option.get().value),
-								},
-								option.get().icon ?? null,
-								Span({ class: "flex-1 truncate" }, option.bind("label")),
-								If(
-									derived([current], (filter) =>
-										(filter?.values ?? []).includes(option.get().value),
-									),
-									Check({ class: "size-3.5 shrink-0 text-primary" }),
+	return Div(
+		{ class: "contents" },
+		...sync,
+		Command(
+			{ label: FILTER_FIELD_LABELS[field] },
+			CommandInput({ placeholder: `${FILTER_FIELD_LABELS[field]}…` }),
+			CommandList(
+				CommandEmpty("Nothing matches."),
+				CommandGroup(
+					CommandGroupItems(
+						ForEach(
+							context.bind((ctx) => optionsFor(field, ctx)),
+							(option) => option.value,
+							(option) =>
+								CommandItem(
+									{
+										value: option.get().label,
+										onSelect: () => {
+											const id = option.get().value;
+											selected.update((ids) =>
+												ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id],
+											);
+											open.set(false);
+										},
+									},
+									MenuCheckbox(selected, option.get().value),
+									option.get().icon ?? null,
+									Span({ class: "flex-1 truncate" }, option.bind("label")),
 								),
-							),
+						),
 					),
 				),
-			),
-		),
-		// Closing from inside the list is what Enter-then-Escape would do anyway;
-		// this is the explicit affordance for "done picking".
-		Div(
-			{ class: "border-t border-border p-1" },
-			Button(
-				{
-					variant: "ghost",
-					size: "sm",
-					class: "h-6 w-full justify-center text-[11px] text-muted-foreground",
-					onClick: () => open.set(false),
-				},
-				"Done",
 			),
 		),
 	);

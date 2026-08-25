@@ -6,6 +6,7 @@ import {
 	ForEach,
 	If,
 	Img,
+	ImplementDocument,
 	ImplementLifecycle,
 	Main,
 	Span,
@@ -24,8 +25,10 @@ import {
 	Settings as SettingsIcon,
 	SunMoon,
 } from "@implementjs/lucide";
+import { preloadRoute } from "@implementjs/kit/runtime";
 import { api } from "@/lib/client/api";
 import { authClient } from "@/lib/client/auth";
+import { isTyping } from "@/lib/client/is-typing";
 import { Button } from "@/lib/components/ui/button";
 import {
 	DropdownMenu,
@@ -80,6 +83,14 @@ export function AppShell(
 					if (document.visibilityState === "visible") void poll();
 				};
 				document.addEventListener("visibilitychange", onVisible);
+
+				// Sidebar targets are lazy route chunks. Warm them so a click cannot
+				// render a page whose module has not loaded yet.
+				const slug = activeSlug.get();
+				void preloadRoute(`/app/${slug}/inbox`);
+				void preloadRoute(`/app/${slug}/feedback`);
+				void preloadRoute(`/app/${slug}/settings`);
+
 				return () => {
 					clearInterval(timer);
 					document.removeEventListener("visibilitychange", onVisible);
@@ -88,6 +99,17 @@ export function AppShell(
 		}),
 		Sidebar(data, activeSlug, url, unread),
 		Main({ class: "flex min-w-0 flex-1 flex-col bg-background" }, children),
+
+		ImplementDocument({
+			onKeydown: (event) => {
+				if (isTyping(event.target)) return;
+				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				if (event.key.toLowerCase() !== "c") return;
+				event.preventDefault();
+				const match = /\/app\/[^/]+\/team\/([^/?#]+)/.exec(url.get().path);
+				openCreateIssue(activeSlug.get(), match?.[1]?.toUpperCase());
+			},
+		}),
 
 		// Mounted once for the whole app: both are opened imperatively from
 		// hotkeys, the sidebar and the palette itself.
@@ -235,6 +257,9 @@ function NavItem(
 		{
 			to,
 			params: { slug: activeSlug },
+			onPointerenter: () => {
+				void preloadRoute(router.href(to, { slug: activeSlug.get() }));
+			},
 			class: derived([active], (isActive) =>
 				cn(
 					"flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",

@@ -11,8 +11,14 @@ export interface ApiKeyPrincipal {
 	permissions: ApiKeyPermissions | null;
 }
 
-/** The key a request is presenting, from either accepted header. */
-export function presentedApiKey(headers: Headers): string | null {
+/**
+ * The API key prefix, so `hooks.server.ts` can tell an API key apart from an
+ * OAuth access token — both arrive as `Authorization: Bearer`.
+ */
+export const API_KEY_PREFIX = "trk_";
+
+/** The bearer credential a request is presenting, from either accepted header. */
+export function presentedCredential(headers: Headers): string | null {
 	const direct = headers.get("x-api-key");
 	if (direct !== null && direct !== "") return direct;
 
@@ -71,6 +77,8 @@ export async function resolveApiKey(presented: string): Promise<ApiKeyPrincipal 
 			name: row.owner.name,
 			email: row.owner.email,
 			image: row.owner.image ?? null,
+			// A key acts as the person who minted it, so it is still a person.
+			type: "human",
 		},
 		keyId: row.key.id,
 		permissions: parsePermissions(row.key.permissions),

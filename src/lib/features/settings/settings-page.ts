@@ -14,11 +14,12 @@ import {
 import { Copy } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
-import { UserAvatar } from "@/lib/components/glyphs";
+import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
+import { AgentsSection } from "./agents-section";
 import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
 import { RepositoriesSection } from "./repositories-section";
@@ -55,6 +56,7 @@ export function SettingsPage({
 					data.bind((value) => value.workspace),
 					params,
 				),
+				AgentsSection(params.slug),
 				WebhooksSection(params.slug, copy),
 				ApiKeysSection(copy),
 			),
@@ -190,8 +192,15 @@ function MembersSection(data: Readable<PageData>, params: { slug: Readable<strin
 						Div(
 							{ class: "min-w-0 flex-1" },
 							Div(
-								{ class: "truncate text-[13px]" },
-								member.bind((value) => value.user.name),
+								{ class: "flex items-center gap-1.5" },
+								Span(
+									{ class: "truncate text-[13px]" },
+									member.bind((value) => value.user.name),
+								),
+								If(
+									member.bind((value) => value.user.type === "agent"),
+									AgentBadge(),
+								),
 							),
 							Div(
 								{ class: "truncate text-[12px] text-muted-foreground" },

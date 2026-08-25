@@ -2,6 +2,7 @@
 // OpenAPI document, and the browser. Kit forbids a client file from importing
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
+import { USER_TYPES } from "./agents";
 import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
@@ -18,6 +19,11 @@ export const UserSummary = v.object({
 	name: v.string(),
 	email: v.string(),
 	image: v.nullable(v.string()),
+	/**
+	 * "agent" marks a bot member. Carried on every user the API returns so the
+	 * UI can badge a comment or an assignee without a second lookup.
+	 */
+	type: v.picklist(USER_TYPES),
 });
 export type UserSummary = v.InferOutput<typeof UserSummary>;
 
@@ -332,6 +338,8 @@ export const CreateIssueBody = v.object({
 	priority: v.optional(IssuePrioritySchema, "none"),
 	assigneeId: v.optional(v.nullable(v.string())),
 	labelIds: v.optional(v.array(v.string())),
+	/** Draft uploads to hang off the new issue. */
+	attachmentIds: v.optional(v.array(v.string())),
 });
 
 export const UpdateIssueBody = v.partial(
@@ -347,6 +355,12 @@ export const UpdateIssueBody = v.partial(
 		labelIds: v.array(v.string()),
 	}),
 );
+
+/** Move an issue into another workspace. Numbers reallocate, so the identifier changes. */
+export const TransferIssueBody = v.object({
+	workspaceSlug: trimmed(1, 60),
+	teamKey: v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6)),
+});
 
 export const CreateCommentBody = v.object({
 	body: trimmed(1, 10_000),
@@ -489,4 +503,28 @@ export const CreateApiKeyBody = v.object({
 export const MarkNotificationsBody = v.object({
 	/** Omit to mark every notification read. */
 	ids: v.optional(v.array(v.string())),
+});
+
+export const InstalledAgentSchema = v.object({
+	grantId: v.string(),
+	clientId: v.string(),
+	name: v.string(),
+	image: v.nullable(v.string()),
+	scopes: v.array(v.string()),
+	installedBy: v.object({ id: v.string(), name: v.string() }),
+	lastUsedAt: v.nullable(v.string()),
+	createdAt: v.string(),
+});
+export type InstalledAgent = v.InferOutput<typeof InstalledAgentSchema>;
+
+/** What the `/device` consent screen posts once someone approves. */
+export const ApproveDeviceBody = v.object({
+	userCode: v.pipe(v.string(), v.trim(), v.minLength(1)),
+	/** Which workspace the agent is being let into. */
+	slug: v.pipe(v.string(), v.trim(), v.minLength(1)),
+	scopes: v.pipe(v.array(v.string()), v.minLength(1, "choose at least one permission")),
+});
+
+export const DenyDeviceBody = v.object({
+	userCode: v.pipe(v.string(), v.trim(), v.minLength(1)),
 });

@@ -1,7 +1,15 @@
 // ⌘K. Navigation, issue actions, and theme — the small set of things worth
 // reaching without the mouse. Mounted once in the shell.
 import { router } from "$implement/router";
-import { Div, ForEach, ImplementDocument, Span, signal } from "@implementjs/core";
+import {
+	Div,
+	ForEach,
+	If,
+	ImplementDocument,
+	ImplementEffect,
+	Span,
+	signal,
+} from "@implementjs/core";
 import { Inbox, LayoutList, Moon, Plus, Settings } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
 import {
@@ -30,6 +38,7 @@ export function openCommandPalette(workspaceSlug?: string): void {
 
 export function CommandPalette(activeSlug: { get: () => string }) {
 	const issues = signal<Issue[]>([]);
+	const search = signal("");
 
 	const load = async () => {
 		const workspaceSlug = activeSlug.get();
@@ -61,10 +70,13 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 
 		Dialog(
 			{ open },
+			ImplementEffect([open], (isOpen) => {
+				if (!isOpen) search.set("");
+			}),
 			DialogContent(
 				{ class: "max-w-lg p-0", showCloseButton: false },
 				Command(
-					{ label: "Command palette" },
+					{ label: "Command palette", search },
 					CommandInput({ placeholder: "Search issues or run a command…" }),
 					CommandList(
 						CommandEmpty("Nothing found."),
@@ -122,31 +134,34 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 							),
 						),
 
-						CommandGroup(
-							CommandGroupHeading("Issues"),
-							CommandGroupItems(
-								ForEach(
-									issues,
-									(issue) => issue.id,
-									(issue) =>
-										CommandItem(
-											{
-												value: `${issue.get().identifier} ${issue.get().title}`,
-												onSelect: () =>
-													go(() =>
-														router.navigate("/app/:slug/issue/:identifier", {
-															slug: activeSlug.get(),
-															identifier: issue.get().identifier,
-														}),
-													),
-											},
-											StatusIcon(issue.bind("status")),
-											Span(
-												{ class: "w-14 shrink-0 font-mono text-[11px] text-muted-foreground" },
-												issue.bind("identifier"),
+						If(
+							issues.bind((list) => list.length > 0),
+							CommandGroup(
+								CommandGroupHeading("Issues"),
+								CommandGroupItems(
+									ForEach(
+										issues,
+										(issue) => issue.id,
+										(issue) =>
+											CommandItem(
+												{
+													value: `${issue.get().identifier} ${issue.get().title}`,
+													onSelect: () =>
+														go(() =>
+															router.navigate("/app/:slug/issue/:identifier", {
+																slug: activeSlug.get(),
+																identifier: issue.get().identifier,
+															}),
+														),
+												},
+												StatusIcon(issue.bind("status")),
+												Span(
+													{ class: "w-14 shrink-0 font-mono text-[11px] text-muted-foreground" },
+													issue.bind("identifier"),
+												),
+												Span({ class: "truncate" }, issue.bind("title")),
 											),
-											Span({ class: "truncate" }, issue.bind("title")),
-										),
+									),
 								),
 							),
 						),

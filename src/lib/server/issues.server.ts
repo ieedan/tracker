@@ -1,10 +1,13 @@
 import { error } from "@implementjs/kit/server";
 import { and, count, desc, eq, inArray, isNull, like, max, or, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
+import { parseIdentifier, type IssuePriority, type IssueStatus } from "@/lib/domain/issues";
 import type { Issue } from "@/lib/domain/schemas";
 import { db } from "./db.server";
+import { emitIssueDeleted, emitIssueEvent } from "./events.server";
+import type { Membership } from "./guards.server";
 import {
+	attachment,
 	comment,
 	feedback,
 	issue,
@@ -12,11 +15,13 @@ import {
 	repository,
 	issueLabel,
 	label,
+	notification,
 	team,
 	user,
 	workspaceMember,
 } from "./schema.server";
-import { toIssue } from "./serialize.server";
+import { identifierFor, toIssue } from "./serialize.server";
+import { requireTeam } from "./teams.server";
 
 const assigneeUser = alias(user, "assignee_user");
 const creatorUser = alias(user, "creator_user");
@@ -244,4 +249,137 @@ export async function validLabelIds(workspaceId: string, ids: string[]): Promise
 		.where(and(eq(label.workspaceId, workspaceId), inArray(label.id, unique)));
 	if (rows.length !== unique.length) error(400, "one or more labels are not in this workspace");
 	return rows.map((row) => row.id);
+}
+
+/** True when `userId` is already in the workspace — unlike `assertMember`, a miss is not an error. */
+async function isMember(workspaceId: string, userId: string): Promise<boolean> {
+	const rows = await db
+		.select({ id: workspaceMember.id })
+		.from(workspaceMember)
+		.where(and(eq(workspaceMember.workspaceId, workspaceId), eq(workspaceMember.userId, userId)))
+		.limit(1);
+	return rows.length > 0;
+}
+
+/**
+ * Moves an issue into another workspace.
+ *
+ * The identifier is per-team, so the number is reallocated in the destination.
+ * Labels are matched by exact name (dropped when the dest has no namesake),
+ * the assignee is kept only if they belong there, and linked feedback stays
+ * behind. Comments hang off the issue id and come along for free.
+ */
+export async function transferIssue(options: {
+	source: Membership;
+	dest: Membership;
+	identifier: string;
+	teamKey: string;
+}): Promise<Issue> {
+	if (options.dest.workspace.id === options.source.workspace.id) {
+		error(400, "use the team field to move within a workspace");
+	}
+
+	const parsed = parseIdentifier(options.identifier);
+	if (parsed === null) error(404, `"${options.identifier}" is not an issue identifier`);
+
+	const rows = await db
+		.select({ issue, team })
+		.from(issue)
+		.innerJoin(team, eq(team.id, issue.teamId))
+		.where(
+			and(
+				eq(team.workspaceId, options.source.workspace.id),
+				eq(team.key, parsed.key),
+				eq(issue.number, parsed.number),
+			),
+		)
+		.limit(1);
+
+	const row = rows[0];
+	if (row === undefined) error(404, `no issue ${parsed.key}-${parsed.number}`);
+	const before = row.issue;
+	const left = {
+		id: before.id,
+		identifier: identifierFor(row.team.key, before.number),
+		title: before.title,
+		team: { key: row.team.key, name: row.team.name },
+	};
+
+	const destTeam = await requireTeam(options.dest.workspace.id, options.teamKey);
+
+	const assigneeId =
+		before.assigneeId !== null && (await isMember(options.dest.workspace.id, before.assigneeId))
+			? before.assigneeId
+			: null;
+
+	const labelNames = (
+		await db
+			.select({ name: label.name })
+			.from(issueLabel)
+			.innerJoin(label, eq(label.id, issueLabel.labelId))
+			.where(eq(issueLabel.issueId, before.id))
+	).map((entry) => entry.name);
+
+	await insertWithNumber(destTeam.id, async (candidate) => {
+		await db
+			.update(issue)
+			.set({
+				teamId: destTeam.id,
+				number: candidate,
+				updatedAt: new Date(),
+				assigneeId,
+				feedbackId: null,
+			})
+			.where(eq(issue.id, before.id));
+	});
+
+	let destLabelIds: string[] = [];
+	if (labelNames.length > 0) {
+		destLabelIds = (
+			await db
+				.select({ id: label.id })
+				.from(label)
+				.where(
+					and(eq(label.workspaceId, options.dest.workspace.id), inArray(label.name, labelNames)),
+				)
+		).map((entry) => entry.id);
+	}
+	await setIssueLabels(before.id, destLabelIds);
+
+	await db
+		.update(attachment)
+		.set({ workspaceId: options.dest.workspace.id })
+		.where(eq(attachment.issueId, before.id));
+
+	const commentIds = (
+		await db.select({ id: comment.id }).from(comment).where(eq(comment.issueId, before.id))
+	).map((entry) => entry.id);
+	if (commentIds.length > 0) {
+		await db
+			.update(attachment)
+			.set({ workspaceId: options.dest.workspace.id })
+			.where(inArray(attachment.commentId, commentIds));
+	}
+
+	await db
+		.update(notification)
+		.set({ workspaceId: options.dest.workspace.id })
+		.where(eq(notification.issueId, before.id));
+
+	await emitIssueDeleted({
+		workspace: options.source.workspace,
+		actor: options.source.user,
+		issue: left,
+	});
+
+	const moved = await getIssueById(before.id);
+	if (moved === undefined) error(500, "issue vanished after transfer");
+
+	await emitIssueEvent("issue.created", {
+		workspace: options.dest.workspace,
+		actor: options.source.user,
+		issue: moved,
+	});
+
+	return moved;
 }

@@ -11,7 +11,18 @@ import type { WebhookEvent } from "@/lib/domain/webhooks";
 import { dispatchPending, enqueue, type EventPayload } from "./webhooks.server";
 
 type Workspace = { id: string; slug: string; name: string };
-type Actor = { id: string; name: string; email: string } | null;
+/**
+ * Who did it. `type` distinguishes a person from a bot, and `onBehalfOf` names
+ * the human a bot is acting for — a consumer that reacts to issue changes
+ * usually wants to know which of those it is looking at.
+ */
+type Actor = {
+	id: string;
+	name: string;
+	email: string;
+	type?: "human" | "agent";
+	onBehalfOf?: { id: string; name: string } | null;
+} | null;
 
 /** Enqueue, then try to send without blocking the caller. */
 async function emit(payload: EventPayload): Promise<void> {

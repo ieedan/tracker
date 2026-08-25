@@ -107,6 +107,7 @@ export const POST = handler({
 			await notify({
 				userId,
 				actorId: author.id,
+				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: target.issue.id,
 				type: "issue_commented",

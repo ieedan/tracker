@@ -4,6 +4,7 @@ import {
 	ForEach,
 	H1,
 	If,
+	ImplementDocument,
 	Input,
 	P,
 	Span,
@@ -15,7 +16,7 @@ import {
 import { ChevronLeft } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
-import { UserAvatar } from "@/lib/components/glyphs";
+import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import type {
 	Attachment,
@@ -34,6 +35,9 @@ import {
 } from "@/lib/features/attachments/attachment-list";
 import type { Upload } from "@/lib/features/attachments/uploader";
 import { fullTime, relativeTime } from "@/lib/format";
+import { CopyPromptButton } from "./copy-prompt";
+import { openCreateIssue } from "./create-issue-dialog";
+import { isTyping } from "@/lib/client/is-typing";
 import {
 	AssigneePicker,
 	LabelChips,
@@ -46,6 +50,7 @@ import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
 import { MentionMenu, MentionText, fileMentions } from "./file-mentions";
+import { TransferIssueButton } from "./transfer-issue";
 
 interface PageData {
 	issue: Issue;
@@ -81,6 +86,20 @@ export function IssueDetailPage({
 	const linkedPull = signal(data.get().issue.pullRequest);
 	data.onChange((next) => linkedPull.set(next.issue.pullRequest));
 
+	const teamOpen = signal(false);
+	const statusOpen = signal(false);
+	const priorityOpen = signal(false);
+	const assigneeOpen = signal(false);
+	const labelOpen = signal(false);
+
+	const openMenu = (which: "team" | "status" | "priority" | "assignee" | "label") => {
+		teamOpen.set(which === "team");
+		statusOpen.set(which === "status");
+		priorityOpen.set(which === "priority");
+		assigneeOpen.set(which === "assignee");
+		labelOpen.set(which === "label");
+	};
+
 	const update = (patch: Parameters<typeof patchIssue>[4], apply: (value: Issue) => Issue) =>
 		void patchIssue(
 			issues,
@@ -115,6 +134,35 @@ export function IssueDetailPage({
 
 	return Div(
 		{ class: "flex min-h-0 flex-1" },
+
+		ImplementDocument({
+			onKeydown: (event) => {
+				if (isTyping(event.target)) return;
+				if (event.metaKey || event.ctrlKey || event.altKey) return;
+				const key = event.key.toLowerCase();
+				if (key === "c") {
+					event.preventDefault();
+					openCreateIssue(params.slug.get());
+					return;
+				}
+				if (key === "t") {
+					event.preventDefault();
+					openMenu("team");
+				} else if (key === "s") {
+					event.preventDefault();
+					openMenu("status");
+				} else if (key === "p") {
+					event.preventDefault();
+					openMenu("priority");
+				} else if (key === "a") {
+					event.preventDefault();
+					openMenu("assignee");
+				} else if (key === "l") {
+					event.preventDefault();
+					openMenu("label");
+				}
+			},
+		}),
 
 		Div(
 			{ class: "flex min-w-0 flex-1 flex-col" },
@@ -168,13 +216,14 @@ export function IssueDetailPage({
 		// Linear puts the properties in a right rail rather than above the body.
 		Div(
 			{ class: "hidden w-64 shrink-0 flex-col gap-4 border-l border-border p-4 lg:flex" },
+			PropertyRow("Workspace", TransferIssueButton({ slug: params.slug, issue })),
 			PropertyRow(
 				"Team",
 				TeamPicker(
 					issue.bind("team"),
 					data.bind((value) => value.teams),
 					moveTeam,
-					{ showLabel: true },
+					{ showLabel: true, open: teamOpen },
 				),
 			),
 			PropertyRow(
@@ -182,7 +231,7 @@ export function IssueDetailPage({
 				StatusPicker(
 					issue.bind("status"),
 					(status) => update({ status }, (value) => ({ ...value, status })),
-					{ showLabel: true },
+					{ showLabel: true, open: statusOpen },
 				),
 			),
 			PropertyRow(
@@ -190,7 +239,7 @@ export function IssueDetailPage({
 				PriorityPicker(
 					issue.bind("priority"),
 					(priority) => update({ priority }, (value) => ({ ...value, priority })),
-					{ showLabel: true },
+					{ showLabel: true, open: priorityOpen },
 				),
 			),
 			PropertyRow(
@@ -207,7 +256,7 @@ export function IssueDetailPage({
 									: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
 										value.assignee),
 						})),
-					{ showLabel: true },
+					{ showLabel: true, open: assigneeOpen },
 				),
 			),
 			PropertyRow(
@@ -266,9 +315,12 @@ export function IssueDetailPage({
 										: [...value.labels, data.get().labels.find((label) => label.id === labelId)!],
 								}),
 							),
+						{ open: labelOpen },
 					),
 				),
 			),
+
+			CopyPromptButton({ issue, slug: params.slug }),
 
 			Div(
 				{ class: "mt-2 border-t border-border pt-3 text-[11px] text-muted-foreground" },
@@ -446,6 +498,10 @@ function CommentThread(
 							Span(
 								{ class: "text-[13px] font-medium" },
 								comment.bind((c) => c.author.name),
+							),
+							If(
+								comment.bind((c) => c.author.type === "agent"),
+								AgentBadge(),
 							),
 							Span(
 								{ class: "text-[11px] text-muted-foreground" },
