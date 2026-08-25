@@ -17,6 +17,7 @@ import {
 	CreateCommentBody,
 	CreateIssueBody,
 	CreateLabelBody,
+	LinkPullRequestBody,
 	TransferIssueBody,
 	UpdateFeedbackBody,
 	UpdateIssueBody,
@@ -227,6 +228,33 @@ export const MCP_TOOLS: McpTool[] = [
 			method: "POST",
 			path: `/api/v1/workspaces/${slug}/issues/${encodeURIComponent(String(args.identifier))}/comments`,
 			body: { body: args.body, attachmentIds: args.attachmentIds },
+		}),
+	},
+	{
+		name: "link_pull_request",
+		title: "Link a pull request",
+		description:
+			"Attach a pull request to an issue, so the work and the ticket point at each other. Accepts a full URL, `owner/name#12`, or `#12` when the issue is already scoped to a repository. One PR per issue.",
+		readOnly: false,
+		scoped: true,
+		input: v.object({ identifier, ...LinkPullRequestBody.entries, ...workspaceArg }),
+		request: (args, slug) => ({
+			method: "POST",
+			path: `/api/v1/workspaces/${slug}/issues/${encodeURIComponent(String(args.identifier))}/pull-request`,
+			body: { reference: args.reference },
+		}),
+	},
+	{
+		name: "list_repositories",
+		title: "List repositories",
+		description:
+			"Repositories linked to the workspace, with their ids — needed to scope an issue with `repositoryId`, and to reference files.",
+		readOnly: true,
+		scoped: true,
+		input: v.object({ ...workspaceArg }),
+		request: (_args, slug) => ({
+			method: "GET",
+			path: `/api/v1/workspaces/${slug}/repositories`,
 		}),
 	},
 	{
