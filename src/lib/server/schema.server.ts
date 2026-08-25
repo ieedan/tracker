@@ -8,6 +8,12 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import type {
+	FeedbackBoard,
+	FeedbackIntake,
+	FeedbackStatus,
+	FeedbackVisibility,
+} from "@/lib/domain/feedback";
+import type {
 	IssuePriority,
 	IssueStatus,
 	NotificationType,
@@ -28,6 +34,10 @@ export const workspace = sqliteTable("workspace", {
 	id: text("id").primaryKey(),
 	name: text("name").notNull(),
 	slug: text("slug").notNull().unique(),
+	/** Who may POST to `/api/v1/workspaces/<slug>/user-feedback`. */
+	feedbackIntake: text("feedbackIntake").$type<FeedbackIntake>().notNull().default("api_key"),
+	/** Whether `/<slug>/public/feedback` is readable without signing in. */
+	feedbackBoard: text("feedbackBoard").$type<FeedbackBoard>().notNull().default("private"),
 	createdAt: now(),
 	updatedAt: timestamp("updatedAt")
 		.notNull()
@@ -109,6 +119,132 @@ export const label = sqliteTable(
 	(table) => [uniqueIndex("label_unique").on(table.workspaceId, table.name)],
 );
 
+/**
+ * A piece of user feedback.
+ *
+ * Same shape as an issue in the ways that matter — title, description, labels,
+ * a number you can quote — but a separate table, because feedback is a request
+ * for work rather than the work itself. Its statuses reflect triage, not
+ * progress, and converting is what turns one into the other.
+ */
+export const feedback = sqliteTable(
+	"feedback",
+	{
+		id: text("id").primaryKey(),
+		workspaceId: text("workspaceId")
+			.notNull()
+			.references(() => workspace.id, { onDelete: "cascade" }),
+		/** Per-workspace counter — the `12` in `FB-12`. */
+		number: integer("number").notNull(),
+		title: text("title").notNull(),
+		description: text("description").notNull().default(""),
+		status: text("status").$type<FeedbackStatus>().notNull().default("new"),
+		visibility: text("visibility").$type<FeedbackVisibility>().notNull().default("private"),
+		/**
+		 * Who sent it. All three are optional and independent: an anonymous public
+		 * post has none, a widget post has a name and email, a post from someone
+		 * signed in has a user id as well.
+		 */
+		submitterName: text("submitterName"),
+		submitterEmail: text("submitterEmail"),
+		submitterUserId: text("submitterUserId").references(() => user.id, { onDelete: "set null" }),
+		/** Free-form provenance from the caller: `widget`, `ios`, `support-inbox`. */
+		source: text("source"),
+		createdAt: now(),
+		updatedAt: timestamp("updatedAt")
+			.notNull()
+			.default(sql`(unixepoch() * 1000)`),
+	},
+	(table) => [
+		uniqueIndex("feedback_number_unique").on(table.workspaceId, table.number),
+		index("feedback_workspace_status").on(table.workspaceId, table.status),
+		// The public board's query: this workspace, public only, newest first.
+		index("feedback_public").on(table.workspaceId, table.visibility, table.createdAt),
+	],
+);
+
+export const feedbackLabel = sqliteTable(
+	"feedback_label",
+	{
+		feedbackId: text("feedbackId")
+			.notNull()
+			.references(() => feedback.id, { onDelete: "cascade" }),
+		labelId: text("labelId")
+			.notNull()
+			.references(() => label.id, { onDelete: "cascade" }),
+	},
+	(table) => [primaryKey({ columns: [table.feedbackId, table.labelId] })],
+);
+
+/**
+ * A reply on a piece of feedback.
+ *
+ * Always authored by a real account — that is the anti-spam measure the public
+ * board relies on, since anyone can read it but only someone signed in can add
+ * to it. `internal` keeps a team's own triage notes off the public board.
+ */
+export const feedbackComment = sqliteTable(
+	"feedback_comment",
+	{
+		id: text("id").primaryKey(),
+		feedbackId: text("feedbackId")
+			.notNull()
+			.references(() => feedback.id, { onDelete: "cascade" }),
+		authorId: text("authorId")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		body: text("body").notNull(),
+		/** Visible to workspace members only. Never rendered on the public board. */
+		internal: integer("internal", { mode: "boolean" }).notNull().default(false),
+		createdAt: now(),
+		updatedAt: timestamp("updatedAt")
+			.notNull()
+			.default(sql`(unixepoch() * 1000)`),
+	},
+	(table) => [index("feedback_comment_feedback").on(table.feedbackId, table.createdAt)],
+);
+
+/**
+ * Someone who asked to hear when this feedback moves.
+ *
+ * Nothing sends mail yet; these are collected so that when it does, the list is
+ * already there. The unique index is what makes a repeat subscribe a no-op
+ * rather than a way to receive the same mail eleven times.
+ */
+export const feedbackSubscriber = sqliteTable(
+	"feedback_subscriber",
+	{
+		id: text("id").primaryKey(),
+		feedbackId: text("feedbackId")
+			.notNull()
+			.references(() => feedback.id, { onDelete: "cascade" }),
+		email: text("email").notNull(),
+		/** Set when the subscriber was signed in at the time. */
+		userId: text("userId").references(() => user.id, { onDelete: "set null" }),
+		createdAt: now(),
+	},
+	(table) => [uniqueIndex("feedback_subscriber_unique").on(table.feedbackId, table.email)],
+);
+
+/**
+ * A fixed-window counter, keyed by whatever the caller decides identifies the
+ * client — an IP for public intake, an API key id otherwise.
+ *
+ * It lives in the database rather than in memory because there is no shared
+ * memory to put it in: every serverless invocation starts cold, so an in-process
+ * counter would reset roughly as often as it was consulted.
+ */
+export const rateLimit = sqliteTable(
+	"rate_limit",
+	{
+		key: text("key").primaryKey(),
+		count: integer("count").notNull().default(0),
+		/** When the window rolls over and `count` starts again at one. */
+		resetAt: timestamp("resetAt").notNull(),
+	},
+	(table) => [index("rate_limit_reset").on(table.resetAt)],
+);
+
 export const issue = sqliteTable(
 	"issue",
 	{
@@ -126,6 +262,13 @@ export const issue = sqliteTable(
 		creatorId: text("creatorId")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
+		/**
+		 * The feedback this issue was converted from, if any.
+		 *
+		 * Unique, so converting the same feedback twice cannot fan out into a pile
+		 * of duplicate issues — the second attempt finds the first.
+		 */
+		feedbackId: text("feedbackId").references(() => feedback.id, { onDelete: "set null" }),
 		createdAt: now(),
 		updatedAt: timestamp("updatedAt")
 			.notNull()
@@ -135,6 +278,7 @@ export const issue = sqliteTable(
 		uniqueIndex("issue_number_unique").on(table.teamId, table.number),
 		index("issue_team").on(table.teamId),
 		index("issue_assignee").on(table.assigneeId),
+		uniqueIndex("issue_feedback_unique").on(table.feedbackId),
 	],
 );
 
@@ -308,6 +452,30 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
 	teams: many(team),
 	labels: many(label),
 	webhooks: many(webhook),
+	feedback: many(feedback),
+}));
+
+export const feedbackRelations = relations(feedback, ({ one, many }) => ({
+	workspace: one(workspace, { fields: [feedback.workspaceId], references: [workspace.id] }),
+	submitter: one(user, { fields: [feedback.submitterUserId], references: [user.id] }),
+	labels: many(feedbackLabel),
+	comments: many(feedbackComment),
+	subscribers: many(feedbackSubscriber),
+}));
+
+export const feedbackLabelRelations = relations(feedbackLabel, ({ one }) => ({
+	feedback: one(feedback, { fields: [feedbackLabel.feedbackId], references: [feedback.id] }),
+	label: one(label, { fields: [feedbackLabel.labelId], references: [label.id] }),
+}));
+
+export const feedbackCommentRelations = relations(feedbackComment, ({ one }) => ({
+	feedback: one(feedback, { fields: [feedbackComment.feedbackId], references: [feedback.id] }),
+	author: one(user, { fields: [feedbackComment.authorId], references: [user.id] }),
+}));
+
+export const feedbackSubscriberRelations = relations(feedbackSubscriber, ({ one }) => ({
+	feedback: one(feedback, { fields: [feedbackSubscriber.feedbackId], references: [feedback.id] }),
+	user: one(user, { fields: [feedbackSubscriber.userId], references: [user.id] }),
 }));
 
 export const teamRelations = relations(team, ({ one, many }) => ({
@@ -325,6 +493,7 @@ export const workspaceMemberRelations = relations(workspaceMember, ({ one }) => 
 
 export const issueRelations = relations(issue, ({ one, many }) => ({
 	team: one(team, { fields: [issue.teamId], references: [team.id] }),
+	feedback: one(feedback, { fields: [issue.feedbackId], references: [feedback.id] }),
 	assignee: one(user, { fields: [issue.assigneeId], references: [user.id] }),
 	creator: one(user, { fields: [issue.creatorId], references: [user.id] }),
 	labels: many(issueLabel),

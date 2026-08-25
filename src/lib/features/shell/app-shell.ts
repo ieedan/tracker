@@ -16,6 +16,7 @@ import {
 	ChevronDown,
 	Inbox as InboxIcon,
 	LayoutList,
+	MessageSquareQuote,
 	LogOut,
 	Plus,
 	Settings as SettingsIcon,
@@ -120,6 +121,7 @@ function Sidebar(
 
 		NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
 		NavItem(url, activeSlug, "/app/:slug", LayoutList, "All issues"),
+		NavItem(url, activeSlug, "/app/:slug/feedback", MessageSquareQuote, "User feedback"),
 		NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
 
 		TeamNav(data, activeSlug, url),
@@ -191,7 +193,7 @@ function WorkspaceSwitcher(data: Readable<ShellData>, activeSlug: Readable<strin
 	);
 }
 
-type NavPath = "/app/:slug" | "/app/:slug/inbox" | "/app/:slug/settings";
+type NavPath = "/app/:slug" | "/app/:slug/inbox" | "/app/:slug/feedback" | "/app/:slug/settings";
 
 function NavItem(
 	url: Readable<{ path: string }>,

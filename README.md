@@ -60,6 +60,10 @@ at a workspace that does not exist.
   assignee's and reporter's inbox. You are never notified of your own actions.
 - **Attachments** — drag files onto an issue or pick them; images and video
   render in place, everything else becomes a chip. Up to 100MB each.
+- **User feedback** — an ingest endpoint anyone can point a widget or a support
+  script at, a workspace tab to triage what arrives, one click to turn a piece
+  of feedback into an issue, and an optional public board where the people who
+  asked can follow along.
 - **Filters** — `F` (or the Filter button) opens a two-step menu: pick a
   dimension — status, priority, assignee, label, team, creator — then pick
   values. Each active filter becomes a chip you can edit in place: click the
@@ -140,11 +144,104 @@ while a workspace's issues fit in one response; the API already takes
 `?team=`/`?status=` server-side, and pushing the rest down to SQL is what to do
 when the list grows enough to need pagination.
 
+## User feedback
+
+Feedback is a separate thing from an issue on purpose. An issue is work; a piece
+of feedback is a _request_ for work, which may be duplicated, declined, or one
+of thirty people asking for the same thing. So it has its own table, its own
+`FB-12` numbering and its own statuses — New, Reviewing, Planned, Accepted,
+Declined — none of which claim anything about progress.
+
+### Taking it in
+
+One endpoint, `POST /api/v1/workspaces/<slug>/user-feedback`, and the workspace
+decides who may call it (**Settings → User feedback → Intake**):
+
+| Mode                         | Who can post                           | Rate limit      |
+| ---------------------------- | -------------------------------------- | --------------- |
+| Closed                       | nobody; the endpoint 404s              | —               |
+| API key required _(default)_ | callers presenting a workspace API key | 120/min per key |
+| Open to anyone               | anyone with the URL                    | 5/min per IP    |
+
+A new workspace starts on **API key required**. An open ingest endpoint on a URL
+that is guessable from a workspace slug is something you should have to switch
+on, not something you find out about after it fills with spam.
+
+```bash
+curl -X POST http://localhost:5173/api/v1/workspaces/acme/user-feedback \
+  -H "content-type: application/json" \
+  -H "x-api-key: $TRACKER_API_KEY" \
+  -d '{
+        "title": "Dark mode please",
+        "description": "The white burns at night.",
+        "email": "rae@example.com",
+        "name": "Rae",
+        "source": "widget",
+        "subscribe": true
+      }'
+```
+
+`email` is optional and is what a reply would go to; `subscribe` adds it to the
+list told when this feedback moves. **Nothing sends mail yet** — the list is
+being collected so that it is already populated the day sending exists.
+
+The limiter is a fixed window in the database (`rate_limit`), not in memory:
+every serverless invocation starts cold, so an in-process counter would reset
+about as often as it was consulted. The counter is one atomic upsert, so two
+simultaneous requests cannot both read "4 of 5" and both be allowed.
+
+### Triaging it
+
+The **User feedback** tab lists what has arrived, newest first, with tabs across
+the statuses. Status and labels are edited inline. **Convert** files an issue
+from it in one click — the default team, or pick one from the split button.
+
+Converting:
+
+- copies the submitter's description across **verbatim** — rewriting what
+  somebody told you and then quoting it back is how the record stops meaning
+  anything;
+- carries over the feedback's labels and adds a `user feedback` label, created
+  on demand, so months later you can filter the backlog by it and see which of
+  your work came from someone actually asking;
+- links both ways — the issue keeps `feedbackId`, the feedback shows the issue
+  it became;
+- is idempotent. A second convert returns the first issue rather than making
+  another; the unique index on `issue.feedbackId` is what guarantees it.
+
+### The public board
+
+With **Public board** set to _Anyone with the link_, feedback marked public
+appears at `/<workspace-slug>/public/feedback`. It is a separate page, not the
+tab with things hidden — different audience, different job:
+
+- no triage controls, no internal notes, no submitter names or addresses;
+- anyone can read it and subscribe by email with no account at all;
+- replying needs a signed-in account, which is the anti-spam measure, and is
+  rate limited to 10/min per account for non-members;
+- members can leave **internal notes**, which never reach it.
+
+Redaction happens in `toFeedback`/`toFeedbackComment` on the server, not in the
+UI. The load's return value is serialized into the page for hydration, so "the
+component does not render it" would not have been protection.
+
+Turning the board off un-publishes everything on it. Turning it back on does
+not republish — each item has to be made public again deliberately.
+
+### Webhooks
+
+`feedback.created`, `feedback.updated`, `feedback.status_changed`,
+`feedback.converted`, `feedback.comment_created` and `feedback.deleted`, on the
+same signed delivery pipeline as the issue events. `feedback.converted` carries
+both the feedback and the issue it became. These payloads go to an endpoint the
+workspace registered, so they are the _member_ view — submitter address and all.
+
 ## Webhooks
 
 Add one under **Settings → Webhooks**, choose the events, and the signing secret
 is shown once. Events: `issue.created`, `issue.updated`, `issue.assigned`,
-`issue.status_changed`, `issue.deleted`, `comment.created`.
+`issue.status_changed`, `issue.deleted`, `comment.created`, and the six
+`feedback.*` events above.
 
 Every request is a JSON POST carrying:
 
@@ -188,7 +285,7 @@ src/
 ├ lib/
 │  ├ domain/             schemas and constants shared by client and server
 │  ├ server/             *.server.ts — db, auth, guards, queries. Never bundled.
-│  ├ features/           screens: issues, inbox, settings, workspaces, shell
+│  ├ features/           screens: issues, feedback, inbox, settings, shell
 │  ├ components/ui/      @implementjs/ui components, restyled
 │  └ client/             browser-side api, auth and toasts
 └ routes/
@@ -197,7 +294,9 @@ src/
    │  └ webhooks/drain/  cron-authorised delivery retries
    ├ app/[slug]/         the product, behind a session
    │  ├ team/[key]/      one team's issues
+   │  ├ feedback/        the triage tab, and FB-12
    │  └ issue/[identifier]/   ENG-42
+   ├ [slug]/public/feedback/  the public board — no session, no shell
    ├ workspaces/new      onboarding — no workspace, no shell
    ├ login, signup, invite/[token]
    └ layout.ts, page.ts, error.ts

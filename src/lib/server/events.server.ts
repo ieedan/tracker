@@ -6,7 +6,7 @@
  * does not await — the response should not wait on someone else's server, and
  * the cron drain is what makes delivery reliable either way.
  */
-import type { Issue } from "@/lib/domain/schemas";
+import type { Feedback, FeedbackComment, Issue } from "@/lib/domain/schemas";
 import type { WebhookEvent } from "@/lib/domain/webhooks";
 import { dispatchPending, enqueue, type EventPayload } from "./webhooks.server";
 
@@ -66,5 +66,49 @@ export async function emitIssueDeleted(context: {
 		workspace: context.workspace,
 		actor: context.actor,
 		data: { issue: context.issue },
+	});
+}
+
+/**
+ * Feedback events.
+ *
+ * The payload is the *member* view of the feedback, submitter address and all:
+ * a webhook goes to an endpoint the workspace registered, which is the same
+ * trust boundary as the workspace's own API. The public board is the only place
+ * that redaction applies to.
+ */
+export async function emitFeedbackEvent(
+	event: Extract<WebhookEvent, `feedback.${string}`>,
+	context: {
+		workspace: Workspace;
+		actor: Actor;
+		feedback: Feedback;
+		/** On `feedback.updated` and `feedback.status_changed`: what moved. */
+		changes?: Record<string, { from: unknown; to: unknown }>;
+		/** On `feedback.converted`: the issue it became. */
+		issue?: Issue;
+		/** On `feedback.comment_created`: the reply. */
+		comment?: FeedbackComment;
+	},
+): Promise<void> {
+	const data: Record<string, unknown> = { feedback: context.feedback };
+	if (context.changes !== undefined) data.changes = context.changes;
+	if (context.issue !== undefined) data.issue = context.issue;
+	if (context.comment !== undefined) data.comment = context.comment;
+
+	await emit({ event, workspace: context.workspace, actor: context.actor, data });
+}
+
+/** Deleted feedback has no row left to read, so the payload is a summary. */
+export async function emitFeedbackDeleted(context: {
+	workspace: Workspace;
+	actor: Actor;
+	feedback: { id: string; number: number; identifier: string; title: string };
+}): Promise<void> {
+	await emit({
+		event: "feedback.deleted",
+		workspace: context.workspace,
+		actor: context.actor,
+		data: { feedback: context.feedback },
 	});
 }

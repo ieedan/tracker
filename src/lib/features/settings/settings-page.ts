@@ -20,6 +20,7 @@ import { Button } from "@/lib/components/ui/button";
 import type { ApiKey, Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { relativeTime } from "@/lib/format";
+import { FeedbackSection } from "./feedback-section";
 import { WebhooksSection } from "./webhooks-section";
 
 interface PageData {
@@ -47,6 +48,10 @@ export function SettingsPage({
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				MembersSection(data, params),
 				LabelsSection(data, params),
+				FeedbackSection(
+					data.bind((value) => value.workspace),
+					params,
+				),
 				WebhooksSectionBlock(params),
 				ApiKeysSection(),
 			),

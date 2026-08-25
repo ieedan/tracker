@@ -103,7 +103,9 @@
 										"maxLength": 60
 									}
 								},
-								"required": ["name"],
+								"required": [
+									"name"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -184,7 +186,10 @@
 											"type": "string"
 										}
 									},
-									"required": ["key", "plaintext"],
+									"required": [
+										"key",
+										"plaintext"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -252,14 +257,40 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
+											"type": "string"
+										},
+										"feedbackIntake": {
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
+											"type": "string"
+										},
+										"feedbackBoard": {
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "role", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"slug",
+										"role",
+										"feedbackIntake",
+										"feedbackBoard",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -303,14 +334,25 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
 										},
 										"authVia": {
-											"enum": ["session", "api-key"],
+											"enum": [
+												"session",
+												"api-key"
+											],
 											"type": "string"
 										}
 									},
-									"required": ["user", "authVia"],
+									"required": [
+										"user",
+										"authVia"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -384,7 +426,12 @@
 														]
 													}
 												},
-												"required": ["id", "name", "email", "image"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image"
+												]
 											},
 											"workspaceSlug": {
 												"type": "string"
@@ -404,7 +451,11 @@
 																"type": "number"
 															}
 														},
-														"required": ["identifier", "title", "number"]
+														"required": [
+															"identifier",
+															"title",
+															"number"
+														]
 													},
 													{
 														"type": "null"
@@ -471,7 +522,9 @@
 											"type": "boolean"
 										}
 									},
-									"required": ["ok"],
+									"required": [
+										"ok"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -499,7 +552,9 @@
 											"type": "number"
 										}
 									},
-									"required": ["count"],
+									"required": [
+										"count"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -532,14 +587,40 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
+												"type": "string"
+											},
+											"feedbackIntake": {
+												"enum": [
+													"disabled",
+													"api_key",
+													"public"
+												],
+												"type": "string"
+											},
+											"feedbackBoard": {
+												"enum": [
+													"private",
+													"public"
+												],
 												"type": "string"
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "slug", "role", "createdAt"]
+										"required": [
+											"id",
+											"name",
+											"slug",
+											"role",
+											"feedbackIntake",
+											"feedbackBoard",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -564,7 +645,9 @@
 										"maxLength": 60
 									}
 								},
-								"required": ["name"],
+								"required": [
+									"name"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -588,14 +671,40 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
+											"type": "string"
+										},
+										"feedbackIntake": {
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
+											"type": "string"
+										},
+										"feedbackBoard": {
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "role", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"slug",
+										"role",
+										"feedbackIntake",
+										"feedbackBoard",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -638,14 +747,40 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
+											"type": "string"
+										},
+										"feedbackIntake": {
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
+											"type": "string"
+										},
+										"feedbackBoard": {
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "role", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"slug",
+										"role",
+										"feedbackIntake",
+										"feedbackBoard",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -676,9 +811,24 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 60
+									},
+									"feedbackIntake": {
+										"enum": [
+											"disabled",
+											"api_key",
+											"public"
+										],
+										"type": "string"
+									},
+									"feedbackBoard": {
+										"enum": [
+											"private",
+											"public"
+										],
+										"type": "string"
 									}
 								},
-								"required": ["name"],
+								"required": [],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -702,14 +852,40 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
+											"type": "string"
+										},
+										"feedbackIntake": {
+											"enum": [
+												"disabled",
+												"api_key",
+												"public"
+											],
+											"type": "string"
+										},
+										"feedbackBoard": {
+											"enum": [
+												"private",
+												"public"
+											],
 											"type": "string"
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "slug", "role", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"slug",
+										"role",
+										"feedbackIntake",
+										"feedbackBoard",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -717,6 +893,245 @@
 					},
 					"400": {
 						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/attachments": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugAttachments",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"filename": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 200
+									},
+									"contentType": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 120
+									},
+									"size": {
+										"type": "integer",
+										"minimum": 1
+									},
+									"issueId": {
+										"type": "string"
+									},
+									"commentId": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"filename",
+									"contentType",
+									"size"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"attachment": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"filename": {
+													"type": "string"
+												},
+												"contentType": {
+													"type": "string"
+												},
+												"size": {
+													"type": "number"
+												},
+												"url": {
+													"type": "string"
+												},
+												"uploadedBy": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"email": {
+															"type": "string"
+														},
+														"image": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image"
+													]
+												},
+												"createdAt": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"filename",
+												"contentType",
+												"size",
+												"url",
+												"uploadedBy",
+												"createdAt"
+											]
+										},
+										"uploadUrl": {
+											"type": "string"
+										},
+										"contentType": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"attachment",
+										"uploadUrl",
+										"contentType"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/attachments/{id}/complete": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugAttachmentsByIdComplete",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"filename": {
+											"type": "string"
+										},
+										"contentType": {
+											"type": "string"
+										},
+										"size": {
+											"type": "number"
+										},
+										"url": {
+											"type": "string"
+										},
+										"uploadedBy": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"filename",
+										"contentType",
+										"size",
+										"url",
+										"uploadedBy",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
 					}
 				}
 			}
@@ -751,7 +1166,10 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
 												"type": "string"
 											},
 											"url": {
@@ -774,7 +1192,15 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"]
+										"required": [
+											"id",
+											"token",
+											"role",
+											"url",
+											"expiresAt",
+											"revoked",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -803,7 +1229,10 @@
 								"type": "object",
 								"properties": {
 									"role": {
-										"enum": ["admin", "member"],
+										"enum": [
+											"admin",
+											"member"
+										],
 										"type": "string",
 										"default": "member"
 									},
@@ -834,7 +1263,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"url": {
@@ -857,7 +1289,15 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"],
+									"required": [
+										"id",
+										"token",
+										"role",
+										"url",
+										"expiresAt",
+										"revoked",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -898,12 +1338,24 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string"
 									}
 								},
 								{
-									"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+									"enum": [
+										"backlog",
+										"todo",
+										"in_progress",
+										"done",
+										"canceled"
+									],
 									"type": "string"
 								}
 							]
@@ -918,12 +1370,24 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string"
 									}
 								},
 								{
-									"enum": ["none", "urgent", "high", "medium", "low"],
+									"enum": [
+										"none",
+										"urgent",
+										"high",
+										"medium",
+										"low"
+									],
 									"type": "string"
 								}
 							]
@@ -978,7 +1442,11 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "key"]
+												"required": [
+													"id",
+													"name",
+													"key"
+												]
 											},
 											"title": {
 												"type": "string"
@@ -987,11 +1455,23 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+												"enum": [
+													"backlog",
+													"todo",
+													"in_progress",
+													"done",
+													"canceled"
+												],
 												"type": "string"
 											},
 											"priority": {
-												"enum": ["none", "urgent", "high", "medium", "low"],
+												"enum": [
+													"none",
+													"urgent",
+													"high",
+													"medium",
+													"low"
+												],
 												"type": "string"
 											},
 											"assignee": {
@@ -1019,7 +1499,12 @@
 																]
 															}
 														},
-														"required": ["id", "name", "email", "image"]
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image"
+														]
 													},
 													{
 														"type": "null"
@@ -1049,7 +1534,12 @@
 														]
 													}
 												},
-												"required": ["id", "name", "email", "image"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image"
+												]
 											},
 											"labels": {
 												"type": "array",
@@ -1066,11 +1556,45 @@
 															"type": "string"
 														}
 													},
-													"required": ["id", "name", "color"]
+													"required": [
+														"id",
+														"name",
+														"color"
+													]
 												}
 											},
 											"commentCount": {
 												"type": "number"
+											},
+											"feedback": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"number": {
+																"type": "number"
+															},
+															"identifier": {
+																"type": "string"
+															},
+															"title": {
+																"type": "string"
+															}
+														},
+														"required": [
+															"id",
+															"number",
+															"identifier",
+															"title"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
 											},
 											"createdAt": {
 												"type": "string"
@@ -1092,6 +1616,7 @@
 											"creator",
 											"labels",
 											"commentCount",
+											"feedback",
 											"createdAt",
 											"updatedAt"
 										]
@@ -1140,12 +1665,24 @@
 										"default": ""
 									},
 									"status": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string",
 										"default": "backlog"
 									},
 									"priority": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string",
 										"default": "none"
 									},
@@ -1166,7 +1703,10 @@
 										}
 									}
 								},
-								"required": ["teamKey", "title"],
+								"required": [
+									"teamKey",
+									"title"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1202,7 +1742,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -1211,11 +1755,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -1243,7 +1799,12 @@
 															]
 														}
 													},
-													"required": ["id", "name", "email", "image"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image"
+													]
 												},
 												{
 													"type": "null"
@@ -1273,7 +1834,12 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -1290,11 +1856,45 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
 											"type": "number"
+										},
+										"feedback": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -1316,6 +1916,7 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"feedback",
 										"createdAt",
 										"updatedAt"
 									],
@@ -1381,7 +1982,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -1390,11 +1995,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -1422,7 +2039,12 @@
 															]
 														}
 													},
-													"required": ["id", "name", "email", "image"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image"
+													]
 												},
 												{
 													"type": "null"
@@ -1452,7 +2074,12 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -1469,11 +2096,45 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
 											"type": "number"
+										},
+										"feedback": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -1495,6 +2156,7 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"feedback",
 										"createdAt",
 										"updatedAt"
 									],
@@ -1549,11 +2211,23 @@
 										"maxLength": 20000
 									},
 									"status": {
-										"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+										"enum": [
+											"backlog",
+											"todo",
+											"in_progress",
+											"done",
+											"canceled"
+										],
 										"type": "string"
 									},
 									"priority": {
-										"enum": ["none", "urgent", "high", "medium", "low"],
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
 										"type": "string"
 									},
 									"assigneeId": {
@@ -1609,7 +2283,11 @@
 													"type": "string"
 												}
 											},
-											"required": ["id", "name", "key"]
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
 										},
 										"title": {
 											"type": "string"
@@ -1618,11 +2296,23 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": ["backlog", "todo", "in_progress", "done", "canceled"],
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
 											"type": "string"
 										},
 										"priority": {
-											"enum": ["none", "urgent", "high", "medium", "low"],
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
 											"type": "string"
 										},
 										"assignee": {
@@ -1650,7 +2340,12 @@
 															]
 														}
 													},
-													"required": ["id", "name", "email", "image"]
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image"
+													]
 												},
 												{
 													"type": "null"
@@ -1680,7 +2375,12 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
 										},
 										"labels": {
 											"type": "array",
@@ -1697,11 +2397,45 @@
 														"type": "string"
 													}
 												},
-												"required": ["id", "name", "color"]
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
 											}
 										},
 										"commentCount": {
 											"type": "number"
+										},
+										"feedback": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
 										},
 										"createdAt": {
 											"type": "string"
@@ -1723,6 +2457,7 @@
 										"creator",
 										"labels",
 										"commentCount",
+										"feedback",
 										"createdAt",
 										"updatedAt"
 									],
@@ -1831,7 +2566,77 @@
 														]
 													}
 												},
-												"required": ["id", "name", "email", "image"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image"
+												]
+											},
+											"attachments": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"filename": {
+															"type": "string"
+														},
+														"contentType": {
+															"type": "string"
+														},
+														"size": {
+															"type": "number"
+														},
+														"url": {
+															"type": "string"
+														},
+														"uploadedBy": {
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																},
+																"email": {
+																	"type": "string"
+																},
+																"image": {
+																	"anyOf": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																}
+															},
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image"
+															]
+														},
+														"createdAt": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"filename",
+														"contentType",
+														"size",
+														"url",
+														"uploadedBy",
+														"createdAt"
+													]
+												}
 											},
 											"createdAt": {
 												"type": "string"
@@ -1840,7 +2645,14 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "body", "author", "createdAt", "updatedAt"]
+										"required": [
+											"id",
+											"body",
+											"author",
+											"attachments",
+											"createdAt",
+											"updatedAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -1883,9 +2695,17 @@
 										"type": "string",
 										"minLength": 1,
 										"maxLength": 10000
+									},
+									"attachmentIds": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
 									}
 								},
-								"required": ["body"],
+								"required": [
+									"body"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -1928,7 +2748,77 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
 										},
 										"createdAt": {
 											"type": "string"
@@ -1937,7 +2827,14 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "body", "author", "createdAt", "updatedAt"],
+									"required": [
+										"id",
+										"body",
+										"author",
+										"attachments",
+										"createdAt",
+										"updatedAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -1982,7 +2879,11 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "color"]
+										"required": [
+											"id",
+											"name",
+											"color"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2020,7 +2921,10 @@
 										"pattern": "^#[0-9a-fA-F]{6}$"
 									}
 								},
-								"required": ["name", "color"],
+								"required": [
+									"name",
+									"color"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2044,7 +2948,11 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "color"],
+									"required": [
+										"id",
+										"name",
+										"color"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2083,7 +2991,10 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": ["admin", "member"],
+												"enum": [
+													"admin",
+													"member"
+												],
 												"type": "string"
 											},
 											"user": {
@@ -2109,13 +3020,23 @@
 														]
 													}
 												},
-												"required": ["id", "name", "email", "image"]
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image"
+												]
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": ["id", "role", "user", "createdAt"]
+										"required": [
+											"id",
+											"role",
+											"user",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2148,12 +3069,17 @@
 										"format": "email"
 									},
 									"role": {
-										"enum": ["admin", "member"],
+										"enum": [
+											"admin",
+											"member"
+										],
 										"type": "string",
 										"default": "member"
 									}
 								},
-								"required": ["email"],
+								"required": [
+									"email"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2171,7 +3097,10 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": ["admin", "member"],
+											"enum": [
+												"admin",
+												"member"
+											],
 											"type": "string"
 										},
 										"user": {
@@ -2197,13 +3126,23 @@
 													]
 												}
 											},
-											"required": ["id", "name", "email", "image"]
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": ["id", "role", "user", "createdAt"],
+									"required": [
+										"id",
+										"role",
+										"user",
+										"createdAt"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2287,7 +3226,13 @@
 												"type": "string"
 											}
 										},
-										"required": ["id", "name", "key", "issueCount", "createdAt"]
+										"required": [
+											"id",
+											"name",
+											"key",
+											"issueCount",
+											"createdAt"
+										]
 									},
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -2325,7 +3270,9 @@
 										"maxLength": 6
 									}
 								},
-								"required": ["name"],
+								"required": [
+									"name"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2355,7 +3302,1681 @@
 											"type": "string"
 										}
 									},
-									"required": ["id", "name", "key", "issueCount", "createdAt"],
+									"required": [
+										"id",
+										"name",
+										"key",
+										"issueCount",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/user-feedback": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugUserFeedback",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "status",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [
+								{
+									"type": "array",
+									"items": {
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
+										"type": "string"
+									}
+								},
+								{
+									"enum": [
+										"new",
+										"reviewing",
+										"planned",
+										"accepted",
+										"declined"
+									],
+									"type": "string"
+								}
+							]
+						}
+					},
+					{
+						"name": "visibility",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"enum": [
+								"private",
+								"public"
+							],
+							"type": "string"
+						}
+					},
+					{
+						"name": "converted",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"enum": [
+								"true",
+								"false"
+							],
+							"type": "string"
+						}
+					},
+					{
+						"name": "q",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"number": {
+												"type": "number"
+											},
+											"identifier": {
+												"type": "string"
+											},
+											"title": {
+												"type": "string"
+											},
+											"description": {
+												"type": "string"
+											},
+											"status": {
+												"enum": [
+													"new",
+													"reviewing",
+													"planned",
+													"accepted",
+													"declined"
+												],
+												"type": "string"
+											},
+											"visibility": {
+												"enum": [
+													"private",
+													"public"
+												],
+												"type": "string"
+											},
+											"labels": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"color": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"color"
+													]
+												}
+											},
+											"submitter": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"email": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													},
+													"user": {
+														"anyOf": [
+															{
+																"type": "object",
+																"properties": {
+																	"id": {
+																		"type": "string"
+																	},
+																	"name": {
+																		"type": "string"
+																	},
+																	"email": {
+																		"type": "string"
+																	},
+																	"image": {
+																		"anyOf": [
+																			{
+																				"type": "string"
+																			},
+																			{
+																				"type": "null"
+																			}
+																		]
+																	}
+																},
+																"required": [
+																	"id",
+																	"name",
+																	"email",
+																	"image"
+																]
+															},
+															{
+																"type": "null"
+															}
+														]
+													}
+												},
+												"required": [
+													"name",
+													"email",
+													"user"
+												]
+											},
+											"source": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"commentCount": {
+												"type": "number"
+											},
+											"subscriberCount": {
+												"type": "number"
+											},
+											"issue": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"identifier": {
+																"type": "string"
+															},
+															"title": {
+																"type": "string"
+															}
+														},
+														"required": [
+															"id",
+															"identifier",
+															"title"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
+											"createdAt": {
+												"type": "string"
+											},
+											"updatedAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"number",
+											"identifier",
+											"title",
+											"description",
+											"status",
+											"visibility",
+											"labels",
+											"submitter",
+											"source",
+											"commentCount",
+											"subscriberCount",
+											"issue",
+											"createdAt",
+											"updatedAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugUserFeedback",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"title": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 200
+									},
+									"description": {
+										"type": "string",
+										"maxLength": 20000,
+										"default": ""
+									},
+									"email": {
+										"type": "string",
+										"format": "email"
+									},
+									"name": {
+										"type": "string",
+										"maxLength": 80
+									},
+									"source": {
+										"type": "string",
+										"maxLength": 60
+									},
+									"public": {
+										"type": "boolean",
+										"default": false
+									},
+									"subscribe": {
+										"type": "boolean",
+										"default": false
+									}
+								},
+								"required": [
+									"title"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"identifier": {
+											"type": "string"
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
+											"type": "string"
+										},
+										"visibility": {
+											"enum": [
+												"private",
+												"public"
+											],
+											"type": "string"
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"submitter": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"email": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"user": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																},
+																"email": {
+																	"type": "string"
+																},
+																"image": {
+																	"anyOf": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																}
+															},
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image"
+															]
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
+										},
+										"source": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"commentCount": {
+											"type": "number"
+										},
+										"subscriberCount": {
+											"type": "number"
+										},
+										"issue": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"identifier",
+										"title",
+										"description",
+										"status",
+										"visibility",
+										"labels",
+										"submitter",
+										"source",
+										"commentCount",
+										"subscriberCount",
+										"issue",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/user-feedback/{id}": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugUserFeedbackById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"identifier": {
+											"type": "string"
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
+											"type": "string"
+										},
+										"visibility": {
+											"enum": [
+												"private",
+												"public"
+											],
+											"type": "string"
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"submitter": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"email": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"user": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																},
+																"email": {
+																	"type": "string"
+																},
+																"image": {
+																	"anyOf": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																}
+															},
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image"
+															]
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
+										},
+										"source": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"commentCount": {
+											"type": "number"
+										},
+										"subscriberCount": {
+											"type": "number"
+										},
+										"issue": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"identifier",
+										"title",
+										"description",
+										"status",
+										"visibility",
+										"labels",
+										"submitter",
+										"source",
+										"commentCount",
+										"subscriberCount",
+										"issue",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugUserFeedbackById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"title": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 200
+									},
+									"description": {
+										"type": "string",
+										"maxLength": 20000
+									},
+									"status": {
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
+										"type": "string"
+									},
+									"visibility": {
+										"enum": [
+											"private",
+											"public"
+										],
+										"type": "string"
+									},
+									"labelIds": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								},
+								"required": [],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"identifier": {
+											"type": "string"
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"new",
+												"reviewing",
+												"planned",
+												"accepted",
+												"declined"
+											],
+											"type": "string"
+										},
+										"visibility": {
+											"enum": [
+												"private",
+												"public"
+											],
+											"type": "string"
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"submitter": {
+											"type": "object",
+											"properties": {
+												"name": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"email": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"user": {
+													"anyOf": [
+														{
+															"type": "object",
+															"properties": {
+																"id": {
+																	"type": "string"
+																},
+																"name": {
+																	"type": "string"
+																},
+																"email": {
+																	"type": "string"
+																},
+																"image": {
+																	"anyOf": [
+																		{
+																			"type": "string"
+																		},
+																		{
+																			"type": "null"
+																		}
+																	]
+																}
+															},
+															"required": [
+																"id",
+																"name",
+																"email",
+																"image"
+															]
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"name",
+												"email",
+												"user"
+											]
+										},
+										"source": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"commentCount": {
+											"type": "number"
+										},
+										"subscriberCount": {
+											"type": "number"
+										},
+										"issue": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"identifier",
+										"title",
+										"description",
+										"status",
+										"visibility",
+										"labels",
+										"submitter",
+										"source",
+										"commentCount",
+										"subscriberCount",
+										"issue",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugUserFeedbackById",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"deleted": {
+											"type": "boolean"
+										}
+									},
+									"required": [
+										"deleted"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/user-feedback/{id}/comments": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugUserFeedbackByIdComments",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"properties": {
+											"id": {
+												"type": "string"
+											},
+											"body": {
+												"type": "string"
+											},
+											"author": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"email": {
+														"type": "string"
+													},
+													"image": {
+														"anyOf": [
+															{
+																"type": "string"
+															},
+															{
+																"type": "null"
+															}
+														]
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"email",
+													"image"
+												]
+											},
+											"internal": {
+												"type": "boolean"
+											},
+											"createdAt": {
+												"type": "string"
+											},
+											"updatedAt": {
+												"type": "string"
+											}
+										},
+										"required": [
+											"id",
+											"body",
+											"author",
+											"internal",
+											"createdAt",
+											"updatedAt"
+										]
+									},
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugUserFeedbackByIdComments",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"body": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 10000
+									},
+									"internal": {
+										"type": "boolean",
+										"default": false
+									}
+								},
+								"required": [
+									"body"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"body": {
+											"type": "string"
+										},
+										"author": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
+										},
+										"internal": {
+											"type": "boolean"
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"body",
+										"author",
+										"internal",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/user-feedback/{id}/convert": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugUserFeedbackByIdConvert",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"teamKey": {
+										"type": "string",
+										"maxLength": 6
+									},
+									"title": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 200
+									},
+									"priority": {
+										"enum": [
+											"none",
+											"urgent",
+											"high",
+											"medium",
+											"low"
+										],
+										"type": "string",
+										"default": "none"
+									},
+									"assigneeId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
+									"status": {
+										"enum": [
+											"new",
+											"reviewing",
+											"planned",
+											"accepted",
+											"declined"
+										],
+										"type": "string",
+										"default": "accepted"
+									}
+								},
+								"required": [],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"number": {
+											"type": "number"
+										},
+										"identifier": {
+											"type": "string"
+										},
+										"team": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"key": {
+													"type": "string"
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"key"
+											]
+										},
+										"title": {
+											"type": "string"
+										},
+										"description": {
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"backlog",
+												"todo",
+												"in_progress",
+												"done",
+												"canceled"
+											],
+											"type": "string"
+										},
+										"priority": {
+											"enum": [
+												"none",
+												"urgent",
+												"high",
+												"medium",
+												"low"
+											],
+											"type": "string"
+										},
+										"assignee": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"email": {
+															"type": "string"
+														},
+														"image": {
+															"anyOf": [
+																{
+																	"type": "string"
+																},
+																{
+																	"type": "null"
+																}
+															]
+														}
+													},
+													"required": [
+														"id",
+														"name",
+														"email",
+														"image"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"creator": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image"
+											]
+										},
+										"labels": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"name": {
+														"type": "string"
+													},
+													"color": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"name",
+													"color"
+												]
+											}
+										},
+										"commentCount": {
+											"type": "number"
+										},
+										"feedback": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"number": {
+															"type": "number"
+														},
+														"identifier": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"number",
+														"identifier",
+														"title"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"number",
+										"identifier",
+										"team",
+										"title",
+										"description",
+										"status",
+										"priority",
+										"assignee",
+										"creator",
+										"labels",
+										"commentCount",
+										"feedback",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/user-feedback/{id}/subscribe": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugUserFeedbackByIdSubscribe",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"email": {
+										"type": "string",
+										"format": "email"
+									}
+								},
+								"required": [
+									"email"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"subscribed": {
+											"type": "boolean"
+										}
+									},
+									"required": [
+										"subscribed"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2408,7 +5029,13 @@
 														"issue.assigned",
 														"issue.status_changed",
 														"issue.deleted",
-														"comment.created"
+														"comment.created",
+														"feedback.created",
+														"feedback.updated",
+														"feedback.status_changed",
+														"feedback.converted",
+														"feedback.comment_created",
+														"feedback.deleted"
 													],
 													"type": "string"
 												}
@@ -2432,7 +5059,11 @@
 											"lastDeliveryStatus": {
 												"anyOf": [
 													{
-														"enum": ["pending", "succeeded", "failed"],
+														"enum": [
+															"pending",
+															"succeeded",
+															"failed"
+														],
 														"type": "string"
 													},
 													{
@@ -2507,14 +5138,23 @@
 												"issue.assigned",
 												"issue.status_changed",
 												"issue.deleted",
-												"comment.created"
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
 											],
 											"type": "string"
 										},
 										"minItems": 1
 									}
 								},
-								"required": ["url", "events"],
+								"required": [
+									"url",
+									"events"
+								],
 								"$schema": "http://json-schema.org/draft-07/schema#"
 							}
 						}
@@ -2549,7 +5189,13 @@
 															"issue.assigned",
 															"issue.status_changed",
 															"issue.deleted",
-															"comment.created"
+															"comment.created",
+															"feedback.created",
+															"feedback.updated",
+															"feedback.status_changed",
+															"feedback.converted",
+															"feedback.comment_created",
+															"feedback.deleted"
 														],
 														"type": "string"
 													}
@@ -2573,7 +5219,11 @@
 												"lastDeliveryStatus": {
 													"anyOf": [
 														{
-															"enum": ["pending", "succeeded", "failed"],
+															"enum": [
+																"pending",
+																"succeeded",
+																"failed"
+															],
 															"type": "string"
 														},
 														{
@@ -2608,7 +5258,10 @@
 											"type": "string"
 										}
 									},
-									"required": ["webhook", "secret"],
+									"required": [
+										"webhook",
+										"secret"
+									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
 							}
@@ -2661,7 +5314,13 @@
 												"issue.assigned",
 												"issue.status_changed",
 												"issue.deleted",
-												"comment.created"
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
 											],
 											"type": "string"
 										},
@@ -2703,7 +5362,13 @@
 													"issue.assigned",
 													"issue.status_changed",
 													"issue.deleted",
-													"comment.created"
+													"comment.created",
+													"feedback.created",
+													"feedback.updated",
+													"feedback.status_changed",
+													"feedback.converted",
+													"feedback.comment_created",
+													"feedback.deleted"
 												],
 												"type": "string"
 											}
@@ -2727,7 +5392,11 @@
 										"lastDeliveryStatus": {
 											"anyOf": [
 												{
-													"enum": ["pending", "succeeded", "failed"],
+													"enum": [
+														"pending",
+														"succeeded",
+														"failed"
+													],
 													"type": "string"
 												},
 												{
@@ -2851,12 +5520,22 @@
 													"issue.assigned",
 													"issue.status_changed",
 													"issue.deleted",
-													"comment.created"
+													"comment.created",
+													"feedback.created",
+													"feedback.updated",
+													"feedback.status_changed",
+													"feedback.converted",
+													"feedback.comment_created",
+													"feedback.deleted"
 												],
 												"type": "string"
 											},
 											"status": {
-												"enum": ["pending", "succeeded", "failed"],
+												"enum": [
+													"pending",
+													"succeeded",
+													"failed"
+												],
 												"type": "string"
 											},
 											"attempts": {
@@ -2968,12 +5647,22 @@
 												"issue.assigned",
 												"issue.status_changed",
 												"issue.deleted",
-												"comment.created"
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
 											],
 											"type": "string"
 										},
 										"status": {
-											"enum": ["pending", "succeeded", "failed"],
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
 											"type": "string"
 										},
 										"attempts": {

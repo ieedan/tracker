@@ -202,3 +202,51 @@ it points at a path (`src/routes/(openapi)`) that the app never wrote. Removing
 **Workaround in this repo:** `path` is not used. `output` writes into `static/`,
 which is served at `/openapi.json` in dev and shipped as a static asset by the
 host — so the live route is not needed here. Tagged in `vite.config.ts`.
+
+---
+
+## #5 — `DropdownMenuTrigger` will not accept a derived `disabled`
+
+Widen `DropdownMenuTriggerProps["disabled"]` from `Signal<boolean> | boolean` to
+`Readable<boolean> | boolean`. The prop is only ever read, and every other
+disable-able control in the stack already takes the wider type.
+
+Reproduce:
+
+```ts
+import { DropdownMenu, DropdownMenuTrigger } from "@implementjs/primitives";
+import { derived, signal } from "@implementjs/core";
+
+const board = signal<"private" | "public">("private");
+const open = derived([board], (value) => value === "public");
+
+DropdownMenu(DropdownMenuTrigger({ disabled: open.bind((value) => !value) }, "Visibility"));
+```
+
+`tsc --noEmit`:
+
+```
+error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'variant' does not
+    exist in type 'Mountable | ReadableChild'.
+```
+
+The declaration is `Omit<RenderableProps<typeof Button>, "disabled"> &
+{ disabled?: Signal<boolean> | boolean }` — the `Omit` drops Button's own
+`disabled` and puts back a narrower one. `Signal<T>` is the _writable_ type;
+`Readable<T>` is its read-only supertype, so nothing produced by `derived` or by
+`.bind()` is assignable. In practice that means a trigger can be disabled by a
+local toggle but never by loaded data, which is the common case — "disable this
+menu because the workspace setting says so" is exactly what you cannot express.
+
+The error message is also misleading: because the narrowing knocks the call out
+of the props overload entirely, TypeScript reports the _next_ overload's
+complaint about `variant`, pointing at a prop that is perfectly valid.
+
+**Workaround in this repo:** the visibility control in
+`src/lib/features/feedback/pickers.ts` renders an `If(boardOpen)` around the
+whole thing — the real menu when the board is open, a static styled `Span` with
+an explanatory `title` when it is not. Tagged `implement:bug:#5`. It reads
+better here than a greyed-out menu would, so this one is worth keeping either
+way — but it should be a choice, not a workaround.

@@ -12,6 +12,9 @@ import { auth } from "../src/lib/server/auth.server";
 import { db } from "../src/lib/server/db.server";
 import {
 	comment,
+	feedback,
+	feedbackComment,
+	feedbackSubscriber,
 	issue,
 	issueLabel,
 	label,
@@ -159,6 +162,10 @@ async function main(): Promise<void> {
 		id: workspaceId,
 		name: "Acme",
 		slug,
+		// Open, so the demo has a public board to look at. A real workspace
+		// starts closed on both counts.
+		feedbackIntake: "public",
+		feedbackBoard: "public",
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	});
@@ -281,7 +288,108 @@ async function main(): Promise<void> {
 		},
 	]);
 
-	console.log("Seeded the Acme workspace (teams ENG and PRD).");
+	// User feedback, in the three states worth seeing at once: something new,
+	// something being looked at, and something that already became an issue.
+	const feedbackRows = [
+		{
+			number: 1,
+			title: "Dark mode is too bright at the edges",
+			description:
+				"The sidebar border is almost white in dark mode. On an OLED screen at night it is the only thing you can see.",
+			status: "reviewing" as const,
+			visibility: "public" as const,
+			submitterName: "Rae Okafor",
+			submitterEmail: "rae@example.com",
+			source: "widget",
+			ageHours: 30,
+		},
+		{
+			number: 2,
+			title: "Let me filter issues by the person who reported them",
+			description: "I triage what my team filed. Right now I can only filter by assignee.",
+			status: "new" as const,
+			visibility: "public" as const,
+			submitterName: "Jules Bennet",
+			submitterEmail: "jules@example.com",
+			source: "widget",
+			ageHours: 6,
+		},
+		{
+			number: 3,
+			title: "Our support inbox keeps losing context on escalations",
+			description:
+				"When we escalate a ticket the customer's original wording is gone by the time it reaches engineering.",
+			status: "new" as const,
+			// Named customers and account details: exactly what a private item is for.
+			visibility: "private" as const,
+			submitterName: "Priya Raman",
+			submitterEmail: "priya@example.com",
+			source: "support-inbox",
+			ageHours: 3,
+		},
+	];
+
+	const feedbackIds = new Map<number, string>();
+	for (const row of feedbackRows) {
+		const id = nanoid();
+		feedbackIds.set(row.number, id);
+		await db.insert(feedback).values({
+			id,
+			workspaceId,
+			number: row.number,
+			title: row.title,
+			description: row.description,
+			status: row.status,
+			visibility: row.visibility,
+			submitterName: row.submitterName,
+			submitterEmail: row.submitterEmail,
+			submitterUserId: null,
+			source: row.source,
+			createdAt: new Date(Date.now() - 3600_000 * row.ageHours),
+			updatedAt: new Date(Date.now() - 3600_000 * row.ageHours),
+		});
+	}
+
+	await db.insert(feedbackComment).values([
+		{
+			id: nanoid(),
+			feedbackId: feedbackIds.get(1)!,
+			authorId: grace,
+			body: "Confirmed on OLED. We are going to drop the border to the same value as the background.",
+			internal: false,
+			createdAt: new Date(Date.now() - 3600_000 * 20),
+			updatedAt: new Date(Date.now() - 3600_000 * 20),
+		},
+		{
+			id: nanoid(),
+			feedbackId: feedbackIds.get(1)!,
+			body: "Third person to mention this. Worth doing before the launch.",
+			authorId: alan,
+			// Never reaches the public board.
+			internal: true,
+			createdAt: new Date(Date.now() - 3600_000 * 19),
+			updatedAt: new Date(Date.now() - 3600_000 * 19),
+		},
+	]);
+
+	await db.insert(feedbackSubscriber).values([
+		{
+			id: nanoid(),
+			feedbackId: feedbackIds.get(1)!,
+			email: "rae@example.com",
+			userId: null,
+			createdAt: new Date(Date.now() - 3600_000 * 30),
+		},
+		{
+			id: nanoid(),
+			feedbackId: feedbackIds.get(1)!,
+			email: "watching@example.com",
+			userId: null,
+			createdAt: new Date(Date.now() - 3600_000 * 12),
+		},
+	]);
+
+	console.log("Seeded the Acme workspace (teams ENG and PRD, and some feedback).");
 	console.log(`Sign in as ${PEOPLE[0]!.email} / ${PASSWORD}`);
 }
 

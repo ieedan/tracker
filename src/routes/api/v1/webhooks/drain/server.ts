@@ -2,6 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { timingSafeEqual } from "node:crypto";
 import * as v from "valibot";
 import { env } from "@/lib/env.server";
+import { purgeExpiredLimits } from "@/lib/server/rate-limit.server";
 import { drainDue } from "@/lib/server/webhooks.server";
 import { handler } from "./$types";
 
@@ -21,7 +22,7 @@ import { handler } from "./$types";
  * drain is a way to make this server issue outbound requests on demand.
  */
 export const POST = handler({
-	response: v.object({ attempted: v.number() }),
+	response: v.object({ attempted: v.number(), purged: v.number() }),
 	async handle({ request }) {
 		const expected = env.CRON_SECRET;
 		if (expected === "") error(404, "not found");
@@ -29,7 +30,11 @@ export const POST = handler({
 		const presented = request.headers.get("authorization") ?? "";
 		if (!matches(presented, `Bearer ${expected}`)) error(401, "bad cron credentials");
 
-		return await drainDue();
+		// Rate-limit windows expire on their own; the rows do not. This cron is
+		// already running, so it sweeps them rather than earning a second entry.
+		const purged = await purgeExpiredLimits();
+		const drained = await drainDue();
+		return { ...drained, purged };
 	},
 });
 

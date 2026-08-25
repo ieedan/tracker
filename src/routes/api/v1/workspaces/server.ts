@@ -37,6 +37,10 @@ export const POST = handler({
 			name: body.name,
 			slug,
 			createdAt: new Date(),
+			// Feedback intake starts closed to anonymous callers and the public
+			// board starts off. Both are switches an admin flips deliberately.
+			feedbackIntake: "api_key" as const,
+			feedbackBoard: "private" as const,
 			updatedAt: new Date(),
 		};
 

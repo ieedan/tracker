@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build && tsx scripts/vercel-cron.ts",
+		"build": "vite build && tsx --env-file-if-exists=.env scripts/vercel-cron.ts",
 		"preview": "vite preview",
 		"dev:setup": "tsx scripts/setup.ts",
 		"sync": "implement-kit sync",
@@ -19,7 +19,7 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
-		"db:seed": "tsx scripts/seed.ts"
+		"db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1117.0",

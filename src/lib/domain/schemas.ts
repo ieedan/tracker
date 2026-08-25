@@ -2,6 +2,7 @@
 // OpenAPI document, and the browser. Kit forbids a client file from importing
 // an endpoint, so anything both sides need lives here.
 import * as v from "valibot";
+import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
 import { DELIVERY_STATUSES, WEBHOOK_EVENTS } from "./webhooks";
 
@@ -24,11 +25,19 @@ export const LabelSchema = v.object({
 });
 export type Label = v.InferOutput<typeof LabelSchema>;
 
+export const FeedbackIntakeSchema = v.picklist(FEEDBACK_INTAKE_MODES);
+export const FeedbackBoardSchema = v.picklist(FEEDBACK_BOARD_MODES);
+export const FeedbackStatusSchema = v.picklist(FEEDBACK_STATUSES);
+
 export const WorkspaceSchema = v.object({
 	id: v.string(),
 	name: v.string(),
 	slug: v.string(),
 	role: WorkspaceRoleSchema,
+	/** Who may POST feedback to this workspace. */
+	feedbackIntake: FeedbackIntakeSchema,
+	/** Whether the public feedback board is readable without signing in. */
+	feedbackBoard: FeedbackBoardSchema,
 	createdAt: v.string(),
 });
 export type Workspace = v.InferOutput<typeof WorkspaceSchema>;
@@ -66,6 +75,10 @@ export const IssueSchema = v.object({
 	creator: UserSummary,
 	labels: v.array(LabelSchema),
 	commentCount: v.number(),
+	/** Set when this issue was converted from a piece of user feedback. */
+	feedback: v.nullable(
+		v.object({ id: v.string(), number: v.number(), identifier: v.string(), title: v.string() }),
+	),
 	createdAt: v.string(),
 	updatedAt: v.string(),
 });
@@ -237,6 +250,105 @@ export const CreateLabelBody = v.object({
 	name: trimmed(1, 40),
 	color: v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/)),
 });
+
+// --- user feedback --------------------------------------------------------
+
+/** Who sent it. Every field is optional; anonymous public posts have none. */
+export const FeedbackSubmitterSchema = v.object({
+	name: v.nullable(v.string()),
+	/** Members only — a submitter's address is never shown on the public board. */
+	email: v.nullable(v.string()),
+	user: v.nullable(UserSummary),
+});
+
+export const FeedbackSchema = v.object({
+	id: v.string(),
+	number: v.number(),
+	/** `FB-12`. */
+	identifier: v.string(),
+	title: v.string(),
+	description: v.string(),
+	status: FeedbackStatusSchema,
+	visibility: v.picklist(["private", "public"]),
+	labels: v.array(LabelSchema),
+	submitter: FeedbackSubmitterSchema,
+	source: v.nullable(v.string()),
+	commentCount: v.number(),
+	subscriberCount: v.number(),
+	/** The issue this became, once someone converted it. */
+	issue: v.nullable(v.object({ id: v.string(), identifier: v.string(), title: v.string() })),
+	createdAt: v.string(),
+	updatedAt: v.string(),
+});
+export type Feedback = v.InferOutput<typeof FeedbackSchema>;
+
+export const FeedbackCommentSchema = v.object({
+	id: v.string(),
+	body: v.string(),
+	author: UserSummary,
+	/** Workspace-only note. Never present in a public response. */
+	internal: v.boolean(),
+	createdAt: v.string(),
+	updatedAt: v.string(),
+});
+export type FeedbackComment = v.InferOutput<typeof FeedbackCommentSchema>;
+
+/**
+ * The ingest body. Kept small on purpose — this is the one endpoint someone
+ * else's code calls, and every required field is a reason for it not to.
+ */
+export const CreateFeedbackBody = v.object({
+	title: trimmed(1, 200),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(20_000)), ""),
+	/** Who is asking, for a reply. Also the address `subscribe` uses. */
+	email: v.optional(v.pipe(v.string(), v.trim(), v.email("must be an email address"))),
+	name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(80))),
+	/** Where it came from: `widget`, `ios`, `support-inbox`. */
+	source: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+	/** Show it on the public board. Ignored when the board is private. */
+	public: v.optional(v.boolean(), false),
+	/** Add `email` to the list notified when this feedback moves. */
+	subscribe: v.optional(v.boolean(), false),
+});
+
+export const UpdateFeedbackBody = v.partial(
+	v.object({
+		title: trimmed(1, 200),
+		description: v.pipe(v.string(), v.maxLength(20_000)),
+		status: FeedbackStatusSchema,
+		visibility: v.picklist(["private", "public"]),
+		labelIds: v.array(v.string()),
+	}),
+);
+
+export const ConvertFeedbackBody = v.object({
+	/** Which team files the issue. Defaults to the workspace's first team. */
+	teamKey: v.optional(v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6))),
+	/** Defaults to the feedback's own title and description. */
+	title: v.optional(trimmed(1, 200)),
+	priority: v.optional(IssuePrioritySchema, "none"),
+	assigneeId: v.optional(v.nullable(v.string())),
+	/** The feedback status to leave behind. Defaults to `accepted`. */
+	status: v.optional(FeedbackStatusSchema, "accepted"),
+});
+
+export const CreateFeedbackCommentBody = v.object({
+	body: trimmed(1, 10_000),
+	/** Members only. A non-member asking for this is refused, not downgraded. */
+	internal: v.optional(v.boolean(), false),
+});
+
+export const SubscribeFeedbackBody = v.object({
+	email: v.pipe(v.string(), v.trim(), v.email("must be an email address")),
+});
+
+export const UpdateWorkspaceBody = v.partial(
+	v.object({
+		name: trimmed(1, 60),
+		feedbackIntake: FeedbackIntakeSchema,
+		feedbackBoard: FeedbackBoardSchema,
+	}),
+);
 
 export const CreateApiKeyBody = v.object({ name: trimmed(1, 60) });
 

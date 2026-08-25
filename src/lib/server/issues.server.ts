@@ -4,7 +4,16 @@ import { alias } from "drizzle-orm/sqlite-core";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
 import type { Issue } from "@/lib/domain/schemas";
 import { db } from "./db.server";
-import { comment, issue, issueLabel, label, team, user, workspaceMember } from "./schema.server";
+import {
+	comment,
+	feedback,
+	issue,
+	issueLabel,
+	label,
+	team,
+	user,
+	workspaceMember,
+} from "./schema.server";
 import { toIssue } from "./serialize.server";
 
 const assigneeUser = alias(user, "assignee_user");
@@ -30,6 +39,10 @@ const baseSelect = {
 	team,
 	assignee: assigneeUser,
 	creator: creatorUser,
+	// Present only on issues converted from feedback, which is most of them
+	// never — a left join costs less than a second query that usually finds
+	// nothing.
+	feedback,
 };
 
 type IssueRows = Array<{
@@ -37,6 +50,7 @@ type IssueRows = Array<{
 	team: typeof team.$inferSelect;
 	assignee: typeof user.$inferSelect | null;
 	creator: typeof user.$inferSelect;
+	feedback: typeof feedback.$inferSelect | null;
 }>;
 
 const withJoins = () =>
@@ -45,7 +59,8 @@ const withJoins = () =>
 		.from(issue)
 		.innerJoin(team, eq(team.id, issue.teamId))
 		.leftJoin(assigneeUser, eq(assigneeUser.id, issue.assigneeId))
-		.innerJoin(creatorUser, eq(creatorUser.id, issue.creatorId));
+		.innerJoin(creatorUser, eq(creatorUser.id, issue.creatorId))
+		.leftJoin(feedback, eq(feedback.id, issue.feedbackId));
 
 /**
  * Attaches labels and comment counts to a page of issue rows.
@@ -88,6 +103,7 @@ async function hydrate(rows: IssueRows): Promise<Issue[]> {
 				a.name.localeCompare(b.name),
 			),
 			commentCount: countsByIssue.get(row.issue.id) ?? 0,
+			feedback: row.feedback,
 		}),
 	);
 }

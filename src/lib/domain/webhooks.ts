@@ -7,6 +7,12 @@ export const WEBHOOK_EVENTS = [
 	"issue.status_changed",
 	"issue.deleted",
 	"comment.created",
+	"feedback.created",
+	"feedback.updated",
+	"feedback.status_changed",
+	"feedback.converted",
+	"feedback.comment_created",
+	"feedback.deleted",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -17,6 +23,12 @@ export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = {
 	"issue.status_changed": "Issue status changed",
 	"issue.deleted": "Issue deleted",
 	"comment.created": "Comment created",
+	"feedback.created": "Feedback received",
+	"feedback.updated": "Feedback updated",
+	"feedback.status_changed": "Feedback status changed",
+	"feedback.converted": "Feedback converted to issue",
+	"feedback.comment_created": "Feedback reply posted",
+	"feedback.deleted": "Feedback deleted",
 };
 
 export const WEBHOOK_EVENT_HINTS: Record<WebhookEvent, string> = {
@@ -26,6 +38,12 @@ export const WEBHOOK_EVENT_HINTS: Record<WebhookEvent, string> = {
 	"issue.status_changed": "The status moves, e.g. Todo → In Progress.",
 	"issue.deleted": "An issue is removed.",
 	"comment.created": "Someone comments on an issue.",
+	"feedback.created": "New feedback arrives at the ingest endpoint.",
+	"feedback.updated": "Feedback is edited — title, description, labels, visibility.",
+	"feedback.status_changed": "Triage moves it, e.g. New → Planned.",
+	"feedback.converted": "Feedback becomes an issue. Carries both.",
+	"feedback.comment_created": "Someone replies to feedback, publicly or internally.",
+	"feedback.deleted": "Feedback is removed.",
 };
 
 export const DELIVERY_STATUSES = ["pending", "succeeded", "failed"] as const;
