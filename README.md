@@ -88,11 +88,16 @@ preview as **demo@tracker.dev** / **password123**.
 
 GitHub on previews is its own choice: a separate App (which keeps production's
 private key and its list of installations out of preview deployments), the
-production App, or nothing. Repository linking works either way. Sign-in only
-works on the one origin registered as a callback, because GitHub matches
-callback URLs exactly and every branch has a different one — better-auth's
-[`oAuthProxy`](https://better-auth.com/docs/plugins/oauth-proxy) plugin is what
-lifts that, and this app does not currently use it.
+production App, or nothing. Repository linking works either way.
+
+Sign-in is the part that does not travel. GitHub matches callback URLs
+literally and rejects a wildcard at registration — `https://tracker-*.vercel.app/…`
+is not a valid callback URL — so the per-branch and per-deployment URLs can
+never be registered, and only the one origin you did register can complete a
+sign-in. better-auth's
+[`oAuthProxy`](https://better-auth.com/docs/plugins/oauth-proxy) plugin exists
+for this: sign-in goes through one registered URL, which hands the session back
+to the preview origin. This app does not currently use it.
 
 `pnpm preview:prune` deletes the preview databases whose branch is gone from
 `origin`.

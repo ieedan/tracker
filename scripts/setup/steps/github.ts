@@ -115,11 +115,12 @@ async function personalAccessToken(
 }
 
 /**
- * Every branch gets its own preview URL and GitHub matches callbacks exactly,
- * so only the origin registered above can complete a sign-in.
+ * Every branch gets its own preview URL, and GitHub takes callback URLs
+ * literally — a wildcard is rejected at registration, since a pattern would
+ * hand the authorization code to anyone who can stand up a matching host.
  */
 const PREVIEW_CALLBACK_NOTE = [
-	`Repository linking works on every preview. Sign-in only works on the origin above, since GitHub matches callback URLs exactly and each branch has its own — better-auth's oAuthProxy plugin is what lifts that.`,
+	"Repository linking works on every preview. Sign-in works only on the exact origin above: GitHub matches callback URLs literally and refuses a wildcard, so the per-branch and per-deployment URLs cannot be registered. better-auth's oAuthProxy plugin is what lifts that — it signs in through one registered URL and hands the session back to the preview.",
 ];
 
 async function githubApp(
@@ -209,14 +210,14 @@ export const github: Step = {
 					{
 						value: "own" as const,
 						label: "A separate App",
-						hint: "keeps production's private key and installations out of previews",
+						hint: "repository linking only; keeps production's key out of previews",
 					},
 					...(canReuse
 						? [
 								{
 									value: "reuse" as const,
 									label: "Reuse the production App",
-									hint: "one registration to keep up to date",
+									hint: "repository linking only; one registration to maintain",
 								},
 							]
 						: []),
@@ -233,6 +234,10 @@ export const github: Step = {
 				set(ctx, BLANK);
 				return;
 			}
+			// Either App leaves the sign-in button on screen, where it cannot
+			// finish — worth saying before they pick one and wonder.
+			warn(`"Sign in with GitHub" will not work on previews; use the seeded demo account.`);
+
 			if (choice === "reuse") {
 				set(ctx, { ...production, GITHUB_DEV_TOKEN: "" });
 				return;
