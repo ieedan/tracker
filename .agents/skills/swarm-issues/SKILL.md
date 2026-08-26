@@ -23,7 +23,7 @@ You
 Subagent:
 1. Receives the issue(s) to work on from you
 2. Reads the issue(s) fresh to understand the issue(s)
-3. Creates its own worktree for the issue(s) with the name `bee/<issue-number>_<issue-number>` (ex: bee/ENG_123, bee/ENG-123_ENG-456)
+3. Creates its own worktree for the issue(s) with the name `bee/<issue-number>` (ex: bee/ENG_123, bee/ENG-123/456)
 4. Marks the issue(s) as "in progress" and assign them to yourself ("Claude", "Cursor", whatever agent you are authed as through the tracker MCP)
 5. Create and commit changes
 6. Creates a PR for the issue(s)
