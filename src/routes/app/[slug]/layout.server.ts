@@ -4,14 +4,14 @@ import { db } from "@/lib/server/db.server";
 import { label, user, workspaceMember } from "@/lib/server/schema.server";
 import { toLabel, toMember, toWorkspace } from "@/lib/server/serialize.server";
 import { listTeams } from "@/lib/server/teams.server";
-import type { LoadEvent } from "./$types";
+import type { LayoutLoadEvent } from "./$types";
 
 /**
  * Everything the workspace chrome needs. Members and labels are small, bounded
  * lists that almost every screen under here uses (assignee pickers, label
  * pickers, filters), so they are loaded once for the section.
  */
-export default async function load({ locals, params }: LoadEvent) {
+export default async function load({ locals, params }: LayoutLoadEvent) {
 	const membership = await requireMembership(locals, params.slug);
 
 	const memberRows = await db

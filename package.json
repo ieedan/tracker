@@ -23,7 +23,8 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
-		"preview:prune": "tsx --env-file-if-exists=.env.preview scripts/preview-prune.ts"
+		"preview:prune": "tsx --env-file-if-exists=.env.preview scripts/preview-prune.ts",
+		"verify:mcp": "tsx scripts/verify-mcp.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1117.0",
@@ -47,9 +48,9 @@
 	"devDependencies": {
 		"@clack/prompts": "^1.7.0",
 		"@dotenvx/dotenvx": "^2.21.0",
-		"@implementjs/adapter-vercel": "^0.0.12",
+		"@implementjs/adapter-vercel": "^0.0.14",
 		"@implementjs/eslint": "~0.0.1",
-		"@implementjs/kit": "~0.0.12",
+		"@implementjs/kit": "~0.0.14",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.2.0",
 		"@valibot/to-json-schema": "^1.7.1",
