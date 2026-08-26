@@ -45,7 +45,9 @@ export const POST = handler({
 				},
 				data: { test: true, message: "This is a test delivery from tracker." },
 			},
-			{ webhookId: hook.id },
+			// Conditions are skipped: a synthetic payload carries no issue to match
+			// against, so applying them would make every filtered webhook untestable.
+			{ webhookId: hook.id, ignoreFilter: true },
 		);
 
 		const id = ids[0];

@@ -8,7 +8,14 @@ import { API_KEY_ACTIONS } from "./api-keys";
 import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
 import { GIT_PROVIDERS, INDEX_STATES, PULL_REQUEST_STATES } from "./providers";
-import { DELIVERY_STATUSES, WEBHOOK_EVENTS } from "./webhooks";
+import {
+	FILTER_MATCHES,
+	FILTER_OPERATORS,
+	validateFilter,
+	type FilterGroup,
+	type FilterRule,
+} from "./webhook-filters";
+import { DELIVERY_STATUSES, normalizeHeaders, validateHeaders, WEBHOOK_EVENTS } from "./webhooks";
 
 export const GitProviderSchema = v.picklist(GIT_PROVIDERS);
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
@@ -194,11 +201,61 @@ export type Notification = v.InferOutput<typeof NotificationSchema>;
 
 export const WebhookEventSchema = v.picklist(WEBHOOK_EVENTS);
 
+/**
+ * One rule in a webhook's condition tree — either a comparison or a nested
+ * group of them. Recursive, so `v.lazy` is what expresses it.
+ */
+export const FilterConditionSchema = v.object({
+	type: v.literal("condition"),
+	field: v.pipe(v.string(), v.trim(), v.minLength(1)),
+	operator: v.picklist(FILTER_OPERATORS),
+	value: v.optional(v.union([v.string(), v.array(v.string())])),
+});
+
+export const FilterRuleSchema: v.GenericSchema<FilterRule> = v.lazy(() =>
+	v.union([FilterConditionSchema, FilterGroupSchema]),
+);
+
+export const FilterGroupSchema: v.GenericSchema<FilterGroup> = v.object({
+	type: v.literal("group"),
+	match: v.picklist(FILTER_MATCHES),
+	rules: v.array(FilterRuleSchema),
+});
+
+/**
+ * The whole tree, checked structurally as well as shape-wise: `validateFilter`
+ * is what rejects an unknown field, an operator the field's kind cannot take,
+ * and a tree that is too deep or too large.
+ */
+export const WebhookFilterSchema = v.pipe(
+	FilterGroupSchema,
+	v.rawCheck(({ dataset, addIssue }) => {
+		if (!dataset.typed) return;
+		const problem = validateFilter(dataset.value);
+		if (problem !== null) addIssue({ message: problem });
+	}),
+);
+
+/** A header map, validated against the reserved names and the size limits. */
+export const WebhookHeadersSchema = v.pipe(
+	v.record(v.string(), v.string()),
+	v.transform(normalizeHeaders),
+	v.rawCheck(({ dataset, addIssue }) => {
+		if (!dataset.typed) return;
+		const problem = validateHeaders(dataset.value);
+		if (problem !== null) addIssue({ message: problem });
+	}),
+);
+
 export const WebhookSchema = v.object({
 	id: v.string(),
 	url: v.string(),
 	description: v.string(),
 	events: v.array(WebhookEventSchema),
+	/** Extra headers sent with every delivery. Never the reserved ones. */
+	headers: v.record(v.string(), v.string()),
+	/** The condition tree, or null when the webhook takes every event. */
+	filter: v.nullable(FilterGroupSchema),
 	enabled: v.boolean(),
 	createdAt: v.string(),
 	/** Rolling health, so a broken endpoint is visible without opening it. */
@@ -226,12 +283,18 @@ export const CreateWebhookBody = v.object({
 	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ""),
 	/** At least one — a webhook subscribed to nothing would never fire. */
 	events: v.pipe(v.array(WebhookEventSchema), v.minLength(1, "choose at least one event")),
+	headers: v.optional(WebhookHeadersSchema, {}),
+	/** Null, or omitted, means every event the subscription covers. */
+	filter: v.optional(v.nullable(WebhookFilterSchema), null),
 });
 
 export const UpdateWebhookBody = v.partial(
 	v.object({
 		description: v.pipe(v.string(), v.trim(), v.maxLength(200)),
 		events: v.pipe(v.array(WebhookEventSchema), v.minLength(1, "choose at least one event")),
+		headers: WebhookHeadersSchema,
+		/** Explicit null clears the conditions. */
+		filter: v.nullable(WebhookFilterSchema),
 		enabled: v.boolean(),
 	}),
 );
@@ -399,6 +462,10 @@ export const CreateCommentBody = v.object({
 	body: trimmed(1, 10_000),
 	/** Uploads made while drafting, adopted by the comment on submit. */
 	attachmentIds: v.optional(v.array(v.string())),
+});
+
+export const UpdateCommentBody = v.object({
+	body: trimmed(1, 10_000),
 });
 
 export const AddMemberBody = v.object({
