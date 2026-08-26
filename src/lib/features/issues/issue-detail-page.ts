@@ -10,7 +10,6 @@ import {
 	Input,
 	P,
 	Span,
-	Textarea,
 	derived,
 	signal,
 	type Child,
@@ -50,7 +49,6 @@ import { IssueTimeline } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
-import { MentionMenu, fileMentions } from "./file-mentions";
 import { BodyComposer } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
 import { DeleteIssueButton } from "./delete-issue";
@@ -514,6 +512,7 @@ function EditableDescription(
 					rows: 4,
 					autoGrow: true,
 					renderMentions: true,
+					toolbar: true,
 					onBlur: commit,
 					// Blur commits, so ⌘⏎ only has to leave the box.
 					onSubmit: () => draftRef.get()?.blur(),
@@ -580,14 +579,6 @@ function CommentThread(
 	const draftAttachments = signal<Attachment[]>([]);
 	const draftUploads = signal<Upload[]>([]);
 
-	// The same `@` as the description, narrowed to the issue's repository.
-	const mentions = fileMentions({
-		value: draft,
-		slug: () => params.slug.get(),
-		repository: () => repositoryId.get(),
-		element: draftRef,
-	});
-
 	const attach = (files: File[]) => {
 		beginUploads({
 			files,
@@ -638,21 +629,20 @@ function CommentThread(
 				class: "relative flex flex-col gap-2 rounded-md border border-border p-3",
 				onPaste: (event) => preventFilePaste(event, attach),
 			},
-			Textarea({
-				this: draftRef,
+			// The same box as the description and the create dialog — the same `@`
+			// wiring, the same toolbar, the same preview — so a comment is written
+			// the way every other body on the page is.
+			BodyComposer({
 				value: draft,
-				rows: 3,
+				element: draftRef,
+				slug: () => params.slug.get(),
+				repository: () => repositoryId.get(),
 				placeholder: "Leave a comment… @ to reference a file",
-				class:
-					"resize-none border-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground",
-				onInput: mentions.onInput,
-				onKeydown: (event) => {
-					mentions.onKeydown(event);
-					if (event.defaultPrevented) return;
-					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void post();
-				},
+				rows: 3,
+				autoGrow: true,
+				toolbar: true,
+				onSubmit: () => void post(),
 			}),
-			MentionMenu(mentions),
 			AttachmentGrid({
 				attachments: draftAttachments,
 				uploads: draftUploads,
@@ -663,10 +653,6 @@ function CommentThread(
 			Div(
 				{ class: "flex items-center gap-2" },
 				AttachTrigger({ onFiles: attach }),
-				// The box looks like a plain textarea, so nothing about it says the
-				// body will be rendered. One line, not a toolbar: the point is to
-				// tell someone who already knows markdown that it will be honoured.
-				Span({ class: "hidden text-[11px] text-muted-foreground sm:inline" }, "Markdown supported"),
 				Button(
 					{
 						size: "sm",
