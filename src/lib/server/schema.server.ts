@@ -22,6 +22,7 @@ import type {
 } from "@/lib/domain/issues";
 import type { GitProviderId, IndexState, PullRequestState } from "@/lib/domain/providers";
 import type { HarnessKind } from "@/lib/domain/agents";
+import type { WebhookFilter } from "@/lib/domain/webhook-filters";
 import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
@@ -578,6 +579,19 @@ export const webhook = sqliteTable(
 		description: text("description").notNull().default(""),
 		/** JSON array of event names — SQLite has no array type. */
 		events: text("events", { mode: "json" }).$type<WebhookEvent[]>().notNull(),
+		/**
+		 * Extra request headers, as a JSON object. Merged in under the signature
+		 * headers, which always win — see `webhooks.server.ts`.
+		 */
+		headers: text("headers", { mode: "json" })
+			.$type<Record<string, string>>()
+			.notNull()
+			.default({}),
+		/**
+		 * The condition tree that narrows the subscription, or null to take every
+		 * event it is subscribed to. Evaluated at enqueue time.
+		 */
+		filter: text("filter", { mode: "json" }).$type<WebhookFilter>(),
 		enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
 		createdBy: text("createdBy")
 			.notNull()
