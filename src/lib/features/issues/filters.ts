@@ -190,7 +190,7 @@ export const ISSUE_VIEW_LABELS: Record<IssueView, string> = {
  * everything — the terminal states included.
  */
 export const VIEW_STATUSES: Record<IssueView, readonly IssueStatus[] | null> = {
-	active: ["todo", "in_progress"],
+	active: ["todo", "rework", "in_progress", "in_review"],
 	backlog: ["backlog"],
 	all: null,
 };

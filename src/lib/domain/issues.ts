@@ -2,7 +2,16 @@
 // appear in this file — kit enforces that for `*.server.ts`, and a schema that
 // both an endpoint and a form need has to live somewhere both can reach.
 
-export const ISSUE_STATUSES = ["backlog", "todo", "in_progress", "done", "canceled"] as const;
+export const ISSUE_STATUSES = [
+	"backlog",
+	"todo",
+	"rework",
+	"in_progress",
+	"in_review",
+	"done",
+	"canceled",
+	"duplicate",
+] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
 export const ISSUE_PRIORITIES = ["none", "urgent", "high", "medium", "low"] as const;
@@ -11,9 +20,12 @@ export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 export const STATUS_LABELS: Record<IssueStatus, string> = {
 	backlog: "Backlog",
 	todo: "Todo",
+	rework: "Rework",
 	in_progress: "In Progress",
+	in_review: "In Review",
 	done: "Done",
 	canceled: "Canceled",
+	duplicate: "Duplicate",
 };
 
 export const PRIORITY_LABELS: Record<IssuePriority, string> = {
@@ -28,9 +40,12 @@ export const PRIORITY_LABELS: Record<IssuePriority, string> = {
 export const STATUS_ORDER: Record<IssueStatus, number> = {
 	backlog: 0,
 	todo: 1,
-	in_progress: 2,
-	done: 3,
-	canceled: 4,
+	rework: 2,
+	in_progress: 3,
+	in_review: 4,
+	done: 5,
+	canceled: 6,
+	duplicate: 7,
 };
 
 /** Urgent sorts above high, and "none" sinks to the bottom. */

@@ -2296,9 +2296,12 @@
 										"enum": [
 											"backlog",
 											"todo",
+											"rework",
 											"in_progress",
+											"in_review",
 											"done",
-											"canceled"
+											"canceled",
+											"duplicate"
 										],
 										"type": "string"
 									}
@@ -2307,9 +2310,12 @@
 									"enum": [
 										"backlog",
 										"todo",
+										"rework",
 										"in_progress",
+										"in_review",
 										"done",
-										"canceled"
+										"canceled",
+										"duplicate"
 									],
 									"type": "string"
 								}
@@ -2421,9 +2427,12 @@
 												"enum": [
 													"backlog",
 													"todo",
+													"rework",
 													"in_progress",
+													"in_review",
 													"done",
-													"canceled"
+													"canceled",
+													"duplicate"
 												],
 												"type": "string"
 											},
@@ -2859,9 +2868,12 @@
 										"enum": [
 											"backlog",
 											"todo",
+											"rework",
 											"in_progress",
+											"in_review",
 											"done",
-											"canceled"
+											"canceled",
+											"duplicate"
 										],
 										"type": "string",
 										"default": "backlog"
@@ -2955,9 +2967,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -3413,9 +3428,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -3857,9 +3875,12 @@
 										"enum": [
 											"backlog",
 											"todo",
+											"rework",
 											"in_progress",
+											"in_review",
 											"done",
-											"canceled"
+											"canceled",
+											"duplicate"
 										],
 										"type": "string"
 									},
@@ -3942,9 +3963,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -5642,9 +5666,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -7579,9 +7606,12 @@
 												"enum": [
 													"backlog",
 													"todo",
+													"rework",
 													"in_progress",
+													"in_review",
 													"done",
-													"canceled"
+													"canceled",
+													"duplicate"
 												],
 												"type": "string"
 											},
@@ -7795,9 +7825,12 @@
 										"enum": [
 											"backlog",
 											"todo",
+											"rework",
 											"in_progress",
+											"in_review",
 											"done",
-											"canceled"
+											"canceled",
+											"duplicate"
 										],
 										"type": "string",
 										"default": "backlog"
@@ -7904,9 +7937,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -8128,9 +8164,12 @@
 										"enum": [
 											"backlog",
 											"todo",
+											"rework",
 											"in_progress",
+											"in_review",
 											"done",
-											"canceled"
+											"canceled",
+											"duplicate"
 										],
 										"type": "string"
 									},
@@ -8230,9 +8269,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},
@@ -10015,9 +10057,12 @@
 											"enum": [
 												"backlog",
 												"todo",
+												"rework",
 												"in_progress",
+												"in_review",
 												"done",
-												"canceled"
+												"canceled",
+												"duplicate"
 											],
 											"type": "string"
 										},

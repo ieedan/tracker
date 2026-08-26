@@ -88,7 +88,7 @@ export function issueAgentPrompt(issue: Issue, slug: string, origin: string): st
 		"your work would be filed under whoever minted one.",
 		"",
 		`Pass workspace "${slug}" and identifier ${issue.identifier} when a tool asks for them.`,
-		"Statuses: backlog, todo, in_progress, done, canceled.",
+		"Statuses: backlog, todo, rework, in_progress, in_review, done, canceled, duplicate.",
 		"",
 		`Set ${issue.identifier} to in_progress when you start, comment as you go, and set it`,
 		"done when you finish. If you get blocked, comment with the blocker and leave it",
