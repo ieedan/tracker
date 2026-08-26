@@ -44,6 +44,8 @@ const ITEM_SELECTOR = "[data-dropdown-menu-item]";
 const BOUNDARY_SELECTOR = "[data-dropdown-menu-content], [data-dropdown-menu-sub-content]";
 const HEADING_SELECTOR = "[data-dropdown-menu-group-heading]";
 const HOTKEY_SELECTOR = ":scope > [data-slot='menu-hotkey']";
+/** The scrollable region the rows live in, capped by the menu's max height. */
+const VIEWPORT_SELECTOR = "[data-slot='dropdown-menu-viewport']";
 
 /** Set by the filter on rows it hid, so it only re-enables its own. */
 const HIDDEN_ATTR = "data-search-hidden";
@@ -190,6 +192,10 @@ function createController(
 
 	/** A menu opens on a clean query, with the box ready to take one. */
 	const reset = () => {
+		// Back to the top of the list: the viewport keeps its scroll position
+		// through a close (display: none preserves it), and reopening halfway
+		// down a list you scrolled last time reads as missing rows.
+		content?.querySelector(VIEWPORT_SELECTOR)?.scrollTo(0, 0);
 		const input = inputRef.get();
 		if (input === null) return;
 		input.value = "";

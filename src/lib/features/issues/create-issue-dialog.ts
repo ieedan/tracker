@@ -7,6 +7,7 @@ import {
 	If,
 	ImplementDocument,
 	ImplementEffect,
+	ImplementLifecycle,
 	Input,
 	Span,
 	signal,
@@ -364,6 +365,9 @@ export function CreateIssueDialog() {
 	};
 
 	const submit = async () => {
+		// One create per request: the dialog-level shortcut can fire while a
+		// create is already in flight, and must not file the issue twice.
+		if (submitting.get()) return;
 		const trimmed = title.get().trim();
 		const team = chosenTeam.get();
 		// A team is what gives the issue its identifier, so there is nothing to
@@ -496,6 +500,28 @@ export function CreateIssueDialog() {
 			),
 			DialogContent(
 				{ class: "max-w-3xl gap-0 p-0 sm:max-w-3xl", showCloseButton: false },
+				// Cmd/Ctrl+Enter files the issue from anywhere in the dialog — a
+				// property pill, the Create button, an open picker — not just the
+				// text fields. Capture phase so it runs ahead of whatever the
+				// focused control does with Enter, and stopped so the title input's
+				// copy of the shortcut cannot submit a second time. `submit` itself
+				// declines while empty, teamless, or in flight. Attached by hand
+				// because an element's `onKeydownCapture` prop binds a bogus
+				// "keydowncapture" event instead of the capture phase
+				// (implementjs ENG-24).
+				ImplementLifecycle({
+					onMount: (mounted) => {
+						const root = mounted.closest<HTMLElement>("[data-slot='dialog-content']") ?? mounted;
+						const onKeydown = (event: KeyboardEvent) => {
+							if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) return;
+							event.preventDefault();
+							event.stopPropagation();
+							void submit();
+						};
+						root.addEventListener("keydown", onKeydown, true);
+						return () => root.removeEventListener("keydown", onKeydown, true);
+					},
+				}),
 				Div(
 					{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
 					Breadcrumb(
