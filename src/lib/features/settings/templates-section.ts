@@ -33,7 +33,7 @@ import { Label as ControlLabel } from "@/lib/components/ui/label";
 import { Textarea } from "@/lib/components/ui/textarea";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/domain/issues";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
-import type { IssueTemplate, Label, Member, Team, TeamRef } from "@/lib/domain/schemas";
+import type { IssueTemplate, Label, Member, Repository, Team, TeamRef } from "@/lib/domain/schemas";
 import {
 	AssigneePicker,
 	LabelChips,
@@ -42,6 +42,11 @@ import {
 	StatusPicker,
 	TeamPicker,
 } from "@/lib/features/issues/pickers";
+import {
+	RepositoryPicker,
+	toRepositoryRef,
+	type RepositoryRef,
+} from "@/lib/features/issues/repository-picker";
 
 const inputClass =
 	"h-8 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring";
@@ -51,6 +56,7 @@ interface Catalog {
 	teams: Signal<Team[]>;
 	members: Signal<Member[]>;
 	labels: Signal<Label[]>;
+	repositories: Signal<Repository[]>;
 }
 
 export function TemplatesSection(slug: Readable<string>) {
@@ -64,21 +70,24 @@ export function TemplatesSection(slug: Readable<string>) {
 		teams: signal<Team[]>([]),
 		members: signal<Member[]>([]),
 		labels: signal<Label[]>([]),
+		repositories: signal<Repository[]>([]),
 	};
 
 	const load = async () => {
 		const workspaceSlug = slug.get();
-		const [templateResult, teamResult, memberResult, labelResult] = await Promise.all([
+		const [templateResult, teamResult, memberResult, labelResult, repoResult] = await Promise.all([
 			api.GET("/api/v1/workspaces/[slug]/templates", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
+			api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
 		]);
 		loading.set(false);
 		if (templateResult.error === undefined) templates.set(templateResult.data);
 		if (teamResult.error === undefined) catalog.teams.set(teamResult.data);
 		if (memberResult.error === undefined) catalog.members.set(memberResult.data);
 		if (labelResult.error === undefined) catalog.labels.set(labelResult.data);
+		if (repoResult.error === undefined) catalog.repositories.set(repoResult.data);
 	};
 
 	const remove = async (template: IssueTemplate) => {
@@ -191,13 +200,16 @@ export function TemplatesSection(slug: Readable<string>) {
 	);
 }
 
-/** The one-line "ENG · Todo · High · Alice" under a template's name. */
+/** The one-line "ENG · Todo · High · Alice · tracker" under a template's name. */
 function summarize(template: IssueTemplate): string {
 	const parts = [
 		template.team === null ? null : template.team.key,
 		STATUS_LABELS[template.status],
 		template.priority === "none" ? null : PRIORITY_LABELS[template.priority],
 		template.assignee?.name ?? null,
+		template.repository === null
+			? null
+			: (template.repository.fullName.split("/")[1] ?? template.repository.fullName),
 	].filter((part): part is string => part !== null);
 
 	return template.summary === "" ? parts.join(" · ") : `${template.summary} — ${parts.join(" · ")}`;
@@ -218,6 +230,7 @@ function TemplateDialog(
 	const status = signal<IssueStatus>("backlog");
 	const priority = signal<IssuePriority>("none");
 	const assignee = signal<Member["user"] | null>(null);
+	const repository = signal<RepositoryRef | null>(null);
 	const chosenLabels = signal<Label[]>([]);
 	const saving = signal(false);
 
@@ -231,6 +244,7 @@ function TemplateDialog(
 		status.set(template?.status ?? "backlog");
 		priority.set(template?.priority ?? "none");
 		assignee.set(template?.assignee ?? null);
+		repository.set(template?.repository ?? null);
 		chosenLabels.set(template?.labels ?? []);
 	};
 
@@ -247,6 +261,7 @@ function TemplateDialog(
 			status: status.get(),
 			priority: priority.get(),
 			assigneeId: assignee.get()?.id ?? null,
+			repositoryId: repository.get()?.id ?? null,
 			labelIds: chosenLabels.get().map((label) => label.id),
 		};
 
@@ -376,6 +391,20 @@ function TemplateDialog(
 												null),
 								),
 							{ showLabel: true, class: "border border-border" },
+						),
+						RepositoryPicker(
+							repository,
+							catalog.repositories,
+							(repositoryId) =>
+								repository.set(
+									repositoryId === null
+										? null
+										: (catalog.repositories
+												.get()
+												.filter((repo) => repo.id === repositoryId)
+												.map(toRepositoryRef)[0] ?? null),
+								),
+							{ class: "border border-border" },
 						),
 						LabelPicker(
 							chosenLabels,

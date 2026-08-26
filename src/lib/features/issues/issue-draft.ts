@@ -86,8 +86,17 @@ function parseAttachments(value: unknown): Attachment[] {
 	return parsed.success ? parsed.output : [];
 }
 
-/** True when the form is still at defaults — nothing worth keeping. */
-export function isBlankIssueDraft(draft: IssueDraft): boolean {
+/**
+ * True when the form is still at defaults — nothing worth keeping.
+ *
+ * `defaultRepositoryId` is the repository the composer scopes to on its own —
+ * the workspace's only one — so a scope nobody picked does not count as a
+ * draft worth restoring.
+ */
+export function isBlankIssueDraft(
+	draft: IssueDraft,
+	defaultRepositoryId: string | null = null,
+): boolean {
 	return (
 		draft.title.trim() === "" &&
 		draft.description.trim() === "" &&
@@ -96,8 +105,8 @@ export function isBlankIssueDraft(draft: IssueDraft): boolean {
 		draft.assigneeId === null &&
 		draft.labelIds.length === 0 &&
 		// Unlike the team, which is chosen for you, a repository scope is only
-		// ever there because somebody picked it.
-		draft.repositoryId === null &&
+		// ever there because somebody picked it — or the composer defaulted it.
+		(draft.repositoryId === null || draft.repositoryId === defaultRepositoryId) &&
 		draft.attachments.length === 0
 	);
 }

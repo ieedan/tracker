@@ -97,6 +97,15 @@ function teamRefFor(available: Team[], wanted: string): TeamRef | null {
 	return picked === undefined ? null : { id: picked.id, name: picked.name, key: picked.key };
 }
 
+/**
+ * The repository a composer scopes to when nothing else names one: the
+ * workspace's only linked repository, or null when there are none or several.
+ * Set on the pill rather than at create time, so it is visible and clearable.
+ */
+function soleRepositoryRef(available: Repository[]): RepositoryRef | null {
+	return available.length === 1 ? toRepositoryRef(available[0]!) : null;
+}
+
 export function openCreateIssue(workspaceSlug: string, teamKey?: string): void {
 	if (workspaceSlug === "") return;
 	slug.set(workspaceSlug);
@@ -191,7 +200,7 @@ export function CreateIssueDialog() {
 		if (workspaceSlug === "") return;
 
 		const draft = snapshot();
-		if (isBlankIssueDraft(draft)) {
+		if (isBlankIssueDraft(draft, soleRepositoryRef(repositories.get())?.id ?? null)) {
 			clearIssueDraft(workspaceSlug);
 			hasDraft.set(false);
 			return;
@@ -248,6 +257,7 @@ export function CreateIssueDialog() {
 	const resetToDefaults = () => {
 		reset();
 		chosenTeam.set(teamRefFor(teams.get(), preferredTeam.get()));
+		chosenRepository.set(soleRepositoryRef(repositories.get()));
 	};
 
 	const discard = () => {
@@ -309,15 +319,21 @@ export function CreateIssueDialog() {
 			]);
 			if (repoResult.error === undefined) {
 				repositories.set(repoResult.data);
-				if (draft !== null) {
-					// A repository that has since been unlinked is dropped rather than
-					// restored as a scope pointing at nothing.
-					chosenRepository.set(
-						repoResult.data
-							.filter((repo) => repo.id === draft.repositoryId)
-							.map(toRepositoryRef)[0] ?? null,
-					);
-				}
+				// Either source names a repository by id, and either can name one that
+				// has since been unlinked — which is dropped rather than restored as a
+				// scope pointing at nothing.
+				const wantedRepository =
+					template !== null ? (template.repository?.id ?? null) : (draft?.repositoryId ?? null);
+				const restored =
+					repoResult.data.filter((repo) => repo.id === wantedRepository).map(toRepositoryRef)[0] ??
+					null;
+				// When nothing names a repository and the workspace has linked exactly
+				// one, new issues scope to it by default — on the pill, where it can
+				// be seen and cleared. A draft's empty scope is left alone: it may be
+				// a deliberate clear.
+				chosenRepository.set(
+					restored ?? (draft === null ? soleRepositoryRef(repoResult.data) : null),
+				);
 			}
 			if (memberResult.error === undefined) {
 				members.set(memberResult.data);
