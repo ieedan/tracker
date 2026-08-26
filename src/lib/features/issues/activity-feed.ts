@@ -18,23 +18,38 @@ import {
 	ForEach,
 	Fragment,
 	If,
+	ImplementLifecycle,
 	Span,
 	derived,
+	signal,
 	type Child,
 	type Readable,
 } from "@implementjs/core";
 import {
 	AlignLeft,
 	CircleDot,
+	Copy,
+	Ellipsis,
 	FolderGit2,
 	GitPullRequest,
 	Link2Off,
 	Pencil,
 	Tag,
+	Trash2,
 	Users,
 } from "@implementjs/lucide";
+import { toastError, toastSuccess } from "@/lib/client/toast";
 import { AgentBadge, PriorityIcon, StatusIcon, UserAvatar } from "@/lib/components/glyphs";
 import { Markdown } from "@/lib/components/markdown";
+import { Button } from "@/lib/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/lib/components/ui/dropdown-menu";
+import { Textarea } from "@/lib/components/ui/textarea";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -59,14 +74,29 @@ interface TimelineRow {
 	activity: Activity | null;
 }
 
+/**
+ * What a comment row may do to its comment. The handlers own the request and
+ * the list update; the row only reports whether to leave its edit or confirm
+ * state up when one fails.
+ */
+export interface CommentActions {
+	/** The signed-in user — Edit and Delete only show on their own comments. */
+	viewerId: Readable<string>;
+	/** Admins may delete anyone's comment. Editing stays with the author. */
+	isAdmin: Readable<boolean>;
+	onEdit: (id: string, body: string) => Promise<boolean>;
+	onDelete: (id: string) => Promise<boolean>;
+}
+
 export interface IssueTimelineProps {
 	comments: Readable<Comment[]>;
 	activity: Readable<Activity[]>;
 	issue: Readable<Issue>;
 	slug: Readable<string>;
+	actions: CommentActions;
 }
 
-export function IssueTimeline({ comments, activity, issue, slug }: IssueTimelineProps) {
+export function IssueTimeline({ comments, activity, issue, slug, actions }: IssueTimelineProps) {
 	const rows = derived([comments, activity, issue], (commentList, activityList, current) => {
 		const merged: TimelineRow[] = [
 			{
@@ -111,18 +141,65 @@ export function IssueTimeline({ comments, activity, issue, slug }: IssueTimeline
 				: CommentRow(
 						row.bind((value) => value.comment!),
 						slug,
+						actions,
 					),
 	);
 }
 
-function CommentRow(comment: Readable<Comment>, slug: Readable<string>) {
+/**
+ * Creation stamps both timestamps in one go, so a gap between them can only
+ * mean an edit. The tolerance absorbs the two `new Date()` calls the insert
+ * makes without swallowing any real edit, which is a request away at least.
+ */
+function wasEdited(value: Comment): boolean {
+	return Date.parse(value.updatedAt) - Date.parse(value.createdAt) > 1000;
+}
+
+function CommentRow(comment: Readable<Comment>, slug: Readable<string>, actions: CommentActions) {
+	const editing = signal(false);
+	const draft = signal("");
+	const draftRef = signal<HTMLTextAreaElement | null>(null);
+	const saving = signal(false);
+	const confirmingDelete = signal(false);
+
+	const isAuthor = derived([actions.viewerId, comment], (id, value) => value.author.id === id);
+	const canDelete = derived([isAuthor, actions.isAdmin], (author, admin) => author || admin);
+
+	const copy = async () => {
+		try {
+			await navigator.clipboard.writeText(comment.get().body);
+			toastSuccess("Copied to clipboard");
+		} catch {
+			toastError("Could not copy. Select and copy manually.");
+		}
+	};
+
+	const beginEdit = () => {
+		draft.set(comment.get().body);
+		editing.set(true);
+	};
+
+	const save = async () => {
+		const next = draft.get().trim();
+		if (next === "" || saving.get()) return;
+		if (next === comment.get().body) {
+			editing.set(false);
+			return;
+		}
+		saving.set(true);
+		const done = await actions.onEdit(comment.get().id, next);
+		saving.set(false);
+		// A refused save keeps the box up: the words are still only in it.
+		if (done) editing.set(false);
+	};
+
 	return Div(
-		{ class: "flex gap-3" },
+		{ class: "group/comment flex gap-3" },
 		UserAvatar(comment.get().author, "mt-0.5"),
 		Div(
 			{ class: "min-w-0 flex-1" },
 			Div(
-				{ class: "flex items-baseline gap-2" },
+				{ class: "flex items-center gap-2" },
 				Span(
 					{ class: "text-[13px] font-medium" },
 					comment.bind((value) => value.author.name),
@@ -135,11 +212,175 @@ function CommentRow(comment: Readable<Comment>, slug: Readable<string>) {
 					{ class: "text-[11px] text-muted-foreground" },
 					comment.bind((value) => relativeTime(value.createdAt)),
 				),
+				If(
+					comment.bind(wasEdited),
+					Span(
+						{
+							class: "text-[11px] text-muted-foreground",
+							title: comment.bind((value) => `Edited ${relativeTime(value.updatedAt)}`),
+						},
+						"(edited)",
+					),
+				),
+				CommentMenu({
+					isAuthor,
+					canDelete,
+					onCopy: () => void copy(),
+					onEdit: beginEdit,
+					onDelete: () => confirmingDelete.set(true),
+				}),
 			),
-			// Comment bodies are markdown; change events below are not. Only this
-			// branch renders through it, so a status line stays one plain sentence.
-			Markdown(comment.bind("body"), { class: "mt-0.5" }),
+			If(editing)
+				.Then(
+					// Focus is taken on mount rather than through `autofocus` — the
+					// attribute is honoured once per document, and this box appears
+					// well after the page has spent it.
+					ImplementLifecycle({
+						onMount: () => {
+							const node = draftRef.get();
+							if (node === null) return;
+							node.focus();
+							node.setSelectionRange(node.value.length, node.value.length);
+						},
+					}),
+					// A plain box holding the raw markdown — the same source the
+					// composer took, handed back to be reworded.
+					Div(
+						{ class: "mt-1.5 flex flex-col gap-2" },
+						Textarea({
+							this: draftRef,
+							value: draft,
+							rows: 3,
+							class: "max-h-64 text-[13px]",
+							onKeydown: (event) => {
+								if (event.key === "Escape") editing.set(false);
+								if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void save();
+							},
+						}),
+						Div(
+							{ class: "flex justify-end gap-2" },
+							Button(
+								{
+									size: "sm",
+									variant: "secondary",
+									disabled: saving,
+									onClick: () => editing.set(false),
+								},
+								"Cancel",
+							),
+							Button(
+								{
+									size: "sm",
+									loading: saving,
+									disabled: draft.bind((value) => value.trim() === ""),
+									onClick: () => void save(),
+								},
+								"Save",
+							),
+						),
+					),
+				)
+				.Else(
+					// Comment bodies are markdown; change events below are not. Only this
+					// branch renders through it, so a status line stays one plain sentence.
+					Markdown(comment.bind("body"), { class: "mt-0.5" }),
+				),
 			AttachmentGrid({ attachments: comment.bind("attachments"), slug }),
+			DeleteCommentDialog({
+				open: confirmingDelete,
+				onConfirm: () => actions.onDelete(comment.get().id),
+			}),
+		),
+	);
+}
+
+/** The row's "…": Copy for everyone, Edit and Delete only where they apply. */
+function CommentMenu(props: {
+	isAuthor: Readable<boolean>;
+	canDelete: Readable<boolean>;
+	onCopy: () => void;
+	onEdit: () => void;
+	onDelete: () => void;
+}) {
+	return Div(
+		{ class: "ml-auto" },
+		DropdownMenu(
+			DropdownMenuTrigger(
+				{
+					variant: "ghost",
+					size: "icon",
+					class:
+						"size-6 text-muted-foreground opacity-0 group-hover/comment:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
+					"aria-label": "Comment actions",
+				},
+				Ellipsis({ class: "size-3.5" }),
+			),
+			DropdownMenuContent(
+				{ class: "w-36", align: "end" },
+				DropdownMenuItem({ onSelect: props.onCopy }, Copy({ class: "size-3.5" }), "Copy text"),
+				If(
+					props.isAuthor,
+					DropdownMenuItem({ onSelect: props.onEdit }, Pencil({ class: "size-3.5" }), "Edit"),
+				),
+				If(
+					props.canDelete,
+					DropdownMenuItem(
+						{
+							class: "text-destructive data-[highlighted]:text-destructive",
+							onSelect: props.onDelete,
+						},
+						Trash2({ class: "size-3.5" }),
+						"Delete",
+					),
+				),
+			),
+		),
+	);
+}
+
+/** The same shape as deleting an issue: name the loss, one destructive button. */
+function DeleteCommentDialog(props: {
+	open: ReturnType<typeof signal<boolean>>;
+	onConfirm: () => Promise<boolean>;
+}) {
+	const deleting = signal(false);
+
+	const confirm = async () => {
+		if (deleting.get()) return;
+		deleting.set(true);
+		const done = await props.onConfirm();
+		deleting.set(false);
+		if (done) props.open.set(false);
+	};
+
+	return Dialog(
+		{ open: props.open },
+		DialogContent(
+			{ class: "max-w-md gap-0 p-0" },
+			Div(
+				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+				DialogTitle({ class: "text-[15px] font-semibold" }, "Delete comment"),
+				DialogDescription(
+					{ class: "text-[12px]" },
+					"This cannot be undone. The comment and its attachments are deleted for everyone in the workspace.",
+				),
+			),
+			Div(
+				{ class: "flex justify-end gap-2 px-4 py-3" },
+				Button(
+					{
+						size: "sm",
+						variant: "secondary",
+						disabled: deleting,
+						onClick: () => props.open.set(false),
+					},
+					"Cancel",
+				),
+				Button(
+					{ size: "sm", variant: "destructive", loading: deleting, onClick: () => void confirm() },
+					"Delete comment",
+				),
+			),
 		),
 	);
 }

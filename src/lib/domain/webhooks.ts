@@ -93,3 +93,105 @@ export const SIGNATURE_HEADER = "x-tracker-signature";
 export const EVENT_HEADER = "x-tracker-event";
 export const DELIVERY_HEADER = "x-tracker-delivery";
 export const TIMESTAMP_HEADER = "x-tracker-timestamp";
+
+// ---------------------------------------------------------------------------
+// Custom headers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extra headers sent with every delivery — a bearer token for a gateway, a
+ * tenant id, whatever the receiver authenticates on. Stored per webhook and
+ * merged in *before* the pipeline's own headers, which always win: nothing set
+ * here can spoof `x-tracker-signature` or lie about the content type.
+ */
+export const MAX_CUSTOM_HEADERS = 20;
+export const MAX_HEADER_NAME_LENGTH = 100;
+export const MAX_HEADER_VALUE_LENGTH = 1000;
+
+/**
+ * Names a webhook may not set.
+ *
+ * The transport ones would corrupt the request; the `x-tracker-*` ones are the
+ * receiver's proof of who sent this, and a header the workspace controls must
+ * never be mistakable for one the pipeline signed.
+ */
+export const RESERVED_HEADERS: readonly string[] = [
+	"host",
+	"content-length",
+	"content-type",
+	"connection",
+	"transfer-encoding",
+	"keep-alive",
+	"upgrade",
+	"te",
+	"trailer",
+	"expect",
+	"http2-settings",
+	SIGNATURE_HEADER,
+	EVENT_HEADER,
+	DELIVERY_HEADER,
+	TIMESTAMP_HEADER,
+];
+
+/** RFC 9110 token characters — anything else cannot be a header name. */
+const HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
+
+/**
+ * Printable ASCII, tab, and the high range `fetch` still accepts.
+ *
+ * Control characters are rejected rather than stripped: a CR or LF in a value
+ * is request splitting, and silently repairing it hides that someone tried.
+ */
+const HEADER_VALUE_PATTERN = /^[\t\x20-\x7e\x80-\xff]*$/;
+
+/** A message naming what is wrong with a header, or null when it is fine. */
+export function validateHeader(name: string, value: string): string | null {
+	const trimmed = name.trim();
+	if (trimmed === "") return "a header needs a name";
+	if (trimmed.length > MAX_HEADER_NAME_LENGTH) {
+		return `header names may be at most ${MAX_HEADER_NAME_LENGTH} characters`;
+	}
+	if (!HEADER_NAME_PATTERN.test(trimmed)) {
+		return `"${trimmed}" is not a valid header name`;
+	}
+	if (RESERVED_HEADERS.includes(trimmed.toLowerCase())) {
+		return `${trimmed} is set by the delivery pipeline and cannot be overridden`;
+	}
+	if (value.length > MAX_HEADER_VALUE_LENGTH) {
+		return `${trimmed} is longer than ${MAX_HEADER_VALUE_LENGTH} characters`;
+	}
+	if (!HEADER_VALUE_PATTERN.test(value)) {
+		return `${trimmed} contains a character that cannot go in a header`;
+	}
+	return null;
+}
+
+/** The same checks over a whole map, plus the count limit. */
+export function validateHeaders(headers: Record<string, string>): string | null {
+	const names = Object.keys(headers);
+	if (names.length > MAX_CUSTOM_HEADERS) {
+		return `a webhook may set at most ${MAX_CUSTOM_HEADERS} custom headers`;
+	}
+
+	const seen = new Set<string>();
+	for (const name of names) {
+		const problem = validateHeader(name, headers[name] ?? "");
+		if (problem !== null) return problem;
+
+		const lower = name.trim().toLowerCase();
+		if (seen.has(lower)) return `${name.trim()} is set twice`;
+		seen.add(lower);
+	}
+	return null;
+}
+
+/** Trims the names and drops the unnamed rows a half-filled editor leaves. */
+export function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const [name, value] of Object.entries(headers)) {
+		const trimmed = name.trim();
+		if (trimmed === "") continue;
+		result[trimmed] = value;
+	}
+	return result;
+}
