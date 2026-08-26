@@ -40,6 +40,16 @@
 	--sidebar: #fbfbfc;
 	--sidebar-border: #e6e7eb;
 	--elevated: #ffffff;
+
+	/* Code block token colors, one variable per token kind the highlighter in
+	   lib/components/highlight.ts emits. Kept as theme variables rather than
+	   utility colors so both themes tune the same six knobs. */
+	--syntax-comment: #59636e;
+	--syntax-string: #0a3069;
+	--syntax-keyword: #cf222e;
+	--syntax-constant: #0550ae;
+	--syntax-function: #6639ba;
+	--syntax-tag: #116329;
 }
 
 .dark {
@@ -66,6 +76,15 @@
 	--sidebar: #0b0c0d;
 	--sidebar-border: #191a1d;
 	--elevated: #131417;
+
+	/* The light tokens are too dark to read on a near-black block, so the dark
+	   theme lifts each one rather than reusing them. */
+	--syntax-comment: #8a8f98;
+	--syntax-string: #a5d6ff;
+	--syntax-keyword: #ff7b72;
+	--syntax-constant: #79c0ff;
+	--syntax-function: #d2a8ff;
+	--syntax-tag: #7ee787;
 }
 
 /* Not `inline`: Tailwind's own `--default-font-family` is `var(--font-sans)`, and
@@ -74,9 +93,8 @@
    deliberately left alone; identifiers and secrets keep Tailwind's mono stack. */
 @theme {
 	--font-sans:
-		"Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
-		"Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
-		"Apple Color Emoji", "Segoe UI Emoji";
+		"Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+		"Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 @theme inline {
@@ -101,6 +119,12 @@
 	--color-sidebar: var(--sidebar);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-elevated: var(--elevated);
+	--color-syntax-comment: var(--syntax-comment);
+	--color-syntax-string: var(--syntax-string);
+	--color-syntax-keyword: var(--syntax-keyword);
+	--color-syntax-constant: var(--syntax-constant);
+	--color-syntax-function: var(--syntax-function);
+	--color-syntax-tag: var(--syntax-tag);
 
 	/* Accordion and Collapsible animate to a height the primitive measures onto the element at
 	   runtime. Without these they still open and close, they just snap instead of sliding. */
