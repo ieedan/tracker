@@ -25,7 +25,8 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -357,10 +358,10 @@ function RemoveDialog(
 	removing: Readable<boolean>,
 	confirm: () => Promise<void>,
 ) {
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
-		DialogContent(
-			{ class: "max-w-md gap-0 p-0" },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-md" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Remove from workspace"),

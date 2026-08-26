@@ -23,7 +23,8 @@ import {
 import { Trash2 } from "@implementjs/lucide";
 import { toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import type { Issue } from "@/lib/domain/schemas";
 import { deleteIssues } from "./issue-store";
 
@@ -134,15 +135,15 @@ export function DeleteIssuesDialog({
 		onDeleted?.(done);
 	};
 
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
 			if (!isOpen) return;
 			pending.set(chosen.get());
 			deleting.set(false);
 		}),
-		DialogContent(
-			{ class: "max-w-md gap-0 p-0" },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-md" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				DialogTitle(

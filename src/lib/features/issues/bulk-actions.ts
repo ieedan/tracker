@@ -37,7 +37,8 @@ import {
 	CommandList,
 	CommandSeparator,
 } from "@/lib/components/ui/command";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import { PriorityIcon, StatusIcon, UnassignedAvatar, UserAvatar } from "@/lib/components/glyphs";
 import {
 	ISSUE_PRIORITIES,
@@ -475,9 +476,9 @@ export function BulkActionsDialog({
 				go("root");
 			},
 		}),
-		Dialog(
+		ResponsiveDialog(
 			{ open },
-			DialogContent(
+			ResponsiveDialogContent(
 				// No max-width override: the default keeps a phone's 1rem margins.
 				{ class: "gap-0 overflow-hidden p-0", showCloseButton: false },
 				DialogTitle({ class: "sr-only" }, "Bulk actions"),
