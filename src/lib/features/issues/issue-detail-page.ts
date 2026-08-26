@@ -11,6 +11,7 @@ import {
 	P,
 	Span,
 	derived,
+	mediaQuery,
 	signal,
 	type Child,
 	type Readable,
@@ -174,6 +175,10 @@ export function IssueDetailPage({
 			if (updated !== undefined) void refreshActivity();
 		});
 
+	// Wide enough for the properties rail; below this the same sections stack
+	// under the body instead, because a fixed 16rem column would eat the page.
+	const hasRail = mediaQuery("(min-width: 1024px)");
+
 	// Moving teams renumbers the issue, so the URL it lives at changes with it.
 	const moveTeam = (key: string) => {
 		const destination = data.get().teams.find((team) => team.key === key);
@@ -195,6 +200,126 @@ export function IssueDetailPage({
 			}
 		});
 	};
+
+	// Linear puts the properties in a right rail rather than above the body,
+	// under headings rather than beside per-row labels. Every pill already
+	// says what it is — a status ring, a priority column, an avatar, a
+	// coloured dot — so a "Status" caption next to a control reading
+	// "In Progress" is a word doing no work.
+	//
+	// A factory rather than a node: the sections mount in the rail on a wide
+	// viewport and inline under the body on a narrow one, and only one of the
+	// two exists at a time — which is also what keeps the pickers' shared
+	// `open` signals pointing at a single mounted menu.
+	const propertySections = (): Child[] => [
+		PropertySection(
+			"Properties",
+			StatusPicker(
+				issue.bind("status"),
+				(status) => update({ status }, (value) => ({ ...value, status })),
+				{ showLabel: true, open: statusOpen, class: propertyClass },
+			),
+			PriorityPicker(
+				issue.bind("priority"),
+				(priority) => update({ priority }, (value) => ({ ...value, priority })),
+				{ showLabel: true, open: priorityOpen, class: propertyClass },
+			),
+			AssigneePicker(
+				issue.bind("assignee"),
+				data.bind((value) => value.members),
+				(assigneeId) =>
+					update({ assigneeId }, (value) => ({
+						...value,
+						assignee:
+							assigneeId === null
+								? null
+								: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
+									value.assignee),
+					})),
+				{ showLabel: true, open: assigneeOpen, class: propertyClass },
+			),
+			TeamPicker(
+				issue.bind("team"),
+				data.bind((value) => value.teams),
+				moveTeam,
+				{ showLabel: true, open: teamOpen, class: propertyClass },
+			),
+			RepositoryPicker(
+				issue.bind((value) => value.repository),
+				repositories,
+				(repositoryId) =>
+					update({ repositoryId }, (value) => ({
+						...value,
+						repository:
+							repositoryId === null
+								? null
+								: (data
+										.get()
+										.repositories.filter((repo) => repo.id === repositoryId)
+										.map((repo) => ({
+											id: repo.id,
+											fullName: repo.fullName,
+											provider: repo.provider,
+										}))[0] ?? value.repository),
+					})),
+				{ showLabel: true, class: propertyClass },
+			),
+			Div(
+				{ class: "px-1" },
+				PullRequestLink({
+					slug: params.slug,
+					identifier: issue.bind("identifier"),
+					current: linkedPull,
+					enabled: repositories.bind((list) => list.length > 0),
+				}),
+			),
+		),
+
+		// Labels get their own section rather than a row, because there are any
+		// number of them and each one is its own control.
+		PropertySection(
+			"Labels",
+			IssueLabelPicker({
+				selected: issue.bind("labels"),
+				available: data.bind((value) => value.labels),
+				onToggle: (labelId) =>
+					update(
+						{
+							labelIds: toggle(
+								issue.get().labels.map((label) => label.id),
+								labelId,
+							),
+						},
+						(value) => ({
+							...value,
+							labels: value.labels.some((label) => label.id === labelId)
+								? value.labels.filter((label) => label.id !== labelId)
+								: [...value.labels, data.get().labels.find((label) => label.id === labelId)!],
+						}),
+					),
+				open: labelOpen,
+			}),
+		),
+
+		Div(
+			{ class: "flex flex-col items-start gap-1 border-t border-border pt-3" },
+			CopyPromptButton({ issue, slug: params.slug }),
+			TransferIssueButton({ slug: params.slug, issue }),
+			DeleteIssueButton({ slug: params.slug, issue }),
+		),
+
+		Div(
+			{ class: "text-[11px] text-muted-foreground" },
+			P(
+				{},
+				issue.bind((value) => `Created ${fullTime(value.createdAt)}`),
+			),
+			P(
+				{},
+				issue.bind((value) => `by ${value.creator.name}`),
+			),
+		),
+	];
 
 	return Div(
 		{ class: "flex min-h-0 flex-1" },
@@ -252,7 +377,7 @@ export function IssueDetailPage({
 			),
 
 			Div(
-				{ class: "min-h-0 flex-1 overflow-y-auto px-8 py-6" },
+				{ class: "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },
 				Div(
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 					EditableTitle(issue, update),
@@ -272,6 +397,15 @@ export function IssueDetailPage({
 						AttachTrigger({ onFiles: attachToIssue }),
 					),
 
+					// No room for the rail: the same sections, boxed, under the body.
+					If(
+						hasRail.bind((wide) => !wide),
+						Div(
+							{ class: "flex flex-col gap-5 rounded-md border border-border p-4" },
+							...propertySections(),
+						),
+					),
+
 					CommentThread(
 						comments,
 						activity,
@@ -284,120 +418,12 @@ export function IssueDetailPage({
 			),
 		),
 
-		// Linear puts the properties in a right rail rather than above the body,
-		// under headings rather than beside per-row labels. Every pill already
-		// says what it is — a status ring, a priority column, an avatar, a
-		// coloured dot — so a "Status" caption next to a control reading
-		// "In Progress" is a word doing no work.
-		Div(
-			{ class: "hidden w-64 shrink-0 flex-col gap-5 border-l border-border p-4 lg:flex" },
-
-			PropertySection(
-				"Properties",
-				StatusPicker(
-					issue.bind("status"),
-					(status) => update({ status }, (value) => ({ ...value, status })),
-					{ showLabel: true, open: statusOpen, class: propertyClass },
-				),
-				PriorityPicker(
-					issue.bind("priority"),
-					(priority) => update({ priority }, (value) => ({ ...value, priority })),
-					{ showLabel: true, open: priorityOpen, class: propertyClass },
-				),
-				AssigneePicker(
-					issue.bind("assignee"),
-					data.bind((value) => value.members),
-					(assigneeId) =>
-						update({ assigneeId }, (value) => ({
-							...value,
-							assignee:
-								assigneeId === null
-									? null
-									: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
-										value.assignee),
-						})),
-					{ showLabel: true, open: assigneeOpen, class: propertyClass },
-				),
-				TeamPicker(
-					issue.bind("team"),
-					data.bind((value) => value.teams),
-					moveTeam,
-					{ showLabel: true, open: teamOpen, class: propertyClass },
-				),
-				RepositoryPicker(
-					issue.bind((value) => value.repository),
-					repositories,
-					(repositoryId) =>
-						update({ repositoryId }, (value) => ({
-							...value,
-							repository:
-								repositoryId === null
-									? null
-									: (data
-											.get()
-											.repositories.filter((repo) => repo.id === repositoryId)
-											.map((repo) => ({
-												id: repo.id,
-												fullName: repo.fullName,
-												provider: repo.provider,
-											}))[0] ?? value.repository),
-						})),
-					{ showLabel: true, class: propertyClass },
-				),
-				Div(
-					{ class: "px-1" },
-					PullRequestLink({
-						slug: params.slug,
-						identifier: issue.bind("identifier"),
-						current: linkedPull,
-						enabled: repositories.bind((list) => list.length > 0),
-					}),
-				),
-			),
-
-			// Labels get their own section rather than a row, because there are any
-			// number of them and each one is its own control.
-			PropertySection(
-				"Labels",
-				IssueLabelPicker({
-					selected: issue.bind("labels"),
-					available: data.bind((value) => value.labels),
-					onToggle: (labelId) =>
-						update(
-							{
-								labelIds: toggle(
-									issue.get().labels.map((label) => label.id),
-									labelId,
-								),
-							},
-							(value) => ({
-								...value,
-								labels: value.labels.some((label) => label.id === labelId)
-									? value.labels.filter((label) => label.id !== labelId)
-									: [...value.labels, data.get().labels.find((label) => label.id === labelId)!],
-							}),
-						),
-					open: labelOpen,
-				}),
-			),
-
+		// The rail, when the viewport can afford one.
+		If(
+			hasRail,
 			Div(
-				{ class: "flex flex-col items-start gap-1 border-t border-border pt-3" },
-				CopyPromptButton({ issue, slug: params.slug }),
-				TransferIssueButton({ slug: params.slug, issue }),
-				DeleteIssueButton({ slug: params.slug, issue }),
-			),
-
-			Div(
-				{ class: "text-[11px] text-muted-foreground" },
-				P(
-					{},
-					issue.bind((value) => `Created ${fullTime(value.createdAt)}`),
-				),
-				P(
-					{},
-					issue.bind((value) => `by ${value.creator.name}`),
-				),
+				{ class: "flex w-64 shrink-0 flex-col gap-5 overflow-y-auto border-l border-border p-4" },
+				...propertySections(),
 			),
 		),
 	);

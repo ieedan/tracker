@@ -79,7 +79,8 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 				if (!isOpen) search.set("");
 			}),
 			DialogContent(
-				{ class: "max-w-lg p-0", showCloseButton: false },
+				// No max-width override: the default keeps a phone's 1rem margins.
+				{ class: "p-0", showCloseButton: false },
 				Command(
 					{ label: "Command palette", search },
 					CommandInput({ placeholder: "Search issues or run a command…" }),

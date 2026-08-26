@@ -69,7 +69,10 @@ export function FeedbackListPage({
 		{ class: "flex min-h-0 flex-1 flex-col" },
 
 		Div(
-			{ class: "flex h-12 shrink-0 items-center gap-3 border-b border-border px-4" },
+			{
+				class:
+					"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0",
+			},
 			H1({ class: "text-[15px] font-semibold tracking-tight" }, "User feedback"),
 			Span(
 				{ class: "rounded bg-secondary px-1.5 text-[11px] text-muted-foreground" },
@@ -78,8 +81,9 @@ export function FeedbackListPage({
 
 			StatusTabs(statusFilter, feedback),
 
+			// The search takes a full row of its own where the tabs already fill one.
 			Div(
-				{ class: "relative ml-auto" },
+				{ class: "relative order-last w-full lg:order-none lg:ml-auto lg:w-auto" },
 				Search({
 					class:
 						"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
@@ -88,7 +92,7 @@ export function FeedbackListPage({
 					value: query,
 					placeholder: "Search feedback…",
 					class:
-						"h-7 w-56 rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring",
+						"h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring lg:w-56",
 				}),
 			),
 
@@ -155,7 +159,8 @@ function StatusTabs(
 	};
 
 	return Div(
-		{ class: "flex items-center gap-0.5" },
+		// Six tabs outgrow a phone row, so the strip scrolls sideways on its own.
+		{ class: "flex max-w-full items-center gap-0.5 overflow-x-auto" },
 		tab(null, "All"),
 		...FEEDBACK_STATUSES.map((status) => tab(status, FEEDBACK_STATUS_LABELS[status])),
 	);
@@ -183,7 +188,7 @@ function FeedbackRow(
 		),
 
 		Span(
-			{ class: "w-12 shrink-0 font-mono text-[12px] text-muted-foreground" },
+			{ class: "hidden w-12 shrink-0 font-mono text-[12px] text-muted-foreground sm:block" },
 			entry.bind("identifier"),
 		),
 
@@ -196,8 +201,10 @@ function FeedbackRow(
 			entry.bind("title"),
 		),
 
+		// A phone-width row keeps the essentials — status, title, convert — and
+		// leaves this metadata cluster to the detail page.
 		Div(
-			{ class: "flex shrink-0 items-center gap-1.5" },
+			{ class: "hidden shrink-0 items-center gap-1.5 md:flex" },
 			// Who asked, when it is known. Anonymous board posts show nothing
 			// rather than a placeholder that implies a missing name.
 			If(
@@ -256,7 +263,7 @@ function FeedbackRow(
 		),
 
 		Span(
-			{ class: "w-10 shrink-0 text-right text-[12px] text-muted-foreground" },
+			{ class: "hidden w-10 shrink-0 text-right text-[12px] text-muted-foreground sm:block" },
 			entry.bind((value) => relativeTime(value.createdAt)),
 		),
 

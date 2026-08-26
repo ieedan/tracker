@@ -46,7 +46,7 @@ export function SettingsPage({
 			H1({ class: "text-[15px] font-semibold tracking-tight" }, "Settings"),
 		),
 		Div(
-			{ class: "min-h-0 flex-1 overflow-y-auto px-6 py-6" },
+			{ class: "min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6" },
 			Div(
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				WorkspaceSection(data, params),
@@ -189,8 +189,10 @@ function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string
 			),
 		),
 
+		// The swatches take their own row on a phone, where nine circles plus an
+		// input plus a button cannot share one.
 		Div(
-			{ class: "flex gap-2" },
+			{ class: "flex flex-wrap items-center gap-2" },
 			Div(
 				{ class: "flex items-center gap-1" },
 				...LABEL_COLORS.map((swatch) =>
@@ -210,7 +212,7 @@ function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string
 				value: name,
 				placeholder: "Label name",
 				class:
-					"h-8 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
+					"h-8 min-w-40 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
 				onKeydown: (event) => {
 					if (event.key === "Enter") void create();
 				},

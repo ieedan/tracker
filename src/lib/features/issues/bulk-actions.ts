@@ -478,7 +478,8 @@ export function BulkActionsDialog({
 		Dialog(
 			{ open },
 			DialogContent(
-				{ class: "max-w-lg gap-0 overflow-hidden p-0", showCloseButton: false },
+				// No max-width override: the default keeps a phone's 1rem margins.
+				{ class: "gap-0 overflow-hidden p-0", showCloseButton: false },
 				DialogTitle({ class: "sr-only" }, "Bulk actions"),
 				DialogDescription(
 					{ class: "sr-only" },

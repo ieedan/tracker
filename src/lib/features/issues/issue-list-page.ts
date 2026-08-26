@@ -367,7 +367,8 @@ function Header(
 ) {
 	return Div(
 		{
-			class: "flex h-12 shrink-0 items-center gap-3 border-b border-border px-4",
+			class:
+				"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 sm:h-12 sm:flex-nowrap sm:py-0",
 		},
 		SelectIssuesCheckbox({
 			selected,
@@ -396,8 +397,10 @@ function Header(
 
 		AddFilterButton(filters, filterContext, applyFilters, addFilterOpen),
 
+		// The search takes a full row of its own on a phone, where 14rem of
+		// input and the buttons cannot share one.
 		Div(
-			{ class: "relative ml-auto" },
+			{ class: "relative order-last w-full sm:order-none sm:ml-auto sm:w-auto" },
 			Search({
 				class:
 					"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
@@ -407,17 +410,18 @@ function Header(
 				value: query,
 				placeholder: "Search issues…",
 				class:
-					"h-7 w-56 rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring",
+					"h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring sm:w-56",
 			}),
 		),
 		Button(
 			{
 				size: "sm",
-				class: "gap-1.5",
+				class: "ml-auto gap-1.5 sm:ml-0",
+				"aria-label": "New issue",
 				onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
 			},
 			Plus({ class: "size-3.5" }),
-			"New issue",
+			Span({ class: "hidden sm:inline" }, "New issue"),
 		),
 	);
 }
@@ -597,7 +601,7 @@ function IssueRow(
 		),
 
 		Span(
-			{ class: "w-16 shrink-0 font-mono text-[12px] text-muted-foreground" },
+			{ class: "hidden w-16 shrink-0 font-mono text-[12px] text-muted-foreground sm:block" },
 			issue.bind("identifier"),
 		),
 
@@ -616,8 +620,10 @@ function IssueRow(
 			issue.bind("title"),
 		),
 
+		// A phone-width row keeps the essentials — priority, status, title,
+		// assignee — and leaves the badge cluster to the issue page.
 		Div(
-			{ class: "flex shrink-0 items-center gap-1" },
+			{ class: "hidden shrink-0 items-center gap-1 md:flex" },
 			// On a team route every row is the same team, so the badge is noise.
 			If(
 				data.bind((value) => value.team === null),
@@ -629,7 +635,7 @@ function IssueRow(
 		),
 
 		Span(
-			{ class: "w-10 shrink-0 text-right text-[12px] text-muted-foreground" },
+			{ class: "hidden w-10 shrink-0 text-right text-[12px] text-muted-foreground sm:block" },
 			issue.bind((value) => relativeTime(value.updatedAt)),
 		),
 

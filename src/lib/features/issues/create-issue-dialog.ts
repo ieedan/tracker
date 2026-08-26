@@ -651,7 +651,9 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 				{ immediate: false },
 			),
 			DialogContent(
-				{ class: "max-w-3xl gap-0 p-0 sm:max-w-3xl", showCloseButton: false },
+				// The base max-width stays at the dialog's default, which keeps a
+				// phone's 1rem margins; only wider viewports get the full 3xl.
+				{ class: "gap-0 p-0 sm:max-w-3xl", showCloseButton: false },
 				// Cmd/Ctrl+Enter files the issue from anywhere in the dialog — a
 				// property pill, the Create button, an open picker — not just the
 				// text fields. Capture phase so it runs ahead of whatever the
@@ -813,7 +815,10 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 				DialogDescription({ class: "sr-only" }, "Create a new issue in the selected workspace."),
 
 				Div(
-					{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
+					{
+						class:
+							"flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-2.5",
+					},
 					If(
 						hasDraft,
 						Div(

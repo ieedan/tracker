@@ -242,7 +242,10 @@ export function InboxPage({
 		}),
 
 		Div(
-			{ class: "flex h-12 shrink-0 items-center gap-3 border-b border-border px-4" },
+			{
+				class:
+					"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 md:h-12 md:flex-nowrap md:py-0",
+			},
 			H1({ class: "text-[15px] font-semibold tracking-tight" }, "Inbox"),
 			If(
 				unread.bind((count) => count > 0),
@@ -275,12 +278,17 @@ export function InboxPage({
 			),
 		),
 
+		// Side by side where there is room; stacked — list above the reading
+		// pane — on a phone, where 380px of list would be the whole screen.
 		Div(
-			{ class: "flex min-h-0 flex-1" },
+			{ class: "flex min-h-0 flex-1 flex-col md:flex-row" },
 
 			// Left: the list. Fixed width so the detail pane keeps the room it needs.
 			Div(
-				{ class: "flex w-[380px] shrink-0 flex-col overflow-y-auto border-r border-border" },
+				{
+					class:
+						"flex max-h-[40dvh] w-full shrink-0 flex-col overflow-y-auto border-b border-border md:max-h-none md:w-[380px] md:border-r md:border-b-0",
+				},
 				If(
 					visible.bind((list) => list.length === 0),
 					ListEmptyState(readFilter, typeFilter, notifications),

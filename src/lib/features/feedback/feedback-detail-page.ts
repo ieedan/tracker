@@ -6,6 +6,7 @@ import {
 	P,
 	Span,
 	derived,
+	mediaQuery,
 	signal,
 	type Child,
 	type Readable,
@@ -57,6 +58,94 @@ export function FeedbackDetailPage({
 		apply: (value: Feedback) => Feedback,
 	) => void patchFeedback(list, params.slug.get(), data.get().feedback.id, patch, apply);
 
+	// Wide enough for the properties rail; below this the same sections stack
+	// under the body instead, because a fixed 16rem column would eat the page.
+	const hasRail = mediaQuery("(min-width: 1024px)");
+
+	// A factory rather than a node: the sections mount in the rail on a wide
+	// viewport and inline under the body on a narrow one, and only one of the
+	// two exists at a time.
+	const propertySections = (): Child[] => [
+		PropertyRow(
+			"Status",
+			FeedbackStatusPicker(
+				entry.bind("status"),
+				(status) => update({ status }, (value) => ({ ...value, status })),
+				{ showLabel: true },
+			),
+		),
+		PropertyRow(
+			"Visibility",
+			VisibilityPicker(entry.bind("visibility"), boardOpen, (visibility) =>
+				update({ visibility }, (value) => ({ ...value, visibility })),
+			),
+		),
+		PropertyRow(
+			"Labels",
+			Div(
+				{ class: "flex flex-col items-start gap-1.5" },
+				Div({ class: "flex flex-wrap gap-1" }, LabelChips(entry.bind("labels"))),
+				FeedbackLabelPicker(
+					entry.bind("labels"),
+					data.bind((value) => value.labels),
+					(labelId) => {
+						const current = entry.get().labels;
+						const next = current.some((label) => label.id === labelId)
+							? current.filter((label) => label.id !== labelId)
+							: [...current, data.get().labels.find((label) => label.id === labelId)!];
+						update({ labelIds: next.map((label) => label.id) }, (value) => ({
+							...value,
+							labels: next,
+						}));
+					},
+				),
+			),
+		),
+
+		Div(
+			{ class: "mt-2 flex flex-col gap-2 border-t border-border pt-3" },
+			Span({ class: "text-[11px] font-medium text-muted-foreground" }, "Submitted by"),
+			Div(
+				{ class: "text-[12px]" },
+				entry.bind((value) => value.submitter.name ?? value.submitter.email ?? "Anonymous"),
+			),
+			If(
+				entry.bind((value) => value.submitter.email !== null),
+				Div(
+					{ class: "flex items-center gap-1.5 text-[11px] text-muted-foreground" },
+					Mail({ class: "size-3" }),
+					Span(
+						{ class: "truncate" },
+						entry.bind((value) => value.submitter.email ?? ""),
+					),
+				),
+			),
+			If(
+				entry.bind((value) => value.source !== null),
+				Div(
+					{ class: "text-[11px] text-muted-foreground" },
+					entry.bind((value) => `via ${value.source ?? ""}`),
+				),
+			),
+		),
+
+		Div(
+			{ class: "border-t border-border pt-3 text-[11px] text-muted-foreground" },
+			P(
+				{},
+				entry.bind((value) => `Received ${fullTime(value.createdAt)}`),
+			),
+			P(
+				{},
+				entry.bind((value) =>
+					value.subscriberCount === 1
+						? "1 person subscribed to updates"
+						: `${value.subscriberCount} people subscribed to updates`,
+				),
+			),
+		),
+	];
+
 	return Div(
 		{ class: "flex min-h-0 flex-1" },
 
@@ -86,6 +175,7 @@ export function FeedbackDetailPage({
 								size: "sm",
 								variant: "ghost",
 								class: "h-7 gap-1.5 text-[12px] text-muted-foreground",
+								"aria-label": "View public page",
 								onClick: () =>
 									window.open(
 										`/${params.slug.get()}/public/feedback/${entry.get().number}`,
@@ -93,7 +183,7 @@ export function FeedbackDetailPage({
 									),
 							},
 							ExternalLink({ class: "size-3.5" }),
-							"View public page",
+							Span({ class: "hidden sm:inline" }, "View public page"),
 						),
 					),
 					If(entry.bind((value) => value.issue === null))
@@ -125,7 +215,7 @@ export function FeedbackDetailPage({
 			),
 
 			Div(
-				{ class: "min-h-0 flex-1 overflow-y-auto px-8 py-6" },
+				{ class: "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },
 				Div(
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 
@@ -146,6 +236,15 @@ export function FeedbackDetailPage({
 							Div({ class: "text-[13px] text-muted-foreground italic" }, "No description given."),
 						),
 
+					// No room for the rail: the same sections, boxed, under the body.
+					If(
+						hasRail.bind((wide) => !wide),
+						Div(
+							{ class: "flex flex-col gap-4 rounded-md border border-border p-4" },
+							...propertySections(),
+						),
+					),
+
 					FeedbackThread({
 						comments,
 						slug: params.slug,
@@ -157,85 +256,12 @@ export function FeedbackDetailPage({
 			),
 		),
 
-		Div(
-			{ class: "hidden w-64 shrink-0 flex-col gap-4 border-l border-border p-4 lg:flex" },
-			PropertyRow(
-				"Status",
-				FeedbackStatusPicker(
-					entry.bind("status"),
-					(status) => update({ status }, (value) => ({ ...value, status })),
-					{ showLabel: true },
-				),
-			),
-			PropertyRow(
-				"Visibility",
-				VisibilityPicker(entry.bind("visibility"), boardOpen, (visibility) =>
-					update({ visibility }, (value) => ({ ...value, visibility })),
-				),
-			),
-			PropertyRow(
-				"Labels",
-				Div(
-					{ class: "flex flex-col items-start gap-1.5" },
-					Div({ class: "flex flex-wrap gap-1" }, LabelChips(entry.bind("labels"))),
-					FeedbackLabelPicker(
-						entry.bind("labels"),
-						data.bind((value) => value.labels),
-						(labelId) => {
-							const current = entry.get().labels;
-							const next = current.some((label) => label.id === labelId)
-								? current.filter((label) => label.id !== labelId)
-								: [...current, data.get().labels.find((label) => label.id === labelId)!];
-							update({ labelIds: next.map((label) => label.id) }, (value) => ({
-								...value,
-								labels: next,
-							}));
-						},
-					),
-				),
-			),
-
+		// The rail, when the viewport can afford one.
+		If(
+			hasRail,
 			Div(
-				{ class: "mt-2 flex flex-col gap-2 border-t border-border pt-3" },
-				Span({ class: "text-[11px] font-medium text-muted-foreground" }, "Submitted by"),
-				Div(
-					{ class: "text-[12px]" },
-					entry.bind((value) => value.submitter.name ?? value.submitter.email ?? "Anonymous"),
-				),
-				If(
-					entry.bind((value) => value.submitter.email !== null),
-					Div(
-						{ class: "flex items-center gap-1.5 text-[11px] text-muted-foreground" },
-						Mail({ class: "size-3" }),
-						Span(
-							{ class: "truncate" },
-							entry.bind((value) => value.submitter.email ?? ""),
-						),
-					),
-				),
-				If(
-					entry.bind((value) => value.source !== null),
-					Div(
-						{ class: "text-[11px] text-muted-foreground" },
-						entry.bind((value) => `via ${value.source ?? ""}`),
-					),
-				),
-			),
-
-			Div(
-				{ class: "border-t border-border pt-3 text-[11px] text-muted-foreground" },
-				P(
-					{},
-					entry.bind((value) => `Received ${fullTime(value.createdAt)}`),
-				),
-				P(
-					{},
-					entry.bind((value) =>
-						value.subscriberCount === 1
-							? "1 person subscribed to updates"
-							: `${value.subscriberCount} people subscribed to updates`,
-					),
-				),
+				{ class: "flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4" },
+				...propertySections(),
 			),
 		),
 	);
