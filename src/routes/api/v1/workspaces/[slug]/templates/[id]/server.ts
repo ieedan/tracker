@@ -8,6 +8,7 @@ import { requireTeam } from "@/lib/server/teams.server";
 import {
 	requireIssueTemplate,
 	resolveTemplateAssignee,
+	resolveTemplateRepository,
 	setTemplateLabels,
 } from "@/lib/server/templates.server";
 import { handler } from "./$types";
@@ -37,6 +38,9 @@ export const PATCH = handler({
 		}
 		if (body.assigneeId !== undefined) {
 			changes.assigneeId = await resolveTemplateAssignee(workspace.id, body.assigneeId);
+		}
+		if (body.repositoryId !== undefined) {
+			changes.repositoryId = await resolveTemplateRepository(workspace.id, body.repositoryId);
 		}
 
 		await db

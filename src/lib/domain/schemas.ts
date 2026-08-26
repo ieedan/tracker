@@ -622,6 +622,10 @@ export const IssueTemplateSchema = v.object({
 	status: IssueStatusSchema,
 	priority: IssuePrioritySchema,
 	assignee: v.nullable(UserSummary),
+	/** The repository new issues start scoped to, or null. Same shape as on an issue. */
+	repository: v.nullable(
+		v.object({ id: v.string(), fullName: v.string(), provider: GitProviderSchema }),
+	),
 	labels: v.array(LabelSchema),
 	createdAt: v.string(),
 	updatedAt: v.string(),
@@ -641,6 +645,8 @@ export const CreateIssueTemplateBody = v.object({
 	status: v.optional(IssueStatusSchema, "backlog"),
 	priority: v.optional(IssuePrioritySchema, "none"),
 	assigneeId: v.optional(v.nullable(v.string()), null),
+	/** One of the workspace's linked repositories, or null for no default scope. */
+	repositoryId: v.optional(v.nullable(v.string()), null),
 	labelIds: v.optional(v.array(v.string()), []),
 });
 
@@ -654,6 +660,7 @@ export const UpdateIssueTemplateBody = v.partial(
 		status: IssueStatusSchema,
 		priority: IssuePrioritySchema,
 		assigneeId: v.nullable(v.string()),
+		repositoryId: v.nullable(v.string()),
 		labelIds: v.array(v.string()),
 	}),
 );
