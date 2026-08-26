@@ -6,6 +6,7 @@
 import {
 	arityOf,
 	describeFilter,
+	fieldHasOptions,
 	filterField,
 	operatorsFor,
 	type FilterField,
@@ -92,8 +93,7 @@ function toBuilderNode(rule: FilterRule): BuilderNode {
 	}
 
 	const list = rule.value === undefined ? [] : [rule.value].flat();
-	const field = filterField(rule.field);
-	const picked = field?.options !== undefined;
+	const picked = fieldHasOptions(filterField(rule.field));
 
 	return {
 		id: nextId(),
@@ -127,8 +127,7 @@ function fromBuilderNode(node: BuilderNode): FilterRule | null {
 		return { type: "condition", field: node.field, operator: node.operator };
 	}
 
-	const field = filterField(node.field);
-	const picked = field?.options !== undefined;
+	const picked = fieldHasOptions(filterField(node.field));
 
 	if (arity === "many") {
 		const values = picked ? node.values : splitValues(node.value);

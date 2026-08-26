@@ -92,6 +92,18 @@ export interface FilterOption {
 	label: string;
 }
 
+/**
+ * Where a field's values come from when they are the workspace's own — its
+ * members, labels, teams or repositories.
+ *
+ * These cannot be a fixed `options` list: they differ per workspace and change
+ * while a rule exists. The builder resolves them against the workspace and
+ * offers them as a picker; validation stays permissive, so a label that does
+ * not exist yet is still expressible.
+ */
+export const FILTER_SOURCES = ["members", "labels", "teams", "repositories"] as const;
+export type FilterSource = (typeof FILTER_SOURCES)[number];
+
 export interface FilterField {
 	key: string;
 	label: string;
@@ -104,11 +116,19 @@ export interface FilterField {
 	 * this to keep the picker honest about what is actually there.
 	 */
 	events: readonly WebhookEvent[];
+	/** A closed set of values. Validation rejects anything outside it. */
 	options?: readonly FilterOption[];
+	/** An open set, resolved from the workspace. Validation stays permissive. */
+	source?: FilterSource;
 	/** Dotted path into `{ event, actor, ...data }`. */
 	path: string;
 	/** Narrows the raw payload value down to something comparable. */
 	map?: (raw: unknown) => FilterValue;
+}
+
+/** Whether this field's values are picked from a list rather than typed. */
+export function fieldHasOptions(field: FilterField | undefined): boolean {
+	return field !== undefined && (field.options !== undefined || field.source !== undefined);
 }
 
 export type FilterValue = string | number | string[] | null;
@@ -154,6 +174,26 @@ const BOOLEAN_OPTIONS: readonly FilterOption[] = [
 	{ value: "false", label: "No" },
 ];
 
+/**
+ * The keys `data.changes` actually uses, so "only when the priority changed" is
+ * something you pick rather than something you have to know the spelling of.
+ *
+ * They are the writer's field names — `assigneeId`, not "assignee" — because
+ * that is what lands in the payload. The labels are what a person would say.
+ */
+const CHANGED_FIELD_OPTIONS: readonly FilterOption[] = [
+	{ value: "title", label: "Title" },
+	{ value: "description", label: "Description" },
+	{ value: "status", label: "Status" },
+	{ value: "priority", label: "Priority" },
+	{ value: "assigneeId", label: "Assignee" },
+	{ value: "team", label: "Team" },
+	{ value: "repositoryId", label: "Repository" },
+	{ value: "labels", label: "Labels" },
+	{ value: "visibility", label: "Visibility (feedback)" },
+	{ value: "labelIds", label: "Labels (feedback)" },
+];
+
 /** Names out of a `Label[]`, so a condition compares against what people type. */
 const labelNames = (raw: unknown): string[] =>
 	Array.isArray(raw)
@@ -186,6 +226,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Event",
 		kind: "list",
 		events: CHANGE_EVENTS,
+		options: CHANGED_FIELD_OPTIONS,
 		path: "changes",
 		map: changedFields,
 	},
@@ -196,6 +237,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Actor",
 		kind: "text",
 		events: WEBHOOK_EVENTS,
+		source: "members",
 		path: "actor.name",
 	},
 	{
@@ -270,15 +312,17 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Issue",
 		kind: "list",
 		events: ISSUE_EVENTS_FULL,
+		source: "labels",
 		path: "issue.labels",
 		map: labelNames,
 	},
 	{
 		key: "issue.team.key",
-		label: "Issue team key",
+		label: "Issue team",
 		group: "Issue",
 		kind: "text",
 		events: ISSUE_EVENTS_ANY,
+		source: "teams",
 		path: "issue.team.key",
 	},
 	{
@@ -287,6 +331,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Issue",
 		kind: "text",
 		events: ISSUE_EVENTS_FULL,
+		source: "members",
 		path: "issue.assignee.name",
 	},
 	{
@@ -312,6 +357,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Issue",
 		kind: "text",
 		events: ISSUE_EVENTS_FULL,
+		source: "members",
 		path: "issue.creator.name",
 	},
 	{
@@ -320,6 +366,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Issue",
 		kind: "text",
 		events: ISSUE_EVENTS_FULL,
+		source: "repositories",
 		path: "issue.repository.fullName",
 	},
 	{
@@ -404,6 +451,7 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 		group: "Feedback",
 		kind: "list",
 		events: FEEDBACK_EVENTS_FULL,
+		source: "labels",
 		path: "feedback.labels",
 		map: labelNames,
 	},

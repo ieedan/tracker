@@ -6,10 +6,13 @@
 // pipeline will decide. `webhook-builder.ts` holds the data model; this file is
 // only the controls over it.
 //
-// Editing is plain data in a signal, not a graph of nested components: `ForEach`
-// hands each row a writable view of its own node, and writing to it lands back
-// in the array. Dropdowns keep a small local signal synced to that node, the way
-// the issue pickers do.
+// A condition is a chip in the same shape as the issue filter bar's —
+// `Field · operator · values ×`, every segment its own menu — because they are
+// the same idea and should not be two different things to learn. Values come
+// from the workspace wherever the workspace is what defines them: members,
+// labels, teams and repositories are picked, never typed from memory. A typed
+// value is still reachable for the cases a list cannot cover — a label nobody
+// has created yet, an address that is not a member.
 import {
 	Div,
 	Dynamic,
@@ -20,26 +23,36 @@ import {
 	Span,
 	derived,
 	signal,
+	type Child,
 	type Mountable,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { ChevronDownIcon, Plus, Trash2 } from "@implementjs/lucide";
+import { Check, Plus, Trash2, X } from "@implementjs/lucide";
 import { Button } from "@/lib/components/ui/button";
 import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandGroupHeading,
+	CommandGroupItems,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/lib/components/ui/command";
+import {
 	DropdownMenu,
-	DropdownMenuCheckboxGroup,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
-	DropdownMenuGroupHeading,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
+	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/lib/components/ui/popover";
 import { Input } from "@/lib/components/ui/input";
 import { MenuCheckbox } from "@/lib/components/ui/menu-checkbox";
+import { CHIP_GLYPH, UserAvatar } from "@/lib/components/glyphs";
 import {
 	arityOf,
+	fieldHasOptions,
 	fieldsForEvents,
 	filterField,
 	MAX_FILTER_RULES,
@@ -47,9 +60,9 @@ import {
 	OPERATOR_LABELS,
 	type FilterField,
 	type FilterMatch,
-	type FilterOperator,
 } from "@/lib/domain/webhook-filters";
 import type { WebhookEvent } from "@/lib/domain/webhooks";
+import type { Label, Member, Repository, Team } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
 import {
 	countBuilderRules,
@@ -61,14 +74,107 @@ import {
 	type BuilderNode,
 } from "./webhook-builder";
 
+/** The workspace's own values, for the fields whose options are its own. */
+export interface ConditionCatalog {
+	members: Member[];
+	labels: Label[];
+	teams: Team[];
+	repositories: Repository[];
+}
+
+export const emptyCatalog = (): ConditionCatalog => ({
+	members: [],
+	labels: [],
+	teams: [],
+	repositories: [],
+});
+
+interface ConditionOption {
+	value: string;
+	label: string;
+	icon?: Child;
+}
+
+/**
+ * What a field offers: its own closed set, or the workspace's.
+ *
+ * Deduplicated by value because these are names — two members can share one,
+ * and a duplicate would collide as a `ForEach` key.
+ */
+function optionsFor(
+	field: FilterField | undefined,
+	catalog: ConditionCatalog,
+	compact = false,
+): ConditionOption[] {
+	const options = collectOptions(field, catalog, compact);
+	const seen = new Set<string>();
+	return options.filter((option) => {
+		if (seen.has(option.value)) return false;
+		seen.add(option.value);
+		return true;
+	});
+}
+
+function collectOptions(
+	field: FilterField | undefined,
+	catalog: ConditionCatalog,
+	compact: boolean,
+): ConditionOption[] {
+	if (field === undefined) return [];
+	if (field.options !== undefined) {
+		return field.options.map((option) => ({ value: option.value, label: option.label }));
+	}
+
+	const avatar = compact ? CHIP_GLYPH.avatar : undefined;
+
+	switch (field.source) {
+		case "members":
+			return catalog.members.map((member) => ({
+				value: member.user.name,
+				label: member.user.name,
+				icon: UserAvatar(member.user, avatar),
+			}));
+		case "labels":
+			return catalog.labels.map((label) => ({
+				value: label.name,
+				label: label.name,
+				icon: Span({
+					class: cn("shrink-0 rounded-full", compact ? CHIP_GLYPH.dot : "size-2.5"),
+					style: { backgroundColor: label.color },
+				}),
+			}));
+		case "teams":
+			return catalog.teams.map((team) => ({
+				value: team.key,
+				label: team.name,
+				icon: Span({ class: "shrink-0 font-mono text-[10px] text-muted-foreground" }, team.key),
+			}));
+		case "repositories":
+			return catalog.repositories.map((repository) => ({
+				value: repository.fullName,
+				label: repository.fullName,
+			}));
+		default:
+			return [];
+	}
+}
+
+/** How a value reads on the chip — a team's name rather than its key. */
+function labelOf(field: FilterField | undefined, value: string, catalog: ConditionCatalog): string {
+	return optionsFor(field, catalog).find((option) => option.value === value)?.label ?? value;
+}
+
+/** Past a few, a row of glyphs is noise and the count says more. */
+const MAX_CHIP_ICONS = 3;
+
 // ---------------------------------------------------------------------------
 // The editor
 // ---------------------------------------------------------------------------
 
-const triggerClass =
-	"inline-flex h-8 min-w-0 items-center gap-1 rounded-md border border-input bg-background px-2 text-[12px] font-normal text-foreground hover:bg-accent";
-
-const inputClass = "h-8 min-w-0 flex-1 px-2 text-[12px] shadow-none";
+/** Exactly the issue filter bar's chip, so the two read as one idea. */
+const CHIP =
+	"flex h-6 items-center overflow-hidden rounded-md border border-border bg-secondary/50 text-[11px]";
+const SEGMENT = "h-6 rounded-none px-2 text-[11px] font-normal";
 
 /**
  * `events` narrows the field picker: a webhook listening only for feedback has
@@ -78,12 +184,13 @@ export function ConditionsEditor(
 	match: Signal<FilterMatch>,
 	rules: Signal<BuilderNode[]>,
 	events: Readable<WebhookEvent[]>,
+	catalog: Readable<ConditionCatalog>,
 ) {
 	const fields = derived([events], (list) => fieldsForEvents(list));
 	const full = derived([rules], (list) => countBuilderRules(list) >= MAX_FILTER_RULES);
 
 	return Div(
-		{ class: "flex flex-col gap-1.5" },
+		{ class: "flex flex-col gap-2" },
 		Div(
 			{ class: "flex items-center justify-between gap-2" },
 			Span({ class: "text-[13px] font-medium" }, "Conditions"),
@@ -104,13 +211,13 @@ export function ConditionsEditor(
 		If(
 			rules.bind((list) => list.length > 0),
 			Div(
-				{ class: "flex flex-col gap-1.5 rounded-md border border-border p-2" },
-				RuleList(match, rules, fields),
+				{ class: "flex flex-col gap-2 rounded-md border border-border p-2.5" },
+				RuleList(match, rules, fields, catalog),
 			),
 		),
 
 		Div(
-			{ class: "flex items-center gap-1.5" },
+			{ class: "flex flex-wrap items-center gap-1.5" },
 			Button(
 				{
 					size: "xs",
@@ -156,6 +263,7 @@ function RuleList(
 	match: Readable<FilterMatch>,
 	rules: Signal<BuilderNode[]>,
 	fields: Readable<FilterField[]>,
+	catalog: Readable<ConditionCatalog>,
 ): Mountable {
 	const remove = (id: string) => rules.update((list) => list.filter((rule) => rule.id !== id));
 
@@ -164,17 +272,23 @@ function RuleList(
 		(rule) => rule.id,
 		(rule, index) =>
 			Div(
-				{ class: "flex flex-col gap-1.5" },
-				If(
-					index.bind((position) => position > 0),
-					Span(
-						{ class: "px-0.5 text-[11px] font-medium text-muted-foreground" },
-						match.bind((mode) => (mode === "all" ? "and" : "or")),
-					),
+				{ class: "flex flex-wrap items-center gap-1.5" },
+				Span(
+					{
+						class: index.bind((position) =>
+							cn(
+								"w-7 shrink-0 text-right text-[11px] font-medium text-muted-foreground",
+								position === 0 && "opacity-0",
+							),
+						),
+					},
+					match.bind((mode) => (mode === "all" ? "and" : "or")),
 				),
 				rule.get().type === "group"
-					? GroupRow(rule as Signal<BuilderGroup>, fields, () => remove(rule.get().id))
-					: ConditionRow(rule as Signal<BuilderCondition>, fields, () => remove(rule.get().id)),
+					? GroupRow(rule as Signal<BuilderGroup>, fields, catalog, () => remove(rule.get().id))
+					: ConditionChip(rule as Signal<BuilderCondition>, fields, catalog, () =>
+							remove(rule.get().id),
+						),
 			),
 	);
 }
@@ -188,11 +302,13 @@ function RuleList(
 function GroupRow(
 	group: Signal<BuilderGroup>,
 	fields: Readable<FilterField[]>,
+	catalog: Readable<ConditionCatalog>,
 	onRemove: () => void,
 ): Mountable {
 	return Div(
 		{
-			class: "flex flex-col gap-1.5 rounded-md border border-dashed border-border bg-muted/30 p-2",
+			class:
+				"flex min-w-0 flex-1 flex-col gap-2 rounded-md border border-dashed border-border bg-muted/30 p-2",
 		},
 		Div(
 			{ class: "flex items-center justify-between gap-2" },
@@ -208,7 +324,7 @@ function GroupRow(
 				Trash2({ class: "size-3" }),
 			),
 		),
-		RuleList(group.bind("match"), group.bind("rules"), fields),
+		RuleList(group.bind("match"), group.bind("rules"), fields, catalog),
 		Button(
 			{
 				size: "xs",
@@ -253,48 +369,42 @@ function MatchToggle(match: Signal<FilterMatch>) {
 	);
 }
 
-function ConditionRow(
+/** `Issue label includes bug ×` — every segment its own menu. */
+function ConditionChip(
 	condition: Signal<BuilderCondition>,
 	fields: Readable<FilterField[]>,
+	catalog: Readable<ConditionCatalog>,
 	onRemove: () => void,
-) {
-	/**
-	 * Which value control to show. Derived so it only changes when the *shape*
-	 * of the control does — typing into the text box must not remount it, or
-	 * every keystroke would steal its own focus.
-	 */
-	const shape = condition.bind((value) => {
-		const field = filterField(value.field);
-		const options = field?.options === undefined ? "free" : "picked";
-		return `${value.field}:${arityOf(value.operator)}:${options}`;
-	});
-
+): Mountable {
 	return Div(
-		{ class: "flex flex-wrap items-center gap-1.5" },
+		{ class: CHIP },
 		FieldPicker(condition, fields),
 		OperatorPicker(condition),
-		Dynamic([shape], () => ValueControl(condition)),
+		ValueSegment(condition, catalog),
 		Button(
 			{
-				size: "icon-xs",
 				variant: "ghost",
+				size: "icon-xs",
 				type: "button",
-				class: "ml-auto text-muted-foreground",
+				class: "h-6 w-6 rounded-none text-muted-foreground",
 				title: "Remove condition",
 				onClick: onRemove,
 			},
-			Trash2({ class: "size-3" }),
+			X({ class: "size-3" }),
 		),
 	);
 }
 
 function FieldPicker(condition: Signal<BuilderCondition>, fields: Readable<FilterField[]>) {
-	const selected = signal<string | null>(condition.get().field);
+	const open = signal(false);
+	const search = signal("");
+	const groups = derived([fields], (list) => [...new Set(list.map((field) => field.group))]);
 
 	/**
 	 * Changing the field can invalidate the operator — "includes" means nothing
 	 * on a status. Keep it when the new kind still supports it, and fall back to
-	 * that kind's first operator when it does not.
+	 * that kind's first operator when it does not. Operands are dropped either
+	 * way: they belonged to the old field.
 	 */
 	const pick = (key: string) => {
 		const field = filterField(key);
@@ -303,160 +413,63 @@ function FieldPicker(condition: Signal<BuilderCondition>, fields: Readable<Filte
 			...current,
 			field: key,
 			operator: operators.includes(current.operator) ? current.operator : operators[0]!,
-			// Values belong to the old field's options; text is often still useful.
+			value: "",
 			values: [],
 		}));
+		open.set(false);
 	};
 
-	const groups = derived([fields], (list) => [...new Set(list.map((field) => field.group))]);
-
-	return DropdownMenu(
-		{},
-		ImplementEffect([condition], (value) => selected.set(value.field)),
-		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, "max-w-[11rem]") },
+	return Popover(
+		{ open },
+		PopoverTrigger(
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(SEGMENT, "max-w-[10rem] text-muted-foreground"),
+				title: "Choose what to match on",
+			},
 			Span(
 				{ class: "truncate" },
 				condition.bind((value) => filterField(value.field)?.label ?? value.field),
 			),
-			ChevronDownIcon({ class: "size-3 shrink-0 opacity-50" }),
 		),
-		DropdownMenuContent(
-			{ class: "w-64", align: "start", search: "Filter on…" },
-			DropdownMenuRadioGroup(
-				{
-					value: selected,
-					onValueChange: (key) => {
-						if (typeof key === "string") pick(key);
-					},
-				},
-				ForEach(
-					groups,
-					(group) => group,
-					(group) =>
-						Div(
-							{},
-							DropdownMenuGroupHeading(group.bind((name) => name)),
-							ForEach(
-								derived([fields, group], (list, name) =>
-									list.filter((field) => field.group === name),
-								),
-								(field) => field.key,
-								(field) =>
-									DropdownMenuRadioItem(
-										{ value: field.get().key, label: field.get().label },
-										Span({ class: "flex-1 truncate" }, field.bind("label")),
+		PopoverContent(
+			{ class: "w-64 p-0", align: "start" },
+			ImplementEffect([open], (isOpen) => {
+				if (!isOpen) search.set("");
+			}),
+			Command(
+				{ label: "Condition field", search },
+				CommandInput({ placeholder: "Match on…" }),
+				CommandList(
+					CommandEmpty("Nothing matches."),
+					ForEach(
+						groups,
+						(group) => group,
+						(group) =>
+							CommandGroup(
+								CommandGroupHeading(group.get()),
+								CommandGroupItems(
+									ForEach(
+										derived([fields, group], (list, name) =>
+											list.filter((field) => field.group === name),
+										),
+										(field) => field.key,
+										(field) =>
+											CommandItem(
+												{
+													value: field.get().label,
+													onSelect: () => pick(field.get().key),
+												},
+												Span({ class: "flex-1 truncate" }, field.bind("label")),
+												If(
+													condition.bind((value) => value.field === field.get().key),
+													Check({ class: "ml-auto size-3.5 shrink-0 text-primary" }),
+												),
+											),
 									),
+								),
 							),
-						),
-				),
-			),
-		),
-	);
-}
-
-function OperatorPicker(condition: Signal<BuilderCondition>) {
-	const selected = signal<string | null>(condition.get().operator);
-	const operators = condition.bind((value) => [
-		...operatorsFor(filterField(value.field)?.kind ?? "text"),
-	]);
-
-	return DropdownMenu(
-		{},
-		ImplementEffect([condition], (value) => selected.set(value.operator)),
-		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: triggerClass },
-			Span(
-				{ class: "truncate" },
-				condition.bind((value) => OPERATOR_LABELS[value.operator]),
-			),
-			ChevronDownIcon({ class: "size-3 shrink-0 opacity-50" }),
-		),
-		DropdownMenuContent(
-			{ class: "w-52", align: "start" },
-			DropdownMenuRadioGroup(
-				{
-					value: selected,
-					onValueChange: (operator) => {
-						if (typeof operator !== "string") return;
-						condition.bind("operator").set(operator as FilterOperator);
-					},
-				},
-				ForEach(
-					operators,
-					(operator) => operator,
-					(operator) =>
-						DropdownMenuRadioItem(
-							{ value: operator.get(), label: OPERATOR_LABELS[operator.get()] },
-							Span(
-								{ class: "flex-1" },
-								operator.bind((value) => OPERATOR_LABELS[value]),
-							),
-						),
-				),
-			),
-		),
-	);
-}
-
-/** The operand control: nothing, a text box, or a picker over the field's options. */
-function ValueControl(condition: Signal<BuilderCondition>) {
-	const current = condition.get();
-	const field = filterField(current.field);
-	const arity = arityOf(current.operator);
-
-	if (arity === "none") return null;
-
-	if (field?.options !== undefined) {
-		return arity === "many" ? OptionsMulti(condition, field) : OptionsSingle(condition, field);
-	}
-
-	return Input({
-		value: condition.bind("value"),
-		placeholder:
-			arity === "many"
-				? "bug, regression — comma separated"
-				: field?.kind === "number"
-					? "42"
-					: "value",
-		class: inputClass,
-		"aria-label": "Condition value",
-	});
-}
-
-function OptionsSingle(condition: Signal<BuilderCondition>, field: FilterField) {
-	const options = field.options ?? [];
-	const selected = signal<string | null>(condition.get().values[0] ?? null);
-
-	return DropdownMenu(
-		{},
-		ImplementEffect([condition], (value) => selected.set(value.values[0] ?? null)),
-		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, "min-w-[8rem] flex-1") },
-			Span(
-				{ class: "truncate" },
-				condition.bind((value) => {
-					const picked = value.values[0];
-					if (picked === undefined) return "Choose…";
-					return options.find((option) => option.value === picked)?.label ?? picked;
-				}),
-			),
-			ChevronDownIcon({ class: "size-3 shrink-0 opacity-50" }),
-		),
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: options.length > 8 ? "Choose…" : undefined },
-			DropdownMenuRadioGroup(
-				{
-					value: selected,
-					onValueChange: (picked) => {
-						if (typeof picked !== "string") return;
-						condition.bind("values").set([picked]);
-					},
-				},
-				...options.map((option) =>
-					DropdownMenuRadioItem(
-						{ value: option.value, label: option.label },
-						Span({ class: "flex-1 truncate" }, option.label),
 					),
 				),
 			),
@@ -464,39 +477,215 @@ function OptionsSingle(condition: Signal<BuilderCondition>, field: FilterField) 
 	);
 }
 
-function OptionsMulti(condition: Signal<BuilderCondition>, field: FilterField) {
-	const options = field.options ?? [];
-	const values = condition.bind("values");
+function OperatorPicker(condition: Signal<BuilderCondition>) {
+	const operators = condition.bind((value) => [
+		...operatorsFor(filterField(value.field)?.kind ?? "text"),
+	]);
 
 	return DropdownMenu(
-		{},
 		DropdownMenuTrigger(
-			{ variant: "ghost", size: "sm", class: cn(triggerClass, "min-w-[8rem] flex-1") },
-			Span(
-				{ class: "truncate" },
-				values.bind((picked) => {
-					if (picked.length === 0) return "Choose…";
-					if (picked.length === 1) {
-						const only = picked[0]!;
-						return options.find((option) => option.value === only)?.label ?? only;
-					}
-					return `${picked.length} selected`;
-				}),
-			),
-			ChevronDownIcon({ class: "size-3 shrink-0 opacity-50" }),
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(SEGMENT, "border-x border-border"),
+				title: "Choose how to compare",
+			},
+			condition.bind((value) => OPERATOR_LABELS[value.operator]),
 		),
 		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: options.length > 8 ? "Choose…" : undefined },
-			DropdownMenuCheckboxGroup(
-				{ value: values },
-				...options.map((option) =>
-					DropdownMenuCheckboxItem(
+			{ class: "min-w-40", align: "start" },
+			ForEach(
+				operators,
+				(operator) => operator,
+				(operator) =>
+					DropdownMenuItem(
 						{
-							value: option.value,
-							label: option.label,
-							indicator: MenuCheckbox(values, option.value),
+							onSelect: () => {
+								const next = operator.get();
+								// Switching between one operand and many keeps whatever is
+								// already picked; the reverse trims to the first, which is
+								// what `fromBuilder` would have done anyway.
+								condition.update((current) =>
+									arityOf(next) === "one" && current.values.length > 1
+										? { ...current, operator: next, values: current.values.slice(0, 1) }
+										: { ...current, operator: next },
+								);
+							},
 						},
-						Span({ class: "flex-1 truncate" }, option.label),
+						Span(
+							{ class: "flex-1" },
+							operator.bind((value) => OPERATOR_LABELS[value]),
+						),
+						If(
+							condition.bind((value) => value.operator === operator.get()),
+							Check({ class: "ml-auto size-3.5 shrink-0 text-primary" }),
+						),
+					),
+			),
+		),
+	);
+}
+
+/**
+ * The operand segment: nothing, a picker, or a text box.
+ *
+ * Which one is decided by the field and the operator, so it is rebuilt only
+ * when *that* changes — rebuilding on every keystroke would make the text box
+ * steal its own focus.
+ */
+function ValueSegment(condition: Signal<BuilderCondition>, catalog: Readable<ConditionCatalog>) {
+	const shape = condition.bind((value) => {
+		const field = filterField(value.field);
+		return `${value.field}:${arityOf(value.operator)}:${fieldHasOptions(field) ? "picked" : "free"}`;
+	});
+
+	return Dynamic([shape], () => {
+		const current = condition.get();
+		const field = filterField(current.field);
+		const arity = arityOf(current.operator);
+
+		if (arity === "none") return null;
+		if (fieldHasOptions(field)) return ValuePicker(condition, catalog, arity === "many");
+
+		return Div(
+			{ class: "border-l border-border" },
+			Input({
+				value: condition.bind("value"),
+				placeholder:
+					arity === "many"
+						? "one, two — comma separated"
+						: field?.kind === "number"
+							? "42"
+							: "value",
+				"aria-label": "Condition value",
+				class:
+					"h-6 w-40 rounded-none border-0 bg-transparent px-2 text-[11px] shadow-none focus-visible:ring-0",
+			}),
+		);
+	});
+}
+
+/** The workspace's own values, searchable, with a way out for anything new. */
+function ValuePicker(
+	condition: Signal<BuilderCondition>,
+	catalog: Readable<ConditionCatalog>,
+	multiple: boolean,
+) {
+	const open = signal(false);
+	const search = signal("");
+	const values = condition.bind("values");
+
+	const field = derived([condition], (current) => filterField(current.field));
+	const options = derived([field, catalog], (current, list) =>
+		optionsFor(current, list).map((option) => ({ ...option, key: option.value })),
+	);
+
+	const toggle = (value: string) => {
+		if (!multiple) {
+			values.set([value]);
+			open.set(false);
+			return;
+		}
+		values.update((picked) =>
+			picked.includes(value) ? picked.filter((entry) => entry !== value) : [...picked, value],
+		);
+	};
+
+	const summary = derived([condition, catalog], (current, list) => {
+		const picked = current.values;
+		if (picked.length === 0) return "Choose…";
+		const resolved = filterField(current.field);
+		if (picked.length <= 2) {
+			return picked.map((value) => labelOf(resolved, value, list)).join(", ");
+		}
+		return `${picked.length} selected`;
+	});
+
+	return Popover(
+		{ open },
+		PopoverTrigger(
+			{
+				variant: "ghost",
+				size: "sm",
+				class: cn(SEGMENT, "gap-1 border-l border-border"),
+				title: "Choose the value",
+			},
+			// Real nodes rather than text, so they are rebuilt rather than bound.
+			Dynamic([condition, catalog], (current, list) => {
+				if (current.values.length === 0 || current.values.length > MAX_CHIP_ICONS) return null;
+				const resolved = optionsFor(filterField(current.field), list, true);
+				const icons = current.values
+					.map((value) => resolved.find((option) => option.value === value)?.icon)
+					.filter((icon): icon is Child => icon !== undefined && icon !== null);
+				return Div({ class: "flex items-center gap-0.5" }, ...icons);
+			}),
+			Span(
+				{
+					class: condition.bind((current) =>
+						cn("truncate", current.values.length === 0 && "text-muted-foreground"),
+					),
+				},
+				summary,
+			),
+		),
+		PopoverContent(
+			{ class: "w-64 p-0", align: "start" },
+			ImplementEffect([open], (isOpen) => {
+				if (!isOpen) search.set("");
+			}),
+			Command(
+				{ label: "Condition value", search },
+				CommandInput({ placeholder: "Search…" }),
+				CommandList(
+					// The list is what the workspace has; it is not the limit of what a
+					// rule may say. A label that does not exist yet still needs to be
+					// expressible, and typing it is how.
+					CommandEmpty(
+						Div(
+							{ class: "px-1 py-1" },
+							Button(
+								{
+									size: "sm",
+									variant: "ghost",
+									type: "button",
+									class: "h-7 w-full justify-start gap-1.5 text-[12px] font-normal",
+									onClick: () => {
+										const typed = search.get().trim();
+										if (typed !== "") toggle(typed);
+										open.set(false);
+									},
+								},
+								Plus({ class: "size-3.5 shrink-0" }),
+								Span(
+									{ class: "truncate" },
+									search.bind((typed) => `Use "${typed.trim()}"`),
+								),
+							),
+						),
+					),
+					CommandGroup(
+						CommandGroupItems(
+							ForEach(
+								options,
+								(option) => option.key,
+								(option) =>
+									CommandItem(
+										{
+											value: option.get().label,
+											onSelect: () => toggle(option.get().value),
+										},
+										multiple ? MenuCheckbox(values, option.get().value) : null,
+										option.get().icon ?? null,
+										Span({ class: "flex-1 truncate" }, option.bind("label")),
+										multiple
+											? null
+											: If(
+													values.bind((picked) => picked.includes(option.get().value)),
+													Check({ class: "ml-auto size-3.5 shrink-0 text-primary" }),
+												),
+									),
+							),
+						),
 					),
 				),
 			),
@@ -511,7 +700,7 @@ function Preview(match: Readable<FilterMatch>, rules: Readable<BuilderNode[]>) {
 	return If(
 		summary.bind((text) => text !== ""),
 		P(
-			{ class: "rounded-md bg-muted/60 px-2 py-1.5 text-[11px] text-muted-foreground" },
+			{ class: "rounded-md bg-muted/60 px-2.5 py-1.5 text-[11px] text-muted-foreground" },
 			Span({ class: "font-medium text-foreground" }, "Delivers when "),
 			summary,
 		),

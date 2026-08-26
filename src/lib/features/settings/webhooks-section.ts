@@ -34,7 +34,16 @@ import {
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label } from "@/lib/components/ui/label";
-import type { Webhook, WebhookDelivery } from "@/lib/domain/schemas";
+// `Label` is the form-control component in this file; the domain type is the
+// issue label, so it comes in under a name that says which.
+import type {
+	Label as IssueLabel,
+	Member,
+	Repository,
+	Team,
+	Webhook,
+	WebhookDelivery,
+} from "@/lib/domain/schemas";
 import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
 	DEFAULT_WEBHOOK_EVENTS,
@@ -49,7 +58,7 @@ import {
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
-import { ConditionsEditor } from "./webhook-conditions";
+import { ConditionsEditor, emptyCatalog, type ConditionCatalog } from "./webhook-conditions";
 
 const inputClass =
 	"h-8 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring";
@@ -66,12 +75,36 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 	const openLog = signal("");
 	const deliveries = signal<WebhookDelivery[]>([]);
 
+	/**
+	 * The workspace's own values, so a condition on an assignee or a label is
+	 * picked rather than typed. Loaded once with the webhooks — every one of
+	 * these is a small list, and the builder is unusable without them.
+	 */
+	const catalog = signal<ConditionCatalog>(emptyCatalog());
+
 	const load = async () => {
-		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/webhooks", {
-			params: { slug: slug.get() },
-		});
+		const workspaceSlug = slug.get();
+		const [hookResult, memberResult, labelResult, teamResult, repositoryResult] = await Promise.all(
+			[
+				api.GET("/api/v1/workspaces/[slug]/webhooks", { params: { slug: workspaceSlug } }),
+				api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
+				api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
+				api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
+				api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
+			],
+		);
 		loading.set(false);
-		if (error === undefined) hooks.set(data);
+		if (hookResult.error === undefined) hooks.set(hookResult.data);
+
+		// A workspace without repositories, or a member who cannot list them, is
+		// not an error here — that field simply offers nothing to pick.
+		catalog.set({
+			members: memberResult.error === undefined ? (memberResult.data as Member[]) : [],
+			labels: labelResult.error === undefined ? (labelResult.data as IssueLabel[]) : [],
+			teams: teamResult.error === undefined ? (teamResult.data as Team[]) : [],
+			repositories:
+				repositoryResult.error === undefined ? (repositoryResult.data as Repository[]) : [],
+		});
 	};
 
 	const remove = async (id: string) => {
@@ -287,7 +320,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			),
 		),
 
-		WebhookDialog(open, slug, editing, (saved, signingSecret) => {
+		WebhookDialog(open, slug, editing, catalog, (saved, signingSecret) => {
 			if (signingSecret === null) {
 				hooks.set(hooks.get().map((entry) => (entry.id === saved.id ? saved : entry)));
 				return;
@@ -363,6 +396,7 @@ function WebhookDialog(
 	open: Signal<boolean>,
 	slug: Readable<string>,
 	editing: Readable<Webhook | null>,
+	catalog: Readable<ConditionCatalog>,
 	onSaved: (hook: Webhook, secret: string | null) => void,
 ) {
 	const url = signal("");
@@ -461,7 +495,11 @@ function WebhookDialog(
 			if (isOpen) reset();
 		}),
 		DialogContent(
-			{ class: "flex max-h-[85vh] max-w-lg flex-col gap-0 p-0" },
+			// Wide, because the events list and the condition chips are both
+			// horizontal things that were being wrapped to death in a narrow column.
+			// `sm:` prefixed, because the dialog's own default is `sm:max-w-lg` and
+			// an unprefixed `max-w-*` does not override a responsive one.
+			{ class: "flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-4xl" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				DialogTitle(
@@ -475,9 +513,12 @@ function WebhookDialog(
 			),
 
 			Div(
-				{ class: "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4" },
+				{
+					class:
+						"grid min-h-0 flex-1 gap-x-6 gap-y-4 overflow-y-auto px-4 py-4 md:grid-cols-[minmax(0,1fr)_18rem]",
+				},
 				Div(
-					{ class: "flex flex-col gap-1.5" },
+					{ class: "flex flex-col gap-1.5 md:col-start-1" },
 					Label({ for: "webhook-url", class: "text-[13px]" }, "URL"),
 					Input({
 						id: "webhook-url",
@@ -503,7 +544,7 @@ function WebhookDialog(
 				),
 
 				Div(
-					{ class: "flex flex-col gap-1.5" },
+					{ class: "flex flex-col gap-1.5 md:col-start-1" },
 					Label({ for: "webhook-description", class: "text-[13px]" }, "Description"),
 					Input({
 						id: "webhook-description",
@@ -516,9 +557,11 @@ function WebhookDialog(
 					}),
 				),
 
-				EventPicker(cells, recount),
-				HeadersEditor(headers),
-				ConditionsEditor(match, rules, chosen),
+				// Events sit in their own column and stay put while the left side
+				// grows; headers and conditions want the width the rail leaves.
+				Div({ class: "md:col-start-2 md:row-span-4 md:row-start-1" }, EventPicker(cells, recount)),
+				Div({ class: "md:col-start-1" }, HeadersEditor(headers)),
+				Div({ class: "md:col-start-1" }, ConditionsEditor(match, rules, chosen, catalog)),
 			),
 
 			Div(

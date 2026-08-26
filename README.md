@@ -465,6 +465,13 @@ Operators depend on the field: `equals`, `contains`, `starts_with`, `in`,
 under **Settings → Webhooks** only offers the ones that apply, and shows the
 tree back to you as a sentence.
 
+The builder writes the same JSON, as chips that read like the issue filter
+bar. Fields whose values are known — labels, members, teams, repositories, and
+the fixed sets behind statuses, priorities and `changes.fields` — are picked
+from a list rather than typed, so a condition can't miss on a typo. The
+workspace-backed ones stay open: a value the workspace doesn't have yet can
+still be entered, since the API accepts any string there.
+
 Comparison is case- and whitespace-insensitive, so `Claude` matches `claude`.
 A field the event does not carry reads as unset rather than erroring, and a
 webhook with no conditions — or with an empty group — delivers everything it is
