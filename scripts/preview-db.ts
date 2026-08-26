@@ -87,6 +87,35 @@ function migrate(env: Record<string, string>): void {
 		throw new Error("drizzle-kit migrate failed against the preview database");
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A just-recreated database is not necessarily reachable yet — same-name
+ * recreation can route to the deleted instance for a moment — so the migrate
+ * after a recreate gets a few tries where a first migrate gets one.
+ */
+async function migrateWithRetries(env: Record<string, string>, attempts: number): Promise<void> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			migrate(env);
+			return;
+		} catch (error) {
+			if (attempt >= attempts) throw error;
+			console.log(`preview: migrate attempt ${attempt} failed — retrying in 5s`);
+			await sleep(5000);
+		}
+	}
+}
+
+/** The API can list a database for a moment after its deletion is accepted. */
+async function waitForDeletion(auth: TursoAuth, name: string): Promise<void> {
+	for (let attempt = 0; attempt < 15; attempt++) {
+		if ((await getDatabase(auth, name)) === null) return;
+		await sleep(2000);
+	}
+	throw new Error(`preview: ${name} is still listed after deletion`);
+}
+
 /**
  * Environment overrides for this build, or `{}` when this is not a preview.
  *
@@ -149,10 +178,11 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 		// migrate, so start the branch's preview over from the template.
 		console.log(`preview: ${name} no longer matches this branch's migrations — recreating`);
 		await deleteDatabase(auth, name);
+		await waitForDeletion(auth, name);
 		database = await createFromTemplate();
 		overrides.DATABASE_URL = databaseUrl(database);
 		overrides.DATABASE_AUTH_TOKEN = await createDatabaseToken(auth, name);
-		migrate(overrides);
+		await migrateWithRetries(overrides, 5);
 	}
 	console.log(`preview: ${name} ready at ${overrides.DATABASE_URL}`);
 
