@@ -20,7 +20,21 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Copy, Pencil, Plus, Send, Trash2, Webhook as WebhookIcon } from "@implementjs/lucide";
+import {
+	ArrowRight,
+	Ban,
+	ChevronDown,
+	Copy,
+	Ellipsis,
+	Pencil,
+	Plus,
+	Power,
+	RotateCw,
+	Send,
+	SquareTerminal,
+	Trash2,
+	Webhook as WebhookIcon,
+} from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
@@ -33,6 +47,12 @@ import {
 } from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/lib/components/ui/dropdown-menu";
 import { Label } from "@/lib/components/ui/label";
 // `Label` is the form-control component in this file; the domain type is the
 // issue label, so it comes in under a name that says which.
@@ -43,6 +63,7 @@ import type {
 	Team,
 	Webhook,
 	WebhookDelivery,
+	WebhookDeliveryDetail,
 } from "@/lib/domain/schemas";
 import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
@@ -55,7 +76,7 @@ import {
 	WEBHOOK_EVENTS,
 	type WebhookEvent,
 } from "@/lib/domain/webhooks";
-import { relativeTime } from "@/lib/format";
+import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
 import { ConditionsEditor, emptyCatalog, type ConditionCatalog } from "./webhook-conditions";
@@ -70,10 +91,6 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 	const secret = signal("");
 	/** The webhook the dialog is editing, or null when it is creating one. */
 	const editing = signal<Webhook | null>(null);
-
-	/** Which webhook's delivery log is expanded, and its rows. */
-	const openLog = signal("");
-	const deliveries = signal<WebhookDelivery[]>([]);
 
 	/**
 	 * The workspace's own values, so a condition on an assignee or a label is
@@ -134,39 +151,6 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			);
 			toastError(messageOf(error, "Could not update the webhook"));
 		}
-	};
-
-	const sendTest = async (id: string) => {
-		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/webhooks/[id]/test", {
-			params: { slug: slug.get(), id },
-		});
-		if (error !== undefined) {
-			toastError(messageOf(error, "Could not send a test delivery"));
-			return;
-		}
-		if (data.status === "succeeded") toastSuccess(`Delivered (${data.responseStatus ?? 200})`);
-		else toastError(`Test failed: ${data.error ?? "no response"}`);
-
-		await load();
-		if (openLog.get() === id) await showLog(id);
-	};
-
-	const showLog = async (id: string) => {
-		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/webhooks/[id]/deliveries", {
-			params: { slug: slug.get(), id },
-			query: { limit: 10 },
-		});
-		if (error === undefined) deliveries.set(data);
-	};
-
-	const toggleLog = async (id: string) => {
-		if (openLog.get() === id) {
-			openLog.set("");
-			return;
-		}
-		openLog.set(id);
-		deliveries.set([]);
-		await showLog(id);
 	};
 
 	const edit = (hook: Webhook) => {
@@ -237,9 +221,15 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 					(hook) => hook.id,
 					(hook) =>
 						Div(
-							{ class: "flex flex-col" },
+							{ class: "flex items-center gap-3 px-3 py-2.5" },
+							// The row is the way in; everything else hides behind the
+							// ellipsis so the list reads as a list, not a toolbar.
 							Div(
-								{ class: "flex items-center gap-3 px-3 py-2.5" },
+								{
+									class: "flex min-w-0 flex-1 cursor-pointer items-center gap-3",
+									title: "Open this webhook",
+									onClick: () => edit(hook.get()),
+								},
 								HealthDot(hook),
 								Div(
 									{ class: "min-w-0 flex-1" },
@@ -252,56 +242,37 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 									),
 									ConditionSummary(hook),
 								),
-								Button(
-									{
-										size: "sm",
-										variant: "ghost",
-										class: "text-[12px]",
-										onClick: () => void toggleLog(hook.get().id),
-									},
-									"Deliveries",
-								),
-								Button(
-									{
-										size: "icon-sm",
-										variant: "ghost",
-										title: "Send a test delivery",
-										onClick: () => void sendTest(hook.get().id),
-									},
-									Send({ class: "size-3.5" }),
-								),
-								Button(
-									{
-										size: "icon-sm",
-										variant: "ghost",
-										title: "Edit",
-										onClick: () => edit(hook.get()),
-									},
-									Pencil({ class: "size-3.5" }),
-								),
-								Button(
-									{
-										size: "sm",
-										variant: "ghost",
-										class: "text-[12px]",
-										onClick: () => void toggle(hook.get()),
-									},
-									hook.bind((value) => (value.enabled ? "Disable" : "Enable")),
-								),
-								Button(
-									{
-										size: "icon-sm",
-										variant: "ghost",
-										title: "Delete",
-										onClick: () => void remove(hook.get().id),
-									},
-									Trash2({ class: "size-3.5" }),
-								),
 							),
-
-							If(
-								derived([openLog], (open) => open === hook.get().id),
-								DeliveryLog(deliveries),
+							DropdownMenu(
+								DropdownMenuTrigger(
+									{ size: "icon-sm", variant: "ghost", title: "Webhook actions" },
+									Ellipsis({ class: "size-3.5" }),
+								),
+								DropdownMenuContent(
+									{ class: "min-w-36", align: "end" },
+									DropdownMenuItem(
+										{ onSelect: () => edit(hook.get()) },
+										Pencil({ class: "size-3.5" }),
+										"Edit",
+									),
+									DropdownMenuItem(
+										{ onSelect: () => void toggle(hook.get()) },
+										If(
+											hook.bind((value) => value.enabled),
+											Ban({ class: "size-3.5" }),
+										),
+										If(
+											hook.bind((value) => !value.enabled),
+											Power({ class: "size-3.5" }),
+										),
+										hook.bind((value) => (value.enabled ? "Disable" : "Enable")),
+									),
+									DropdownMenuItem(
+										{ onSelect: () => void remove(hook.get().id) },
+										Trash2({ class: "size-3.5" }),
+										"Delete",
+									),
+								),
 							),
 						),
 				),
@@ -320,14 +291,23 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 			),
 		),
 
-		WebhookDialog(open, slug, editing, catalog, (saved, signingSecret) => {
-			if (signingSecret === null) {
-				hooks.set(hooks.get().map((entry) => (entry.id === saved.id ? saved : entry)));
-				return;
-			}
-			hooks.push(saved);
-			secret.set(signingSecret);
-		}),
+		WebhookDialog(
+			open,
+			slug,
+			editing,
+			catalog,
+			copy,
+			// Deliveries sent from inside the dialog move the health dots out here.
+			() => void load(),
+			(saved, signingSecret) => {
+				if (signingSecret === null) {
+					hooks.set(hooks.get().map((entry) => (entry.id === saved.id ? saved : entry)));
+					return;
+				}
+				hooks.push(saved);
+				secret.set(signingSecret);
+			},
+		),
 	);
 }
 
@@ -392,11 +372,16 @@ function collectHeaders(rows: HeaderRow[]): {
 	return { headers, error: validateHeaders(headers) };
 }
 
+/** The dialog's two faces: the form, and the delivery log behind it. */
+type DialogTab = "overview" | "deliveries";
+
 function WebhookDialog(
 	open: Signal<boolean>,
 	slug: Readable<string>,
 	editing: Readable<Webhook | null>,
 	catalog: Readable<ConditionCatalog>,
+	copy: (value: string) => Promise<void>,
+	onDelivered: () => void,
 	onSaved: (hook: Webhook, secret: string | null) => void,
 ) {
 	const url = signal("");
@@ -407,6 +392,14 @@ function WebhookDialog(
 	const headers = signal<HeaderRow[]>([]);
 	const match = signal<FilterMatch>("all");
 	const rules = signal<BuilderNode[]>([]);
+
+	const tab = signal<DialogTab>("overview");
+	const deliveries = signal<WebhookDelivery[]>([]);
+	const deliveriesLoaded = signal(false);
+	/** Which delivery is expanded, and its full record. */
+	const openDelivery = signal("");
+	const detail = signal<WebhookDeliveryDetail | null>(null);
+	const testing = signal(false);
 
 	const recount = () => chosen.set(collect(cells));
 
@@ -428,6 +421,97 @@ function WebhookDialog(
 		const builder = toBuilder(hook?.filter ?? null);
 		match.set(builder.match);
 		rules.set(builder.rules);
+
+		tab.set("overview");
+		deliveries.set([]);
+		deliveriesLoaded.set(false);
+		openDelivery.set("");
+		detail.set(null);
+	};
+
+	const refreshDeliveries = async () => {
+		const hook = editing.get();
+		if (hook === null) return;
+		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/webhooks/[id]/deliveries", {
+			params: { slug: slug.get(), id: hook.id },
+			query: { limit: 25 },
+		});
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not load the deliveries"));
+			return;
+		}
+		deliveries.set(data);
+		deliveriesLoaded.set(true);
+	};
+
+	const showTab = (next: DialogTab) => {
+		tab.set(next);
+		if (next === "deliveries") void refreshDeliveries();
+	};
+
+	const fetchDetail = async (deliveryId: string) => {
+		const hook = editing.get();
+		if (hook === null) return;
+		const { data, error } = await api.GET(
+			"/api/v1/workspaces/[slug]/webhooks/[id]/deliveries/[deliveryId]",
+			{ params: { slug: slug.get(), id: hook.id, deliveryId } },
+		);
+		if (error !== undefined) {
+			openDelivery.set("");
+			toastError(messageOf(error, "Could not load the delivery"));
+			return;
+		}
+		// A slow response must not land under whichever row is open by then.
+		if (openDelivery.get() === deliveryId) detail.set(data);
+	};
+
+	const toggleDetail = async (deliveryId: string) => {
+		if (openDelivery.get() === deliveryId) {
+			openDelivery.set("");
+			return;
+		}
+		openDelivery.set(deliveryId);
+		detail.set(null);
+		await fetchDetail(deliveryId);
+	};
+
+	/** Sends a settled delivery again, then refreshes whatever is showing it. */
+	const retry = async (deliveryId: string) => {
+		const hook = editing.get();
+		if (hook === null) return;
+		const { data, error } = await api.POST(
+			"/api/v1/workspaces/[slug]/webhooks/[id]/deliveries/[deliveryId]/redeliver",
+			{ params: { slug: slug.get(), id: hook.id, deliveryId } },
+		);
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not resend the delivery"));
+			return;
+		}
+		if (data.status === "succeeded") toastSuccess(`Delivered (${data.responseStatus ?? 200})`);
+		else toastError(`Resend failed: ${data.error ?? "no response"}`);
+
+		onDelivered();
+		await refreshDeliveries();
+		if (openDelivery.get() === deliveryId) await fetchDetail(deliveryId);
+	};
+
+	const sendTest = async () => {
+		const hook = editing.get();
+		if (hook === null) return;
+		testing.set(true);
+		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/webhooks/[id]/test", {
+			params: { slug: slug.get(), id: hook.id },
+		});
+		testing.set(false);
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not send a test delivery"));
+			return;
+		}
+		if (data.status === "succeeded") toastSuccess(`Delivered (${data.responseStatus ?? 200})`);
+		else toastError(`Test failed: ${data.error ?? "no response"}`);
+
+		onDelivered();
+		if (deliveriesLoaded.get()) await refreshDeliveries();
 	};
 
 	const submit = async () => {
@@ -501,7 +585,7 @@ function WebhookDialog(
 			// an unprefixed `max-w-*` does not override a responsive one.
 			{ class: "flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-4xl" },
 			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+				{ class: "flex flex-col gap-1 border-b border-border px-4 pt-3" },
 				DialogTitle(
 					{ class: "text-[15px] font-semibold" },
 					isEdit.bind((editing) => (editing ? "Edit webhook" : "Create webhook")),
@@ -510,8 +594,36 @@ function WebhookDialog(
 					{ class: "text-[12px]" },
 					"Where to POST, which events to send, and when.",
 				),
+				// A webhook that exists has a past worth reading; one being created
+				// does not, so the tabs only show up in edit mode.
+				If(
+					isEdit,
+					Div(
+						{ class: "-mb-px mt-2 flex gap-4", role: "tablist", "aria-label": "Webhook views" },
+						DialogTabButton(tab, "overview", "Overview", showTab),
+						DialogTabButton(tab, "deliveries", "Deliveries", showTab),
+					),
+				),
+				If(
+					isEdit.bind((editing) => !editing),
+					Div({ class: "pb-3" }),
+				),
 			),
 
+			If(
+				tab.bind((current) => current === "overview"),
+				OverviewTab(),
+			),
+			If(
+				derived([tab, isEdit], (current, editing) => editing && current === "deliveries"),
+				DeliveriesTab(),
+			),
+		),
+	);
+
+	function OverviewTab() {
+		return Div(
+			{ class: "flex min-h-0 flex-1 flex-col" },
 			Div(
 				{
 					class:
@@ -566,10 +678,28 @@ function WebhookDialog(
 
 			Div(
 				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
-				Span(
-					{ class: "mr-auto text-[11px] text-muted-foreground" },
-					chosen.bind((events) =>
-						events.length === 0 ? "Choose at least one event" : `${events.length} events`,
+				Div(
+					{ class: "mr-auto flex items-center gap-3" },
+					If(
+						isEdit,
+						Button(
+							{
+								size: "sm",
+								variant: "outline",
+								type: "button",
+								class: "gap-1.5 text-[12px]",
+								loading: testing,
+								onClick: () => void sendTest(),
+							},
+							Send({ class: "size-3.5" }),
+							"Send test delivery",
+						),
+					),
+					Span(
+						{ class: "text-[11px] text-muted-foreground" },
+						chosen.bind((events) =>
+							events.length === 0 ? "Choose at least one event" : `${events.length} events`,
+						),
 					),
 				),
 				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
@@ -586,7 +716,55 @@ function WebhookDialog(
 					isEdit.bind((editing) => (editing ? "Save changes" : "Create webhook")),
 				),
 			),
-		),
+		);
+	}
+
+	function DeliveriesTab() {
+		return Div(
+			{ class: "flex min-h-0 flex-1 flex-col" },
+			Div(
+				{ class: "min-h-0 flex-1 overflow-y-auto" },
+				DeliveryList(deliveries, deliveriesLoaded, openDelivery, detail, editing, {
+					toggleDetail: (deliveryId) => void toggleDetail(deliveryId),
+					retry: (deliveryId) => void retry(deliveryId),
+					copy,
+				}),
+			),
+			Div(
+				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
+				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Close"),
+			),
+		);
+	}
+}
+
+/** One underline tab in the dialog header, the shape the mockup draws. */
+function DialogTabButton(
+	tab: Readable<DialogTab>,
+	value: DialogTab,
+	label: string,
+	onSelect: (tab: DialogTab) => void,
+) {
+	const active = tab.bind((current) => current === value);
+	return Div(
+		{
+			role: "tab",
+			tabIndex: 0,
+			"aria-selected": active,
+			class: active.bind((on) =>
+				cn(
+					"-mb-px cursor-pointer border-b-2 px-1 pb-2 text-[13px] font-medium select-none",
+					on
+						? "border-foreground text-foreground"
+						: "border-transparent text-muted-foreground hover:text-foreground",
+				),
+			),
+			onClick: () => onSelect(value),
+			onKeydown: (event) => {
+				if (event.key === "Enter" || event.key === " ") onSelect(value);
+			},
+		},
+		label,
 	);
 }
 
@@ -780,13 +958,34 @@ function HealthDot(hook: Readable<Webhook>) {
 	});
 }
 
-function DeliveryLog(deliveries: Readable<WebhookDelivery[]>) {
+// ---------------------------------------------------------------------------
+// The Deliveries tab
+// ---------------------------------------------------------------------------
+
+interface DeliveryActions {
+	toggleDetail: (deliveryId: string) => void;
+	retry: (deliveryId: string) => void;
+	copy: (value: string) => Promise<void>;
+}
+
+function DeliveryList(
+	deliveries: Readable<WebhookDelivery[]>,
+	loaded: Readable<boolean>,
+	openDelivery: Readable<string>,
+	detail: Readable<WebhookDeliveryDetail | null>,
+	hook: Readable<Webhook | null>,
+	actions: DeliveryActions,
+) {
 	return Div(
-		{ class: "border-t border-border bg-secondary/30 px-3 py-2" },
+		{ class: "flex flex-col" },
 		If(
-			deliveries.bind((list) => list.length === 0),
+			loaded.bind((ready) => !ready),
+			P({ class: "px-4 py-3 text-[12px] text-muted-foreground" }, "Loading…"),
+		),
+		If(
+			derived([loaded, deliveries], (ready, list) => ready && list.length === 0),
 			Empty(
-				{ class: "p-4 md:p-4" },
+				{ class: "p-8 md:p-8" },
 				EmptyHeader(
 					EmptyMedia({ variant: "icon" }, Send({ "aria-hidden": true })),
 					EmptyTitle("No deliveries yet"),
@@ -797,42 +996,299 @@ function DeliveryLog(deliveries: Readable<WebhookDelivery[]>) {
 		ForEach(
 			deliveries,
 			(delivery) => delivery.id,
-			(delivery) =>
-				Div(
-					{ class: "flex items-center gap-3 py-1 text-[11px]" },
-					Span(
-						{
-							class: delivery.bind((value) =>
-								cn(
-									"w-16 shrink-0 font-medium",
-									value.status === "succeeded"
-										? "text-green-500"
-										: value.status === "failed"
-											? "text-destructive"
-											: "text-muted-foreground",
-								),
-							),
+			(delivery) => DeliveryRow(delivery, openDelivery, detail, hook, actions),
+		),
+	);
+}
+
+function DeliveryRow(
+	delivery: Readable<WebhookDelivery>,
+	openDelivery: Readable<string>,
+	detail: Readable<WebhookDeliveryDetail | null>,
+	hook: Readable<Webhook | null>,
+	actions: DeliveryActions,
+) {
+	const expanded = derived([openDelivery], (open) => open !== "" && open === delivery.get().id);
+
+	return Div(
+		{ class: "border-b border-border" },
+		Div(
+			{
+				class:
+					"flex cursor-pointer items-center gap-3 px-4 py-2.5 text-[12px] select-none hover:bg-secondary/40",
+				title: "View this delivery",
+				onClick: () => actions.toggleDetail(delivery.get().id),
+			},
+			StatusBadge(delivery),
+			Span(
+				{ class: "shrink-0 font-medium" },
+				delivery.bind((value) => (value.durationMs === null ? "" : `${value.durationMs}ms`)),
+			),
+			Span(
+				{ class: "shrink-0 font-mono text-[11px] text-muted-foreground" },
+				delivery.bind("event"),
+			),
+			Span(
+				{ class: "min-w-0 flex-1 truncate text-[11px] text-muted-foreground" },
+				delivery.bind((value) => value.error ?? ""),
+			),
+			Span(
+				{ class: "shrink-0 text-[11px] text-muted-foreground" },
+				delivery.bind((value) => relativeTime(value.createdAt)),
+			),
+			// Anything that has failed at least once can be sent again — same id,
+			// same signed payload — so a fixed endpoint can catch up on what it
+			// missed. On a still-pending row this brings the scheduled retry
+			// forward instead of waiting out the backoff.
+			If(
+				delivery.bind(
+					(value) =>
+						value.status === "failed" || (value.status === "pending" && value.attempts > 0),
+				),
+				Button(
+					{
+						size: "icon-sm",
+						variant: "ghost",
+						title: "Retry this delivery",
+						class: "shrink-0",
+						onClick: (event) => {
+							event.stopPropagation();
+							actions.retry(delivery.get().id);
 						},
-						delivery.bind("status"),
+					},
+					RotateCw({ class: "size-3.5" }),
+				),
+			),
+			ChevronDown({
+				class: expanded.bind((open) =>
+					cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180"),
+				),
+			}),
+		),
+
+		If(expanded, DeliveryDetail(delivery, detail, hook, actions)),
+	);
+}
+
+/** Enough reason phrases to make a status read like the mockup's badges. */
+const REASON_PHRASES: Record<number, string> = {
+	200: "OK",
+	201: "CREATED",
+	202: "ACCEPTED",
+	204: "NO CONTENT",
+	301: "MOVED",
+	302: "FOUND",
+	304: "NOT MODIFIED",
+	400: "BAD REQUEST",
+	401: "UNAUTHORIZED",
+	403: "FORBIDDEN",
+	404: "NOT FOUND",
+	405: "NOT ALLOWED",
+	408: "TIMEOUT",
+	409: "CONFLICT",
+	410: "GONE",
+	413: "TOO LARGE",
+	422: "UNPROCESSABLE",
+	429: "TOO MANY REQUESTS",
+	500: "SERVER ERROR",
+	502: "BAD GATEWAY",
+	503: "UNAVAILABLE",
+	504: "GATEWAY TIMEOUT",
+};
+
+/** `200 OK` in green, `400 BAD REQUEST` in orange, and words when there is no status. */
+function StatusBadge(delivery: Readable<WebhookDelivery>) {
+	const text = delivery.bind((value) => {
+		if (value.responseStatus !== null) {
+			const phrase = REASON_PHRASES[value.responseStatus];
+			return phrase === undefined ? `${value.responseStatus}` : `${value.responseStatus} ${phrase}`;
+		}
+		return value.status === "pending" ? "PENDING" : "NO RESPONSE";
+	});
+
+	return Span(
+		{
+			class: delivery.bind((value) =>
+				cn(
+					"inline-flex shrink-0 items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-medium",
+					value.responseStatus !== null && value.responseStatus < 300
+						? "border-green-500/50 text-green-500"
+						: value.responseStatus !== null
+							? "border-orange-500/50 text-orange-500"
+							: value.status === "pending"
+								? "border-border text-muted-foreground"
+								: "border-destructive/50 text-destructive",
+				),
+			),
+		},
+		text,
+	);
+}
+
+/** `{"error": ...}` back into something a person scans, or the raw text as-is. */
+function prettyJson(raw: string): string {
+	try {
+		return JSON.stringify(JSON.parse(raw), null, 2);
+	} catch {
+		return raw;
+	}
+}
+
+/** A value single-quoted for a POSIX shell, however hostile its contents. */
+const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
+
+/**
+ * The delivery as a curl command — same URL, same headers, signature included,
+ * same body — so "does my endpoint accept this?" can be answered from a
+ * terminal instead of by clicking retry and waiting.
+ */
+function toCurl(url: string, detail: WebhookDeliveryDetail): string {
+	const lines = [`curl -X POST ${shellQuote(url)}`];
+	for (const [name, value] of Object.entries(detail.requestHeaders)) {
+		lines.push(`  -H ${shellQuote(`${name}: ${value}`)}`);
+	}
+	lines.push(`  --data-raw ${shellQuote(detail.payload)}`);
+	return lines.join(" \\\n");
+}
+
+const codeBlockClass =
+	"h-full max-h-64 min-h-24 overflow-auto rounded-md border border-border bg-background/80 p-2.5 pr-8 font-mono text-[11px] whitespace-pre-wrap break-all";
+
+/** A code panel with its copy button riding the top-right corner. */
+function CodePanel(text: Readable<string>, copyTitle: string, onCopy: () => void) {
+	return Div(
+		{ class: "relative min-w-0" },
+		Button(
+			{
+				size: "icon-sm",
+				variant: "ghost",
+				title: copyTitle,
+				class: "absolute top-1 right-1 z-10",
+				onClick: onCopy,
+			},
+			Copy({ class: "size-3" }),
+		),
+		Div({ class: codeBlockClass }, text),
+	);
+}
+
+/**
+ * Everything known about one delivery: the payload that was signed and sent on
+ * the left, what the endpoint said back on the right — the difference between
+ * seeing "endpoint responded 400" and knowing why.
+ */
+function DeliveryDetail(
+	delivery: Readable<WebhookDelivery>,
+	detail: Readable<WebhookDeliveryDetail | null>,
+	hook: Readable<Webhook | null>,
+	actions: DeliveryActions,
+) {
+	const copyCurl = () => {
+		const value = detail.get();
+		const target = hook.get();
+		if (value === null || target === null) return;
+		void actions.copy(toCurl(target.url, value));
+	};
+
+	const copyPayload = () => {
+		const value = detail.get();
+		if (value !== null) void actions.copy(value.payload);
+	};
+
+	const copyResponse = () => {
+		const value = detail.get();
+		if (value !== null && value.responseBody !== null) void actions.copy(value.responseBody);
+	};
+
+	return Div(
+		{ class: "flex flex-col gap-2.5 border-t border-border/60 bg-secondary/20 px-4 py-3" },
+		If(
+			detail.bind((value) => value === null),
+			P({ class: "text-[11px] text-muted-foreground" }, "Loading…"),
+		),
+		If(
+			detail.bind((value) => value !== null),
+			Div(
+				{ class: "flex flex-col gap-2.5" },
+				Div(
+					{ class: "flex items-center justify-between gap-2" },
+					Span({ class: "text-[12px] font-medium" }, "Request"),
+					Button(
+						{
+							size: "xs",
+							variant: "ghost",
+							class: "gap-1.5 text-[11px]",
+							title: "Copy this delivery as a curl command",
+							onClick: copyCurl,
+						},
+						SquareTerminal({ class: "size-3.5" }),
+						"Copy as cURL",
 					),
-					Span({ class: "w-40 shrink-0 font-mono text-muted-foreground" }, delivery.bind("event")),
+				),
+
+				Div(
+					{ class: "grid items-stretch gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" },
+					CodePanel(
+						detail.bind((value) => (value === null ? "" : prettyJson(value.payload))),
+						"Copy request payload",
+						copyPayload,
+					),
+					Div(
+						{ class: "hidden items-center md:flex" },
+						ArrowRight({ class: "size-4 text-muted-foreground" }),
+					),
+					Div(
+						{ class: "relative min-w-0" },
+						If(
+							detail.bind((value) => value !== null && value.responseBody !== null),
+							CodePanel(
+								detail.bind((value) =>
+									value === null || value.responseBody === null
+										? ""
+										: prettyJson(value.responseBody),
+								),
+								"Copy response body",
+								copyResponse,
+							),
+						),
+						If(
+							detail.bind((value) => value !== null && value.responseBody === null),
+							Div(
+								{ class: cn(codeBlockClass, "flex items-center text-muted-foreground") },
+								"No response body captured — the endpoint sent nothing back, was never reached, or this delivery predates response capture.",
+							),
+						),
+					),
+				),
+
+				Div(
+					{
+						class: "flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground",
+					},
 					Span(
-						{ class: "min-w-0 flex-1 truncate text-muted-foreground" },
-						delivery.bind(
-							(value) =>
-								value.error ??
-								(value.responseStatus === null ? "" : `HTTP ${value.responseStatus}`),
+						{},
+						delivery.bind((value) => `${value.attempts} attempt${value.attempts === 1 ? "" : "s"}`),
+					),
+					Span(
+						{},
+						delivery.bind((value) => `queued ${fullTime(value.createdAt)}`),
+					),
+					Span(
+						{},
+						delivery.bind((value) =>
+							value.deliveredAt !== null
+								? `delivered ${fullTime(value.deliveredAt)}`
+								: value.nextAttemptAt !== null
+									? `retries ${fullTime(value.nextAttemptAt)}`
+									: "",
 						),
 					),
 					Span(
-						{ class: "shrink-0 text-muted-foreground" },
-						delivery.bind((value) => (value.attempts > 1 ? `${value.attempts} attempts` : "")),
-					),
-					Span(
-						{ class: "w-10 shrink-0 text-right text-muted-foreground" },
-						delivery.bind((value) => relativeTime(value.createdAt)),
+						{ class: "text-destructive" },
+						delivery.bind((value) => value.error ?? ""),
 					),
 				),
+			),
 		),
 	);
 }
