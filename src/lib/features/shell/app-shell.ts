@@ -119,7 +119,7 @@ export function AppShell(
 
 		// Mounted once for the whole app: both are opened imperatively from
 		// hotkeys, the sidebar and the palette itself.
-		CreateIssueDialog(),
+		CreateIssueDialog(data.bind((shell) => shell.workspaces)),
 		CommandPalette(activeSlug),
 	);
 }
@@ -222,10 +222,7 @@ function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: str
 					DropdownMenuGroupHeading("Templates"),
 					If(
 						templates.bind((list) => list.length === 0),
-						Div(
-							{ class: "px-2 py-1.5 text-[12px] text-muted-foreground" },
-							"No templates yet.",
-						),
+						Div({ class: "px-2 py-1.5 text-[12px] text-muted-foreground" }, "No templates yet."),
 					),
 					ForEach(
 						templates,

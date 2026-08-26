@@ -9,6 +9,7 @@ import {
 	ImplementEffect,
 	ImplementLifecycle,
 	Input,
+	type Readable,
 	Span,
 	signal,
 } from "@implementjs/core";
@@ -136,7 +137,7 @@ export function openCreateIssueFromTemplate(
 	open.set(true);
 }
 
-export function CreateIssueDialog() {
+export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 	const title = signal("");
 	const description = signal("");
 	const status = signal<IssueStatus>("backlog");
@@ -301,8 +302,14 @@ export function CreateIssueDialog() {
 		hydrating = true;
 		// A fresh open always starts in the workspace it was opened from, and any
 		// scope load a previous open left in flight is stale now.
-		scopeTicket++;
-		chosenWorkspace.set(null);
+		const ticket = ++scopeTicket;
+		// The crumb should read "this workspace" the moment the composer opens,
+		// not once five requests land. The shell already knows the membership
+		// list, so seed the picker from it (or from the last open's fetch) and
+		// let the fresh response below reconcile.
+		const seeded = workspaces.get().length > 0 ? workspaces.get() : (knownWorkspaces?.get() ?? []);
+		if (workspaces.get().length === 0 && seeded.length > 0) workspaces.set(seeded);
+		chosenWorkspace.set(seeded.find((workspace) => workspace.slug === workspaceSlug) ?? null);
 		try {
 			// Read on open rather than at module load: there is no storage during
 			// SSR, and another tab may have flipped it since.
@@ -343,10 +350,17 @@ export function CreateIssueDialog() {
 				]);
 			if (workspaceResult.error === undefined) {
 				workspaces.set(workspaceResult.data);
+				// Swap the seeded object for its freshly fetched self — without
+				// undoing a retarget made while these requests were in flight.
+				const pickedSlug = chosenWorkspace.get()?.slug ?? workspaceSlug;
 				chosenWorkspace.set(
-					workspaceResult.data.find((workspace) => workspace.slug === workspaceSlug) ?? null,
+					workspaceResult.data.find((workspace) => workspace.slug === pickedSlug) ??
+						chosenWorkspace.get(),
 				);
 			}
+			// A crumb pick mid-flight owns the workspace scope now — its own
+			// loadWorkspaceScope is (or was) fetching against the new slug.
+			if (ticket !== scopeTicket) return;
 			if (repoResult.error === undefined) {
 				repositories.set(repoResult.data);
 				if (draft !== null) {
