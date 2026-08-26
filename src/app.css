@@ -200,6 +200,22 @@
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
 	}
+
+	/* Mobile Safari zooms the whole page onto any focused control whose
+	   computed font-size is under 16px — and with the 15px root above, even
+	   `text-base` lands under it. On phone-width viewports and touch-only
+	   devices, floor every text-taking form control at a real 16px instead.
+	   `!important` because the per-element utilities (`text-sm`,
+	   `text-[13px]`) would otherwise win on specificity; the one input styled
+	   larger than the floor (the issue title's `text-2xl`) is excluded so it
+	   keeps its size. */
+	@media (max-width: 767px), ((hover: none) and (pointer: coarse)) {
+		input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([class*="text-2xl"]),
+		select,
+		textarea {
+			font-size: 16px !important;
+		}
+	}
 }
 
 @layer utilities {
