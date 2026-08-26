@@ -18,6 +18,9 @@ export const PATCH = handler({
 		const changes: Partial<typeof webhook.$inferInsert> = {};
 		if (body.description !== undefined) changes.description = body.description;
 		if (body.events !== undefined) changes.events = body.events;
+		if (body.headers !== undefined) changes.headers = body.headers;
+		// Explicitly nullable: `null` clears the conditions, absent leaves them.
+		if (body.filter !== undefined) changes.filter = body.filter;
 		if (body.enabled !== undefined) changes.enabled = body.enabled;
 
 		const updated = await db

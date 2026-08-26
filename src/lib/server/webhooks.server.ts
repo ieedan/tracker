@@ -23,6 +23,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 import { and, desc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { matchesFilter, type FilterSubject } from "@/lib/domain/webhook-filters";
 import {
 	DELIVERY_HEADER,
 	DELIVERY_TIMEOUT_MS,
@@ -31,6 +32,7 @@ import {
 	RETRY_BACKOFF_MS,
 	SIGNATURE_HEADER,
 	TIMESTAMP_HEADER,
+	validateHeader,
 	type WebhookEvent,
 } from "@/lib/domain/webhooks";
 import { db } from "./db.server";
@@ -170,7 +172,7 @@ export interface EventPayload {
  */
 export async function enqueue(
 	payload: EventPayload,
-	options: { webhookId?: string } = {},
+	options: { webhookId?: string; ignoreFilter?: boolean } = {},
 ): Promise<string[]> {
 	// `webhookId` narrows the fan-out to one endpoint — what a test send needs,
 	// so testing one webhook does not fire every other subscriber with it.
@@ -182,7 +184,17 @@ export async function enqueue(
 		.from(webhook)
 		.where(and(...conditions));
 
-	const subscribed = hooks.filter((hook) => hook.events.includes(payload.event));
+	const subject: FilterSubject = {
+		event: payload.event,
+		actor: payload.actor,
+		data: payload.data,
+	};
+
+	const subscribed = hooks.filter(
+		(hook) =>
+			hook.events.includes(payload.event) &&
+			(options.ignoreFilter === true || passesFilter(hook, subject)),
+	);
 	if (subscribed.length === 0) return [];
 
 	const createdAt = new Date();
@@ -216,6 +228,21 @@ export async function enqueue(
 
 	await db.insert(webhookDelivery).values(rows);
 	return rows.map((row) => row.id);
+}
+
+/**
+ * Whether a webhook's conditions accept this event.
+ *
+ * Fails *open*. A tree is validated before it is stored, so a throw here means
+ * something unforeseen — and dropping events silently is a far worse failure
+ * than sending one the receiver did not want.
+ */
+function passesFilter(hook: WebhookRow, subject: FilterSubject): boolean {
+	try {
+		return matchesFilter(hook.filter, subject);
+	} catch {
+		return true;
+	}
 }
 
 /**
@@ -284,6 +311,10 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 		const response = await fetch(hook.url, {
 			method: "POST",
 			headers: {
+				// The webhook's own headers go on first, so the four below always
+				// win. A workspace can add an `Authorization` its gateway wants; it
+				// can never rewrite the signature the receiver verifies against.
+				...customHeaders(hook.headers),
 				"content-type": "application/json",
 				"user-agent": "tracker-webhooks/1",
 				[EVENT_HEADER]: delivery.event,
@@ -332,6 +363,26 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 			nextAttemptAt: exhausted ? null : new Date(Date.now() + backoff),
 		})
 		.where(eq(webhookDelivery.id, delivery.id));
+}
+
+/**
+ * The stored headers, re-checked on the way out.
+ *
+ * They were validated when they were saved, but a row can predate a rule or be
+ * edited straight in the database, and one bad header would make `fetch` throw
+ * and fail the whole delivery. A rejected header is dropped; the rest still go.
+ */
+function customHeaders(stored: Record<string, string> | null): Record<string, string> {
+	// JSON out of a column is only as well-typed as whatever wrote it.
+	if (stored === null || typeof stored !== "object" || Array.isArray(stored)) return {};
+
+	const headers: Record<string, string> = {};
+	for (const [name, value] of Object.entries(stored)) {
+		if (typeof value !== "string") continue;
+		if (validateHeader(name, value) !== null) continue;
+		headers[name.trim()] = value;
+	}
+	return headers;
 }
 
 /** Loopback targets are for developing against; never in production. */
