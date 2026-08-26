@@ -39,7 +39,7 @@ import {
 	seedPreviewTemplate,
 } from "./steps/database.ts";
 import { github } from "./steps/github.ts";
-import { deploy, pushToVercel } from "./steps/host.ts";
+import { deploy, pushEnvironment, pushToVercel } from "./steps/host.ts";
 import { deploymentStorage, developmentStorage } from "./steps/storage.ts";
 
 const commonOptions = {
@@ -287,11 +287,40 @@ const prod = new Command("prod")
 		]);
 	});
 
+const push = new Command("push")
+	.description("Push an environment file to Vercel, without walking setup again.")
+	.argument("<mode>", "dev, preview or prod")
+	.addOption(commonOptions.cwd)
+	.action(async (rawMode: string, rawOptions) => {
+		const mode = z.enum(["dev", "preview", "prod"]).parse(rawMode);
+		const { cwd } = setupSchema.parse(rawOptions);
+		const file = path.resolve(cwd, ENV_FILE[mode]);
+
+		intro(color.bgCyan(color.black(` push ${ENV_FILE[mode]} `)));
+
+		if (!fs.existsSync(file)) {
+			log.error(`No ${ENV_FILE[mode]} — run \`${scriptCommand(`setup:${mode}`)}\` first.`);
+			process.exit(1);
+		}
+
+		const target = mode === "preview" ? "preview" : "production";
+		const values = dotenvx.parse(fs.readFileSync(file, "utf8")) as Record<string, string>;
+		const failures = await pushEnvironment(cwd, values, target);
+
+		outro(
+			failures.length === 0
+				? `Redeploy for the new values to take effect — Vercel reads them when a build starts.`
+				: "Some values were not set; see above.",
+		);
+		process.exit(failures.length === 0 ? 0 : 1);
+	});
+
 const cli = program
 	.name("setup")
 	.description("Set the project up for development, previews, or production.")
 	.addCommand(dev)
 	.addCommand(preview)
-	.addCommand(prod);
+	.addCommand(prod)
+	.addCommand(push);
 
 cli.parse();

@@ -51,12 +51,21 @@ function readConfig(): PreviewConfig | null {
 	};
 }
 
-/** The URL this deployment will actually be served from. */
-function previewOrigin(): string | null {
-	// The branch URL is stable across redeploys of a branch; the deployment URL
-	// changes every push, which would invalidate every session on every deploy.
-	const host = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || "";
-	return host === "" ? null : `https://${host}`;
+/**
+ * Every origin this deployment answers on.
+ *
+ * There are two: the branch URL, stable across redeploys of a branch, and the
+ * deployment URL, which changes every push and is the one Vercel links from
+ * the pull request. Both have to be trusted — a visitor lands on whichever
+ * link they followed, and better-auth rejects a sign-in from any origin it was
+ * not told about.
+ */
+function previewOrigins(): { baseURL: string | null; trusted: string[] } {
+	const hosts = [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL];
+	const trusted = [...new Set(hosts.filter((host) => !!host).map((host) => `https://${host}`))];
+	// The branch URL leads, so the stable one is what absolute links are built
+	// from when both exist.
+	return { baseURL: trusted[0] ?? null, trusted };
 }
 
 function drizzleKit(): string {
@@ -120,8 +129,9 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 		DATABASE_AUTH_TOKEN: await createDatabaseToken(auth, name),
 	};
 
-	const origin = previewOrigin();
-	if (origin !== null) overrides.BETTER_AUTH_URL = origin;
+	const { baseURL, trusted } = previewOrigins();
+	if (baseURL !== null) overrides.BETTER_AUTH_URL = baseURL;
+	if (trusted.length > 0) overrides.BETTER_AUTH_TRUSTED_ORIGINS = trusted.join(",");
 
 	// The copy carries the template's migration history, so this applies only
 	// what the branch has added on top of it.

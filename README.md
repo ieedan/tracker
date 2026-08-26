@@ -97,6 +97,12 @@ lifts that, and this app does not currently use it.
 `pnpm preview:prune` deletes the preview databases whose branch is gone from
 `origin`.
 
+None of it does anything until `.env.preview` reaches Vercel's Preview
+environment — a build reads the variables that exist when it starts, so a
+deployment made before the push fails validation and has to be redeployed.
+`pnpm setup push preview` sends the file without walking setup again, and
+`pnpm setup push prod` does the same for `.env.production`.
+
 | Script            | What it does                                                         |
 | ----------------- | -------------------------------------------------------------------- |
 | `setup:dev`       | Interactive `.env` for this machine                                  |

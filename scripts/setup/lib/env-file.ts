@@ -34,6 +34,7 @@ export const KNOWN_KEYS = [
 	"DATABASE_AUTH_TOKEN",
 	"BETTER_AUTH_SECRET",
 	"BETTER_AUTH_URL",
+	"BETTER_AUTH_TRUSTED_ORIGINS",
 	"CRON_SECRET",
 	"S3_ENDPOINT",
 	"S3_REGION",
@@ -121,6 +122,9 @@ export function render(
 			? "# A fallback only: preview builds set this to the deployment's own branch URL."
 			: "# The origin the app is served from.",
 		line("BETTER_AUTH_URL", values),
+		"# Extra origins the auth routes accept. Preview builds fill this in with the",
+		"# hosts the deployment answers on; blank everywhere else.",
+		line("BETTER_AUTH_TRUSTED_ORIGINS", values),
 		"",
 		"# Authorises POST /api/v1/webhooks/drain, which retries failed webhook",
 		"# deliveries. Blank closes that route.",
