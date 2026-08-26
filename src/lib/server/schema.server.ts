@@ -621,6 +621,10 @@ export const webhookDelivery = sqliteTable(
 		status: text("status").$type<DeliveryStatus>().notNull().default("pending"),
 		attempts: integer("attempts").notNull().default(0),
 		responseStatus: integer("responseStatus"),
+		/** What the endpoint sent back, truncated — the difference between seeing "400" and knowing why. */
+		responseBody: text("responseBody"),
+		/** How long the latest attempt took, in milliseconds. */
+		durationMs: integer("durationMs"),
 		error: text("error"),
 		/** When the next attempt becomes due. Null once it is settled. */
 		nextAttemptAt: timestamp("nextAttemptAt"),
@@ -819,6 +823,12 @@ export const issueTemplate = sqliteTable(
 		status: text("status").$type<IssueStatus>().notNull().default("backlog"),
 		priority: text("priority").$type<IssuePriority>().notNull().default("none"),
 		assigneeId: text("assigneeId").references(() => user.id, { onDelete: "set null" }),
+		/**
+		 * The repository new issues start scoped to, when the template pins one.
+		 * `set null` for the same reason as team: unlinking a repository should
+		 * not delete the templates that pointed at it.
+		 */
+		repositoryId: text("repositoryId").references(() => repository.id, { onDelete: "set null" }),
 		createdBy: text("createdBy")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
@@ -854,6 +864,10 @@ export const issueTemplateRelations = relations(issueTemplate, ({ one, many }) =
 	}),
 	team: one(team, { fields: [issueTemplate.teamId], references: [team.id] }),
 	assignee: one(user, { fields: [issueTemplate.assigneeId], references: [user.id] }),
+	repository: one(repository, {
+		fields: [issueTemplate.repositoryId],
+		references: [repository.id],
+	}),
 	labels: many(issueTemplateLabel),
 }));
 

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c3e03cbc-25f2-44b7-9dde-792972468146",
-  "prevId": "6d0b295e-752b-45ea-83c9-5fa26321a2ae",
+  "id": "66177fa0-900e-4f5b-96c5-eba6d0dcd429",
+  "prevId": "c3e03cbc-25f2-44b7-9dde-792972468146",
   "tables": {
     "agent_grant": {
       "name": "agent_grant",
@@ -2380,6 +2380,13 @@
         "responseBody": {
           "name": "responseBody",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "durationMs": {
+          "name": "durationMs",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

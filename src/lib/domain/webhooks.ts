@@ -112,6 +112,12 @@ export const RETRY_BACKOFF_MS = [60_000, 300_000, 1_800_000, 7_200_000] as const
 /** Anything slower than this is treated as a failure and retried. */
 export const DELIVERY_TIMEOUT_MS = 8_000;
 
+/**
+ * How much of an endpoint's response body is kept per delivery. Enough to read
+ * an error message; not enough to let a chatty endpoint bloat the log table.
+ */
+export const MAX_STORED_RESPONSE_BODY = 2_000;
+
 /** The header names a receiver reads. */
 export const SIGNATURE_HEADER = "x-tracker-signature";
 export const EVENT_HEADER = "x-tracker-event";

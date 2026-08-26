@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c3e03cbc-25f2-44b7-9dde-792972468146",
-  "prevId": "6d0b295e-752b-45ea-83c9-5fa26321a2ae",
+  "id": "3b4236dd-73f7-4a3d-8ce2-67aa835d9e43",
+  "prevId": "66177fa0-900e-4f5b-96c5-eba6d0dcd429",
   "tables": {
     "agent_grant": {
       "name": "agent_grant",
@@ -1195,6 +1195,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "repositoryId": {
+          "name": "repositoryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "createdBy": {
           "name": "createdBy",
           "type": "text",
@@ -1268,6 +1275,19 @@
           "tableTo": "user",
           "columnsFrom": [
             "assigneeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "issue_template_repositoryId_repository_id_fk": {
+          "name": "issue_template_repositoryId_repository_id_fk",
+          "tableFrom": "issue_template",
+          "tableTo": "repository",
+          "columnsFrom": [
+            "repositoryId"
           ],
           "columnsTo": [
             "id"
@@ -2380,6 +2400,13 @@
         "responseBody": {
           "name": "responseBody",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "durationMs": {
+          "name": "durationMs",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
