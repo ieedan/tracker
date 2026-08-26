@@ -6,6 +6,7 @@ import {
 	If,
 	ImplementDocument,
 	ImplementEffect,
+	ImplementLifecycle,
 	Input,
 	P,
 	Span,
@@ -18,6 +19,7 @@ import {
 import { ChevronLeft } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
+import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
 import type {
 	Activity,
@@ -435,6 +437,25 @@ function EditableTitle(
 		);
 }
 
+/** The same words in the box and in its place, so the two cannot drift apart. */
+const DESCRIPTION_PLACEHOLDER = "Add description… @ to reference a file";
+
+/**
+ * The issue body: markdown at rest, its own source while it is being written.
+ *
+ * Comment bodies have been rendered through {@link Markdown} for a while and
+ * the composer says "Markdown supported" underneath them, so a description
+ * that painted `**bold**` as four literal characters was the odd one out. The
+ * fix is the renderer that already ships — not an editor that writes markup
+ * for you, which would make the body the one field on the page that is not the
+ * text it stores.
+ *
+ * Rendering and writing cannot be the same view: the mention overlay in
+ * `file-mentions.ts` can sit on top of a live textarea because it leaves the
+ * character count alone, and a markdown render does not — `**bold**` is four
+ * characters shorter on screen, so nothing would line up. So the rendered body
+ * is what is shown until it is clicked, and the box takes over from there.
+ */
 function EditableDescription(
 	issue: Readable<Issue>,
 	update: (patch: { description: string }, apply: (value: Issue) => Issue) => void,
@@ -442,15 +463,16 @@ function EditableDescription(
 ) {
 	const draft = signal("");
 	const draftRef = signal<HTMLTextAreaElement | null>(null);
+	const editing = signal(false);
 
 	const commit = () => {
+		// Closing first, so the rendered body is what a save is watched from.
+		editing.set(false);
 		const next = draft.get();
 		if (next === issue.get().description) return;
 		update({ description: next }, (value) => ({ ...value, description: next }));
 	};
 
-	// The same box as the create dialog, so an issue body is written the same
-	// way whichever screen it is being written on.
 	return Fragment(
 		// The stored body fills the box on load, and again when it changes
 		// somewhere else — but never on top of what is being typed here.
@@ -461,26 +483,82 @@ function EditableDescription(
 			if (node !== null && node === document.activeElement) return;
 			draft.set(value.description);
 		}),
-		BodyComposer({
-			value: draft,
-			element: draftRef,
-			slug: () => params.slug.get(),
-			repository: () => issue.get().repository?.id,
-			placeholder: "Add description… @ to reference a file",
-			// The body is as tall as it needs to be here: there is no dialog to
-			// stay inside, and a scrollbar within a page that already scrolls is
-			// the worst of both.
-			rows: 4,
-			autoGrow: true,
-			renderMentions: true,
-			onBlur: commit,
-			// Blur commits, so ⌘⏎ only has to leave the box.
-			onSubmit: () => draftRef.get()?.blur(),
-			onEscape: () => {
-				draft.set(issue.get().description);
-				draftRef.get()?.blur();
-			},
-		}),
+
+		If(editing)
+			.Then(
+				// Focus is taken on mount rather than through `autofocus`: the
+				// attribute is honoured once per document, and by the time a body is
+				// clicked something else has usually spent it.
+				ImplementLifecycle({
+					onMount: () => {
+						const node = draftRef.get();
+						if (node === null) return;
+						node.focus();
+						// Where a click landed in the rendered body says nothing about
+						// where it landed in the source, so the caret goes to the end —
+						// which is where a body is carried on from anyway.
+						node.setSelectionRange(node.value.length, node.value.length);
+					},
+				}),
+				// The same box as the create dialog, so an issue body is written the
+				// same way whichever screen it is being written on.
+				BodyComposer({
+					value: draft,
+					element: draftRef,
+					slug: () => params.slug.get(),
+					repository: () => issue.get().repository?.id,
+					placeholder: DESCRIPTION_PLACEHOLDER,
+					// The body is as tall as it needs to be here: there is no dialog to
+					// stay inside, and a scrollbar within a page that already scrolls is
+					// the worst of both.
+					rows: 4,
+					autoGrow: true,
+					renderMentions: true,
+					onBlur: commit,
+					// Blur commits, so ⌘⏎ only has to leave the box.
+					onSubmit: () => draftRef.get()?.blur(),
+					onEscape: () => {
+						draft.set(issue.get().description);
+						draftRef.get()?.blur();
+					},
+				}),
+			)
+			.Else(
+				Div(
+					{
+						// Not `role: "button"`: a rendered body holds links of its own,
+						// and a button may not contain one. Being reachable and opening
+						// on Enter is what the role would have bought anyway.
+						tabIndex: 0,
+						title: "Click to edit",
+						class:
+							"cursor-text rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+						onClick: (event) => {
+							// A link in the body is there to be followed and a selection is
+							// there to be copied; neither is a request to start writing.
+							if (event.target.closest("a") !== null) return;
+							if (window.getSelection()?.isCollapsed === false) return;
+							editing.set(true);
+						},
+						onKeydown: (event) => {
+							if (event.key !== "Enter") return;
+							event.preventDefault();
+							editing.set(true);
+						},
+					},
+					// An empty body still has to be something you can hit, so the
+					// placeholder stands in for it rather than leaving a zero-height
+					// target where the description goes.
+					If(issue.bind((value) => value.description.trim() !== ""))
+						.Then(Markdown(issue.bind("description")))
+						.Else(
+							P(
+								{ class: "text-[13px] leading-normal text-muted-foreground" },
+								DESCRIPTION_PLACEHOLDER,
+							),
+						),
+				),
+			),
 	);
 }
 

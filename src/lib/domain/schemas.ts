@@ -522,6 +522,12 @@ export const UpdateWorkspaceBody = v.partial(
 	}),
 );
 
+/** Your own profile. Only the picture is editable here today. */
+export const UpdateMeBody = v.object({
+	/** A key from `POST /api/v1/uploads/image`. Null clears the picture. */
+	imageKey: v.nullable(v.string()),
+});
+
 export const CreateApiKeyBody = v.object({
 	name: trimmed(1, 60),
 	permissions: v.pipe(

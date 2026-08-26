@@ -1,4 +1,4 @@
-import { derived, Div, Dynamic, Span, Svg, type Readable } from "@implementjs/core";
+import { derived, Div, Dynamic, Img, Span, Svg, type Readable } from "@implementjs/core";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/domain/issues";
 import type { HarnessKind, UserType } from "@/lib/domain/agents";
@@ -209,6 +209,25 @@ export function UserAvatar(user: AvatarUser, className?: string) {
 				title: user.name,
 			},
 			HarnessLogo(user.harness ?? "other", "size-3.5"),
+		);
+	}
+
+	// The picture they chose, where there is one. `image` is already a URL the
+	// browser can load — an app URL for one uploaded here, the provider's for one
+	// that came with the account; see `userImageUrl`.
+	if (user.image !== null && user.image !== undefined && user.image !== "") {
+		return Span(
+			{
+				class: cn(
+					"inline-flex size-5 shrink-0 overflow-hidden rounded-full select-none",
+					className,
+				),
+				// Kept behind the picture, so a slow or failed load is still their
+				// colour rather than a hole in the row.
+				style: { backgroundColor: avatarColor(user.id) },
+				title: user.name,
+			},
+			Img({ src: user.image, alt: "", class: "size-full object-cover" }),
 		);
 	}
 

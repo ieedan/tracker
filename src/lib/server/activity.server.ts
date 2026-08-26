@@ -9,7 +9,7 @@
 import { asc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { ActivityType } from "@/lib/domain/activity";
-import type { Activity } from "@/lib/domain/schemas";
+import type { Activity, Issue } from "@/lib/domain/schemas";
 import { db } from "./db.server";
 import { issueActivity, user } from "./schema.server";
 import { toActivity } from "./serialize.server";
@@ -59,6 +59,42 @@ export async function recordActivity(
 		// The edit itself already succeeded; losing its footnote is not worth
 		// failing the request over.
 	}
+}
+
+/**
+ * The entries a freshly filed issue starts its timeline with.
+ *
+ * Anything chosen in the composer — a label, an owner, a repository — happened
+ * when the issue was filed, so it is recorded then. Left to the first later
+ * edit to notice, it would surface as a change that never happened, stamped
+ * with the wrong time. Fields still sitting on their default are left out:
+ * "set status to Backlog" on every issue ever filed is noise, not history.
+ */
+export function creationActivity(created: Issue): ActivityInput[] {
+	const entries: ActivityInput[] = [];
+
+	if (created.status !== "backlog") entries.push({ type: "status_changed", to: created.status });
+	if (created.priority !== "none") {
+		entries.push({ type: "priority_changed", to: created.priority });
+	}
+	if (created.assignee !== null) {
+		entries.push({ type: "assignee_changed", to: created.assignee.name });
+	}
+	if (created.repository !== null) {
+		entries.push({ type: "repository_changed", to: created.repository.fullName });
+	}
+	if (created.labels.length > 0) {
+		entries.push({
+			type: "labels_changed",
+			labels: created.labels.map((entry) => ({
+				name: entry.name,
+				color: entry.color,
+				added: true,
+			})),
+		});
+	}
+
+	return entries;
 }
 
 /** Every recorded entry for one issue, oldest first — the order it reads in. */

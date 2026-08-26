@@ -37,12 +37,27 @@ export const iso = (value: Date | null): string | null =>
 /** The user columns every serializer needs. `type` badges bot members. */
 export type UserFields = Pick<UserRow, "id" | "name" | "email" | "image" | "type" | "harness">;
 
+/**
+ * Where a user's picture is actually readable from.
+ *
+ * The column holds one of two things: a URL, put there by the identity
+ * provider that filled the profile in at sign-up — a GitHub avatar lives on
+ * GitHub — or an object key, for a picture uploaded here. A key becomes an app
+ * URL for the same reason a workspace's does: a presigned one expires while the
+ * page that rendered it is still open, and the route behind this serves the
+ * bytes same-origin.
+ */
+export function userImageUrl(id: string, image: string | null | undefined): string | null {
+	if (image === null || image === undefined || image === "") return null;
+	return /^https?:\/\//.test(image) ? image : `/api/v1/users/${id}/image`;
+}
+
 export function toUser(row: UserFields): UserSummary {
 	return {
 		id: row.id,
 		name: row.name,
 		email: row.email,
-		image: row.image ?? null,
+		image: userImageUrl(row.id, row.image),
 		type: row.type,
 		harness: row.harness ?? null,
 	};
@@ -261,6 +276,10 @@ export function toFeedback(
  * Replying to a public thread publishes your name, which is a knowing act. It
  * does not publish your email, so that is blanked for public readers even
  * though the UI never renders it — the payload is in the page either way.
+ *
+ * The picture goes the same way, for both reasons at once: it was chosen for
+ * the people you share a workspace with, and the route that serves it asks the
+ * reader to be one of them. Public readers get the initials instead.
  */
 export function toFeedbackComment(
 	row: FeedbackCommentRow,
@@ -270,7 +289,7 @@ export function toFeedbackComment(
 	return {
 		id: row.id,
 		body: row.body,
-		author: audience === "public" ? { ...toUser(author), email: "" } : toUser(author),
+		author: audience === "public" ? { ...toUser(author), email: "", image: null } : toUser(author),
 		internal: row.internal,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),

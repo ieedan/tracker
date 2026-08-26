@@ -1,5 +1,5 @@
 /**
- * Picking a workspace picture.
+ * Picking a picture — a workspace's, or your own.
  *
  * The upload runs as soon as a file is chosen rather than on submit, so the
  * form has a key in hand by the time you press the button and the wait happens
@@ -13,6 +13,7 @@ import {
 	Img,
 	Input,
 	signal,
+	type Child,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
@@ -51,6 +52,14 @@ export function ImagePicker(options: {
 	 * which is all a workspace that does not exist yet has.
 	 */
 	seed?: Readable<string>;
+	/**
+	 * What the tile shows when there is no picture. Defaults to the generated
+	 * workspace tile; a person's picker passes their avatar, so the empty state
+	 * is what the rest of the app already shows for them.
+	 */
+	placeholder?: Child;
+	/** Tailwind for the tile itself — a person's picture is round, not a square. */
+	previewClass?: string;
 	label?: string;
 	/** Called after a successful upload or a clear, for forms that save eagerly. */
 	onChange?: (key: string | null) => void;
@@ -132,8 +141,10 @@ export function ImagePicker(options: {
 		Button(
 			{
 				variant: "ghost",
-				class:
+				class: cn(
 					"relative size-14 shrink-0 overflow-hidden rounded-lg border border-dashed border-border p-0 hover:border-ring",
+					options.previewClass,
+				),
 				title: "Choose a picture",
 				onClick: () => input.get()?.click(),
 			},
@@ -150,13 +161,14 @@ export function ImagePicker(options: {
 					// workspace actually looks like everywhere else until a picture
 					// is uploaded, so the picker should show it rather than imply
 					// there is nothing there.
-					Dynamic([options.seed ?? options.fallback, options.fallback], (seed, name) =>
-						GeneratedWorkspaceAvatar({
-							seed,
-							name,
-							class: "size-full rounded-none text-lg",
-						}),
-					),
+					options.placeholder ??
+						Dynamic([options.seed ?? options.fallback, options.fallback], (seed, name) =>
+							GeneratedWorkspaceAvatar({
+								seed,
+								name,
+								class: "size-full rounded-none text-lg",
+							}),
+						),
 				),
 
 			If(

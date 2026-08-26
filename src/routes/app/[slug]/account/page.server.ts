@@ -1,4 +1,5 @@
 import { requireMembership } from "@/lib/server/guards.server";
+import { userImageUrl } from "@/lib/server/serialize.server";
 import type { LoadEvent } from "./$types";
 
 /**
@@ -14,5 +15,7 @@ import type { LoadEvent } from "./$types";
  */
 export default async function load({ locals, params }: LoadEvent) {
 	const { user } = await requireMembership(locals, params.slug);
-	return { user };
+	// The picture column as stored is an object key for one uploaded here, so it
+	// goes out as the URL that serves it — same as every other user the API returns.
+	return { user: { ...user, image: userImageUrl(user.id, user.image) } };
 }

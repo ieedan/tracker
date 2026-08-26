@@ -7,6 +7,7 @@ import {
 	IssueSchema,
 	IssueStatusSchema,
 } from "@/lib/domain/schemas";
+import { creationActivity, recordActivity } from "@/lib/server/activity.server";
 import { adoptDraftAttachments } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { emitIssueEvent } from "@/lib/server/events.server";
@@ -125,6 +126,10 @@ export const POST = handler({
 
 		const created = await getIssueById(id);
 		if (created === undefined) error(500, "issue vanished after insert");
+
+		// Whatever the composer set is part of what happened here, so it lands on
+		// the timeline now rather than waiting for an edit to reveal it.
+		await recordActivity(id, user.id, creationActivity(created));
 
 		await emitIssueEvent("issue.created", { workspace, actor: user, issue: created });
 		return json(created, { status: 201 });
