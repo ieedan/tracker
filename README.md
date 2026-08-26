@@ -391,7 +391,11 @@ workspace registered, so they are the _member_ view — submitter address and al
 Add one under **Settings → Webhooks**, choose the events, and the signing secret
 is shown once. Events: `issue.created`, `issue.updated`, `issue.assigned`,
 `issue.status_changed`, `issue.deleted`, `comment.created`, and the six
-`feedback.*` events above.
+`feedback.*` events above. A webhook can also carry [custom
+headers](#custom-headers) and [conditions](#conditions) that narrow what it
+actually receives. Everything but the URL is editable afterwards — the URL is
+what the secret was issued against, so pointing somewhere else means a new
+webhook.
 
 Every request is a JSON POST carrying:
 
@@ -414,6 +418,71 @@ const ok =
 The payload is `{ id, event, createdAt, workspace, actor, data }`. `data.issue`
 is the full issue; `issue.updated` also carries `data.changes` as
 `{ field: { from, to } }`.
+
+### Custom headers
+
+A webhook can send up to 20 headers of its own — a bearer token for whatever
+gateway sits in front of the receiver, a tenant id, a routing key:
+
+```json
+{ "headers": { "Authorization": "Bearer …", "X-Tenant": "acme" } }
+```
+
+They are merged in _under_ the four `x-tracker-*` headers and `content-type`,
+which always win, so nothing set here can spoof the signature a receiver
+verifies against. The transport headers (`host`, `content-length`,
+`connection`, `transfer-encoding` and friends) are refused for the same reason,
+as is any value carrying a control character — a CR in a header value is
+request splitting. Unlike the signing secret, header values are readable by
+workspace admins, because a header is something you edit.
+
+### Conditions
+
+Subscribing to `issue.updated` means every edit to every issue. Conditions
+narrow that to the ones worth sending — _when an issue is labeled `bug`, or
+when one is assigned to Claude_:
+
+```json
+{
+	"filter": {
+		"type": "group",
+		"match": "any",
+		"rules": [
+			{ "type": "condition", "field": "issue.labels", "operator": "includes", "value": "bug" },
+			{
+				"type": "condition",
+				"field": "issue.assignee.name",
+				"operator": "equals",
+				"value": "Claude"
+			}
+		]
+	}
+}
+```
+
+A group is `match: "all"` or `"any"` over its `rules`, and a rule is either a
+condition or another group — one level of nesting, which is `(A or B) and C`.
+Fields cover the event and actor, the issue (status, priority, labels, team,
+assignee, creator, repository), the comment, the feedback, and
+`changes.fields`, which is how you say "only when the priority changed".
+Operators depend on the field: `equals`, `contains`, `starts_with`, `in`,
+`includes_all`, `greater_than`, `is_set` and their negatives — the builder
+under **Settings → Webhooks** only offers the ones that apply, and shows the
+tree back to you as a sentence.
+
+The builder writes the same JSON, as chips that read like the issue filter
+bar. Fields whose values are known — labels, members, teams, repositories, and
+the fixed sets behind statuses, priorities and `changes.fields` — are picked
+from a list rather than typed, so a condition can't miss on a typo. The
+workspace-backed ones stay open: a value the workspace doesn't have yet can
+still be entered, since the API accepts any string there.
+
+Comparison is case- and whitespace-insensitive, so `Claude` matches `claude`.
+A field the event does not carry reads as unset rather than erroring, and a
+webhook with no conditions — or with an empty group — delivers everything it is
+subscribed to. Conditions are evaluated at enqueue time, so a filtered-out
+event leaves no delivery row at all. **Test sends skip them**, since a
+synthetic payload carries no issue to match against.
 
 **Delivery is at-least-once.** Deliveries are written to the database before
 anything is sent, attempted immediately, and retried on a backoff

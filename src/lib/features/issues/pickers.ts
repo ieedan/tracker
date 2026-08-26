@@ -5,6 +5,7 @@ import {
 	Dynamic,
 	ForEach,
 	Fragment,
+	If,
 	ImplementEffect,
 	Span,
 	signal,
@@ -38,7 +39,8 @@ import {
 	type IssuePriority,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Label, Member, Team, TeamRef, UserSummary } from "@/lib/domain/schemas";
+import type { Label, Member, Team, TeamRef, UserSummary, Workspace } from "@/lib/domain/schemas";
+import { WorkspaceAvatar } from "@/lib/components/workspace-avatar";
 import { cn } from "@/lib/utils";
 
 const triggerClass =
@@ -439,6 +441,86 @@ export function TeamPicker(
 						),
 				),
 			),
+		),
+	);
+}
+
+/**
+ * Which workspace the issue lands in — the crumb ahead of the team in the
+ * composer (ENG-58). With only one workspace there is nothing to pick, so the
+ * crumb is static text rather than a dropdown that opens onto a single row.
+ */
+export function WorkspacePicker(
+	current: Readable<Workspace | null>,
+	workspaces: Readable<Workspace[]>,
+	onPick: (slug: string) => void,
+	options: { class?: string } = {},
+) {
+	const value = followRadio(current, (workspace) => workspace?.slug ?? null);
+
+	// Fresh nodes per call — the crumb face is rendered in both branches.
+	const face = () =>
+		Fragment(
+			Dynamic([current], (workspace) =>
+				WorkspaceAvatar(workspace ?? undefined, "size-4 rounded-[4px] text-[8px]"),
+			),
+			Span(
+				{ class: "max-w-36 truncate leading-none" },
+				current.bind((workspace) => workspace?.name ?? "Workspace"),
+			),
+		);
+
+	return If(
+		workspaces.bind((list) => list.length > 1),
+		DropdownMenu(
+			{},
+			syncRadio(current, value, (workspace) => workspace?.slug ?? null),
+			DropdownMenuTrigger(
+				{
+					variant: "ghost",
+					size: "sm",
+					class: cn(
+						"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
+						options.class,
+					),
+					title: "Workspace",
+				},
+				face(),
+			),
+			DropdownMenuContent(
+				{ class: "w-56", align: "start", search: "File in workspace…", hotkeys: true },
+				DropdownMenuRadioGroup(
+					{
+						value,
+						onValueChange: (slug) => {
+							if (typeof slug === "string") onPick(slug);
+						},
+					},
+					DropdownMenuGroupHeading("Workspace"),
+					ForEach(
+						workspaces,
+						(workspace) => workspace.id,
+						(workspace) =>
+							DropdownMenuRadioItem(
+								// The avatar falls back to an initial, which would otherwise
+								// be part of what the filter matches on.
+								{ value: workspace.get().slug, label: workspace.get().name },
+								WorkspaceAvatar(workspace.get(), "size-4 rounded-[4px] text-[8px]"),
+								Span({ class: "flex-1 truncate" }, workspace.bind("name")),
+							),
+					),
+				),
+			),
+		),
+	).Else(
+		Span(
+			{
+				class: cn(
+					"flex items-center gap-1.5 px-1 text-[13px] leading-none font-medium text-muted-foreground",
+					options.class,
+				),
+			},
+			face(),
 		),
 	);
 }

@@ -56,6 +56,8 @@ export const POST = handler({
 			secret,
 			description: body.description,
 			events: body.events,
+			headers: body.headers,
+			filter: body.filter,
 			enabled: true,
 			createdBy: membership.user.id,
 			createdAt: new Date(),

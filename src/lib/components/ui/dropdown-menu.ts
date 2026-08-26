@@ -1,4 +1,4 @@
-import { Span, type Child, type ComponentProps } from "@implementjs/core";
+import { Div, Span, type Child, type ComponentProps } from "@implementjs/core";
 import { CheckIcon, ChevronRightIcon } from "@implementjs/lucide";
 import {
 	DropdownMenu as DropdownMenuPrimitive,
@@ -61,12 +61,11 @@ export const DropdownMenuContent = createComponent(function DropdownMenuContent(
 			offset,
 			...props,
 			"data-slot": "dropdown-menu-content",
-			// no overflow clipping: sub-content panels render nested inside and extend past this box
 			class: cn(
-				"absolute z-50 min-w-[8rem] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none",
+				"absolute z-50 flex max-h-[min(60vh,320px)] min-w-[8rem] flex-col rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none",
 				"origin-(--ip-dropdown-menu-content-transform-origin)",
 				"transition-[opacity,translate,scale,display] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transition-discrete motion-reduce:transition-none",
-				"data-[state=open]:block data-[state=open]:translate-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
+				"data-[state=open]:flex data-[state=open]:translate-0 data-[state=open]:scale-100 data-[state=open]:opacity-100",
 				"data-[state=closed]:pointer-events-none data-[state=closed]:hidden data-[state=closed]:scale-95 data-[state=closed]:opacity-0",
 				"data-[state=closed]:data-[side=bottom]:-translate-y-2 data-[state=closed]:data-[side=top]:translate-y-2 data-[state=closed]:data-[side=left]:translate-x-2 data-[state=closed]:data-[side=right]:-translate-x-2",
 				"starting:data-[state=open]:opacity-0 starting:data-[state=open]:scale-95",
@@ -76,8 +75,15 @@ export const DropdownMenuContent = createComponent(function DropdownMenuContent(
 		},
 		parts.behavior,
 		parts.header,
-		...children,
-		parts.empty,
+		// The rows scroll inside this viewport while the box above caps out at
+		// the max height, which keeps the filter box pinned at the top. The
+		// viewport is static and clips nothing positioned: sub-content panels
+		// place themselves against the content box and still extend past it.
+		Div(
+			{ "data-slot": "dropdown-menu-viewport", class: "min-h-0 overflow-x-hidden overflow-y-auto" },
+			...children,
+			parts.empty,
+		),
 	);
 });
 
@@ -280,12 +286,17 @@ export const DropdownMenuSubContent = createComponent(function DropdownMenuSubCo
 			"data-slot": "dropdown-menu-sub-content",
 			// submenus pop in without a transition, so they feel instant
 			class: cn(
-				"absolute z-50 min-w-[8rem] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none",
-				"data-[state=open]:block",
+				"absolute z-50 flex max-h-[min(60vh,320px)] min-w-[8rem] flex-col rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none",
+				"data-[state=open]:flex",
 				"data-[state=closed]:pointer-events-none data-[state=closed]:hidden",
 				className,
 			),
 		},
-		...children,
+		// Same scroll viewport as the root content, for the same reason: a
+		// submenu with enough rows scrolls instead of growing without bound.
+		Div(
+			{ "data-slot": "dropdown-menu-viewport", class: "min-h-0 overflow-x-hidden overflow-y-auto" },
+			...children,
+		),
 	);
 });

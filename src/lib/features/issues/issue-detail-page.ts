@@ -10,7 +10,6 @@ import {
 	Input,
 	P,
 	Span,
-	Textarea,
 	derived,
 	signal,
 	type Child,
@@ -46,11 +45,10 @@ import { createIssueOpen, openCreateIssue } from "./create-issue-dialog";
 import { isTyping } from "@/lib/client/is-typing";
 import { AssigneePicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
 import { IssueLabelPicker } from "./label-picker";
-import { IssueTimeline } from "./activity-feed";
+import { IssueTimeline, type CommentActions } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
-import { MentionMenu, fileMentions } from "./file-mentions";
 import { BodyComposer } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
 import { DeleteIssueButton } from "./delete-issue";
@@ -65,6 +63,8 @@ interface PageData {
 	teams: Team[];
 	members: Member[];
 	labels: Label[];
+	/** From the app layout — whose comments get an Edit and a Delete. */
+	user: { id: string };
 }
 
 export function IssueDetailPage({
@@ -81,6 +81,40 @@ export function IssueDetailPage({
 
 	const comments = signal(data.get().comments);
 	data.onChange((next) => comments.set(next.comments));
+
+	// Edit and delete return whether they landed, so the row knows to keep its
+	// editor or confirmation up when the server refused.
+	const commentActions: CommentActions = {
+		viewerId: data.bind((value) => value.user.id),
+		isAdmin: data.bind((value) => value.workspace.role === "admin"),
+		onEdit: async (id, body) => {
+			const { data: updated, error } = await api.PATCH(
+				"/api/v1/workspaces/[slug]/issues/[identifier]/comments/[commentId]",
+				{
+					params: { slug: params.slug.get(), identifier: issue.get().identifier, commentId: id },
+					body: { body },
+				},
+			);
+			if (error !== undefined) {
+				toastError(messageOf(error, "Could not update the comment"));
+				return false;
+			}
+			comments.set(comments.get().map((entry) => (entry.id === id ? updated : entry)));
+			return true;
+		},
+		onDelete: async (id) => {
+			const { error } = await api.DELETE(
+				"/api/v1/workspaces/[slug]/issues/[identifier]/comments/[commentId]",
+				{ params: { slug: params.slug.get(), identifier: issue.get().identifier, commentId: id } },
+			);
+			if (error !== undefined) {
+				toastError(messageOf(error, "Could not delete the comment"));
+				return false;
+			}
+			comments.set(comments.get().filter((entry) => entry.id !== id));
+			return true;
+		},
+	};
 
 	const activity = signal(data.get().activity);
 	data.onChange((next) => activity.set(next.activity));
@@ -244,6 +278,7 @@ export function IssueDetailPage({
 						issue,
 						params,
 						issue.bind((value) => value.repository?.id),
+						commentActions,
 					),
 				),
 			),
@@ -514,6 +549,7 @@ function EditableDescription(
 					rows: 4,
 					autoGrow: true,
 					renderMentions: true,
+					toolbar: true,
 					onBlur: commit,
 					// Blur commits, so ⌘⏎ only has to leave the box.
 					onSubmit: () => draftRef.get()?.blur(),
@@ -573,20 +609,13 @@ function CommentThread(
 	issue: Readable<Issue>,
 	params: { slug: Readable<string>; identifier: Readable<string> },
 	repositoryId: Readable<string | undefined>,
+	actions: CommentActions,
 ) {
 	const draft = signal("");
 	const posting = signal(false);
 	const draftRef = signal<HTMLTextAreaElement | null>(null);
 	const draftAttachments = signal<Attachment[]>([]);
 	const draftUploads = signal<Upload[]>([]);
-
-	// The same `@` as the description, narrowed to the issue's repository.
-	const mentions = fileMentions({
-		value: draft,
-		slug: () => params.slug.get(),
-		repository: () => repositoryId.get(),
-		element: draftRef,
-	});
 
 	const attach = (files: File[]) => {
 		beginUploads({
@@ -630,7 +659,7 @@ function CommentThread(
 
 		Div(
 			{ class: "flex flex-col gap-4" },
-			IssueTimeline({ comments, activity, issue, slug: params.slug }),
+			IssueTimeline({ comments, activity, issue, slug: params.slug, actions }),
 		),
 
 		Div(
@@ -638,21 +667,20 @@ function CommentThread(
 				class: "relative flex flex-col gap-2 rounded-md border border-border p-3",
 				onPaste: (event) => preventFilePaste(event, attach),
 			},
-			Textarea({
-				this: draftRef,
+			// The same box as the description and the create dialog — the same `@`
+			// wiring, the same toolbar, the same preview — so a comment is written
+			// the way every other body on the page is.
+			BodyComposer({
 				value: draft,
-				rows: 3,
+				element: draftRef,
+				slug: () => params.slug.get(),
+				repository: () => repositoryId.get(),
 				placeholder: "Leave a comment… @ to reference a file",
-				class:
-					"resize-none border-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground",
-				onInput: mentions.onInput,
-				onKeydown: (event) => {
-					mentions.onKeydown(event);
-					if (event.defaultPrevented) return;
-					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void post();
-				},
+				rows: 3,
+				autoGrow: true,
+				toolbar: true,
+				onSubmit: () => void post(),
 			}),
-			MentionMenu(mentions),
 			AttachmentGrid({
 				attachments: draftAttachments,
 				uploads: draftUploads,
@@ -663,10 +691,6 @@ function CommentThread(
 			Div(
 				{ class: "flex items-center gap-2" },
 				AttachTrigger({ onFiles: attach }),
-				// The box looks like a plain textarea, so nothing about it says the
-				// body will be rendered. One line, not a toolbar: the point is to
-				// tell someone who already knows markdown that it will be honoured.
-				Span({ class: "hidden text-[11px] text-muted-foreground sm:inline" }, "Markdown supported"),
 				Button(
 					{
 						size: "sm",
