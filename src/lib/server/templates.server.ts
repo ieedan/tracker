@@ -9,6 +9,7 @@ import {
 	issueTemplate,
 	issueTemplateLabel,
 	label,
+	repository,
 	team,
 	user,
 	workspaceMember,
@@ -19,10 +20,16 @@ type TemplateRow = typeof issueTemplate.$inferSelect;
 type TeamRow = typeof team.$inferSelect;
 type UserRow = typeof user.$inferSelect;
 type LabelRow = typeof label.$inferSelect;
+type RepositoryRow = typeof repository.$inferSelect;
 
 function toTemplate(
 	row: TemplateRow,
-	parts: { team: TeamRow | null; assignee: UserRow | null; labels: LabelRow[] },
+	parts: {
+		team: TeamRow | null;
+		assignee: UserRow | null;
+		repository: RepositoryRow | null;
+		labels: LabelRow[];
+	},
 ): IssueTemplate {
 	return {
 		id: row.id,
@@ -34,6 +41,14 @@ function toTemplate(
 		status: row.status,
 		priority: row.priority,
 		assignee: parts.assignee === null ? null : toUser(parts.assignee),
+		repository:
+			parts.repository === null
+				? null
+				: {
+						id: parts.repository.id,
+						fullName: `${parts.repository.owner}/${parts.repository.name}`,
+						provider: parts.repository.provider,
+					},
 		labels: parts.labels.map(toLabel),
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -47,7 +62,12 @@ function toTemplate(
  * which would multiply each template row by its label count.
  */
 async function hydrate(
-	rows: Array<{ template: TemplateRow; team: TeamRow | null; assignee: UserRow | null }>,
+	rows: Array<{
+		template: TemplateRow;
+		team: TeamRow | null;
+		assignee: UserRow | null;
+		repository: RepositoryRow | null;
+	}>,
 ): Promise<IssueTemplate[]> {
 	if (rows.length === 0) return [];
 
@@ -69,6 +89,7 @@ async function hydrate(
 		toTemplate(row.template, {
 			team: row.team,
 			assignee: row.assignee,
+			repository: row.repository,
 			labels: (byTemplate.get(row.template.id) ?? []).toSorted((a, b) =>
 				a.name.localeCompare(b.name),
 			),
@@ -78,10 +99,11 @@ async function hydrate(
 
 const withJoins = () =>
 	db
-		.select({ template: issueTemplate, team, assignee: user })
+		.select({ template: issueTemplate, team, assignee: user, repository })
 		.from(issueTemplate)
 		.leftJoin(team, eq(team.id, issueTemplate.teamId))
-		.leftJoin(user, eq(user.id, issueTemplate.assigneeId));
+		.leftJoin(user, eq(user.id, issueTemplate.assigneeId))
+		.leftJoin(repository, eq(repository.id, issueTemplate.repositoryId));
 
 /** Every template in the workspace, alphabetically — the order the menu shows. */
 export async function listIssueTemplates(workspaceId: string): Promise<IssueTemplate[]> {
@@ -149,4 +171,25 @@ export async function resolveTemplateAssignee(
 		.limit(1);
 
 	return rows[0]?.userId ?? null;
+}
+
+/**
+ * The repository id a template may scope new issues to, or null.
+ *
+ * A repository the workspace has since unlinked — or never linked — is dropped
+ * rather than kept as a default the issue endpoint would reject at create time.
+ */
+export async function resolveTemplateRepository(
+	workspaceId: string,
+	repositoryId: string | null,
+): Promise<string | null> {
+	if (repositoryId === null) return null;
+
+	const rows = await db
+		.select({ id: repository.id })
+		.from(repository)
+		.where(and(eq(repository.workspaceId, workspaceId), eq(repository.id, repositoryId)))
+		.limit(1);
+
+	return rows[0]?.id ?? null;
 }
