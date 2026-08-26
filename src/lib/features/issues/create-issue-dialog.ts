@@ -9,13 +9,16 @@ import {
 	ImplementEffect,
 	ImplementLifecycle,
 	Input,
+	type Readable,
 	Span,
 	signal,
 } from "@implementjs/core";
 import { X } from "@implementjs/lucide";
+import { router } from "$implement/router";
 import { api, messageOf } from "@/lib/client/api";
 import { isTyping } from "@/lib/client/is-typing";
-import { toastError, toastSuccess } from "@/lib/client/toast";
+import { toastError, toastSuccess, toasts } from "@/lib/client/toast";
+import type { ToasterToastData } from "@/lib/components/ui/toast";
 import { Button } from "@/lib/components/ui/button";
 import {
 	Breadcrumb,
@@ -43,6 +46,7 @@ import type {
 	Repository,
 	Team,
 	TeamRef,
+	Workspace,
 } from "@/lib/domain/schemas";
 import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
 import {
@@ -61,7 +65,14 @@ import {
 	saveIssueDraft,
 	type IssueDraft,
 } from "./issue-draft";
-import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
+import {
+	AssigneePicker,
+	LabelPicker,
+	PriorityPicker,
+	StatusPicker,
+	TeamPicker,
+	WorkspacePicker,
+} from "./pickers";
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
 import { BodyComposer } from "./body-composer";
 
@@ -126,7 +137,7 @@ export function openCreateIssueFromTemplate(
 	open.set(true);
 }
 
-export function CreateIssueDialog() {
+export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 	const title = signal("");
 	const description = signal("");
 	const status = signal<IssueStatus>("backlog");
@@ -148,6 +159,16 @@ export function CreateIssueDialog() {
 	const chosenTeam = signal<TeamRef | null>(null);
 	const repositories = signal<Repository[]>([]);
 	const chosenRepository = signal<RepositoryRef | null>(null);
+	// ENG-58: the breadcrumb can retarget the issue at any workspace you belong
+	// to. `slug` stays the workspace the composer opened from — drafts are keyed
+	// by it — while everything workspace-scoped (pickers, uploads, the create
+	// itself) reads `issueSlug`.
+	const workspaces = signal<Workspace[]>([]);
+	const chosenWorkspace = signal<Workspace | null>(null);
+	const issueSlug = derived(
+		[chosenWorkspace, slug],
+		(workspace, origin) => workspace?.slug ?? origin,
+	);
 	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
 	const hasDraft = signal(false);
 	const statusOpen = signal(false);
@@ -171,6 +192,8 @@ export function CreateIssueDialog() {
 	// flag keeps those writes from clobbering storage before they settle.
 	let hydrating = false;
 	let persistTimer: ReturnType<typeof setTimeout> | undefined;
+	// A slow response for a workspace the crumb has since left must not land.
+	let scopeTicket = 0;
 
 	const snapshot = (): IssueDraft => ({
 		title: title.get(),
@@ -248,7 +271,10 @@ export function CreateIssueDialog() {
 	 */
 	const resetToDefaults = () => {
 		reset();
-		chosenTeam.set(teamRefFor(teams.get(), preferredTeam.get()));
+		// The workspace crumb survives a reset — you chose where to file — but the
+		// preferred team only means anything in the workspace it came from.
+		const home = issueSlug.get() === slug.get();
+		chosenTeam.set(teamRefFor(teams.get(), home ? preferredTeam.get() : ""));
 	};
 
 	const discard = () => {
@@ -257,21 +283,33 @@ export function CreateIssueDialog() {
 			persistTimer = undefined;
 		}
 		const leftover = attachments.get();
-		const workspaceSlug = slug.get();
+		// Files were uploaded to wherever the crumb pointed, which is not
+		// necessarily the workspace the draft is keyed by.
+		const uploadSlug = issueSlug.get();
 		hydrating = true;
-		clearIssueDraft(workspaceSlug);
+		clearIssueDraft(slug.get());
 		hasDraft.set(false);
 		resetToDefaults();
 		hydrating = false;
 		for (const file of leftover) {
 			void api.DELETE("/api/v1/workspaces/[slug]/attachments/[id]", {
-				params: { slug: workspaceSlug, id: file.id },
+				params: { slug: uploadSlug, id: file.id },
 			});
 		}
 	};
 
 	const loadContext = async (workspaceSlug: string) => {
 		hydrating = true;
+		// A fresh open always starts in the workspace it was opened from, and any
+		// scope load a previous open left in flight is stale now.
+		const ticket = ++scopeTicket;
+		// The crumb should read "this workspace" the moment the composer opens,
+		// not once five requests land. The shell already knows the membership
+		// list, so seed the picker from it (or from the last open's fetch) and
+		// let the fresh response below reconcile.
+		const seeded = workspaces.get().length > 0 ? workspaces.get() : (knownWorkspaces?.get() ?? []);
+		if (workspaces.get().length === 0 && seeded.length > 0) workspaces.set(seeded);
+		chosenWorkspace.set(seeded.find((workspace) => workspace.slug === workspaceSlug) ?? null);
 		try {
 			// Read on open rather than at module load: there is no storage during
 			// SSR, and another tab may have flipped it since.
@@ -302,12 +340,27 @@ export function CreateIssueDialog() {
 				uploads.set([]);
 			}
 
-			const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
-				api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
-				api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
-				api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
-				api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
-			]);
+			const [memberResult, labelResult, teamResult, repoResult, workspaceResult] =
+				await Promise.all([
+					api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
+					api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
+					api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
+					api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
+					api.GET("/api/v1/workspaces"),
+				]);
+			if (workspaceResult.error === undefined) {
+				workspaces.set(workspaceResult.data);
+				// Swap the seeded object for its freshly fetched self — without
+				// undoing a retarget made while these requests were in flight.
+				const pickedSlug = chosenWorkspace.get()?.slug ?? workspaceSlug;
+				chosenWorkspace.set(
+					workspaceResult.data.find((workspace) => workspace.slug === pickedSlug) ??
+						chosenWorkspace.get(),
+				);
+			}
+			// A crumb pick mid-flight owns the workspace scope now — its own
+			// loadWorkspaceScope is (or was) fetching against the new slug.
+			if (ticket !== scopeTicket) return;
 			if (repoResult.error === undefined) {
 				repositories.set(repoResult.data);
 				if (draft !== null) {
@@ -364,6 +417,62 @@ export function CreateIssueDialog() {
 		}
 	};
 
+	/**
+	 * Everything the pickers show is scoped to a workspace — people, labels,
+	 * teams, repositories — so a crumb switch refetches the lot against the new
+	 * slug. The team lands on the new workspace's default; the team you were
+	 * looking at only means anything back in the workspace you came from.
+	 */
+	const loadWorkspaceScope = async (workspaceSlug: string) => {
+		const ticket = ++scopeTicket;
+		const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
+			api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
+			api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
+			api.GET("/api/v1/workspaces/[slug]/teams", { params: { slug: workspaceSlug } }),
+			api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: workspaceSlug } }),
+		]);
+		if (ticket !== scopeTicket) return;
+		if (memberResult.error === undefined) members.set(memberResult.data);
+		if (labelResult.error === undefined) labels.set(labelResult.data);
+		if (repoResult.error === undefined) repositories.set(repoResult.data);
+		if (teamResult.error === undefined) {
+			teams.set(teamResult.data);
+			chosenTeam.set(
+				teamRefFor(teamResult.data, workspaceSlug === slug.get() ? preferredTeam.get() : ""),
+			);
+		}
+	};
+
+	/**
+	 * The breadcrumb picked another workspace. The title and description travel
+	 * with you; everything that names something in the workspace being left —
+	 * assignee, labels, repository, uploaded files — cannot cross with the
+	 * issue, so those are cleared and the files deleted rather than orphaned.
+	 */
+	const pickWorkspace = (picked: string) => {
+		const next = workspaces.get().find((workspace) => workspace.slug === picked);
+		if (next === undefined || next.slug === issueSlug.get()) return;
+
+		const leftover = attachments.get();
+		const leaving = issueSlug.get();
+		for (const file of leftover) {
+			void api.DELETE("/api/v1/workspaces/[slug]/attachments/[id]", {
+				params: { slug: leaving, id: file.id },
+			});
+		}
+
+		chosenWorkspace.set(next);
+		assignee.set(null);
+		chosenLabels.set([]);
+		chosenRepository.set(null);
+		attachments.set([]);
+		uploads.set([]);
+		// Nothing to file to until the new workspace's teams arrive; the create
+		// button stays disabled through the gap.
+		chosenTeam.set(null);
+		void loadWorkspaceScope(next.slug);
+	};
+
 	const submit = async () => {
 		// One create per request: the dialog-level shortcut can fire while a
 		// create is already in flight, and must not file the issue twice.
@@ -375,8 +484,9 @@ export function CreateIssueDialog() {
 		if (trimmed === "" || team === null) return;
 
 		submitting.set(true);
+		const targetSlug = issueSlug.get();
 		const { data, error } = await api.POST("/api/v1/workspaces/[slug]/issues", {
-			params: { slug: slug.get() },
+			params: { slug: targetSlug },
 			body: {
 				teamKey: team.key,
 				title: trimmed,
@@ -396,8 +506,27 @@ export function CreateIssueDialog() {
 			return;
 		}
 
-		issueCreated.set(data);
-		toastSuccess(`Created ${data.identifier}`);
+		if (targetSlug === slug.get()) {
+			issueCreated.set(data);
+			toastSuccess(`Created ${data.identifier}`);
+		} else {
+			// Filed somewhere else: the open pages must not adopt it, and the app
+			// does not walk you over there uninvited — the toast carries the way.
+			toasts.add({
+				type: "success",
+				title: `Created ${data.identifier} in ${chosenWorkspace.get()?.name ?? targetSlug}`,
+				data: {
+					action: {
+						label: "View",
+						onClick: () =>
+							router.navigate("/app/:slug/issue/:identifier", {
+								slug: targetSlug,
+								identifier: data.identifier,
+							}),
+					},
+				} satisfies ToasterToastData,
+			});
+		}
 		hydrating = true;
 		// The draft belonged to the issue that now exists; a pending save of it
 		// would only write it back.
@@ -425,7 +554,7 @@ export function CreateIssueDialog() {
 	const attach = (files: File[]) => {
 		beginUploads({
 			files,
-			slug: slug.get(),
+			slug: issueSlug.get(),
 			uploads,
 			onUploaded: (attachment) => {
 				attachments.push(attachment);
@@ -529,6 +658,12 @@ export function CreateIssueDialog() {
 						BreadcrumbList(
 							{ class: "items-center gap-1 leading-none sm:gap-1.5" },
 							BreadcrumbItem(
+								// ENG-58: file into any workspace you belong to, defaulting
+								// to the one the composer opened from.
+								WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace),
+							),
+							BreadcrumbSeparator(),
+							BreadcrumbItem(
 								TeamPicker(
 									chosenTeam,
 									teams,
@@ -585,7 +720,7 @@ export function CreateIssueDialog() {
 						value: description,
 						element: descriptionRef,
 						// `@` in the description searches the linked repositories' file index.
-						slug: () => slug.get(),
+						slug: () => issueSlug.get(),
 						repository: () => chosenRepository.get()?.id,
 						placeholder: "Add description… @ to reference a file",
 						rows: 4,
@@ -595,8 +730,9 @@ export function CreateIssueDialog() {
 					AttachmentGrid({
 						attachments,
 						uploads,
-						slug,
-						onRemove: (attachment) => void removeAttachment(slug.get(), attachment, attachments),
+						slug: issueSlug,
+						onRemove: (attachment) =>
+							void removeAttachment(issueSlug.get(), attachment, attachments),
 					}),
 				),
 
@@ -651,7 +787,7 @@ export function CreateIssueDialog() {
 					),
 				),
 
-				DialogDescription({ class: "sr-only" }, "Create a new issue in this workspace."),
+				DialogDescription({ class: "sr-only" }, "Create a new issue in the selected workspace."),
 
 				Div(
 					{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
