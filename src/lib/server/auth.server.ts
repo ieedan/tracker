@@ -153,6 +153,11 @@ export const auth = betterAuth({
 	secret: env.BETTER_AUTH_SECRET,
 	baseURL: env.BETTER_AUTH_URL,
 	basePath: "/api/auth",
+	// Added to `baseURL`, which better-auth trusts by itself — see the schema
+	// for why a preview deployment needs more than one.
+	trustedOrigins: env.BETTER_AUTH_TRUSTED_ORIGINS.split(",")
+		.map((origin) => origin.trim())
+		.filter((origin) => origin !== ""),
 	database: drizzleAdapter(db, { provider: "sqlite", schema }),
 	// `/token` belongs to the OAuth provider, not to better-auth's own handler.
 	disabledPaths: ["/token"],
