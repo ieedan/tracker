@@ -138,7 +138,8 @@ export function validateTemplate(template: string): string | null {
 /**
  * What the settings dialog previews against, and what `validateTemplate`
  * renders. The quotes in the title are deliberate: they are exactly what the
- * escaped form exists to survive.
+ * escaped form exists to survive. The issue is the full serialized shape, so
+ * the editor's suggestions and preview show what a real delivery carries.
  */
 export const SAMPLE_EVENT: TemplateEvent = {
 	id: "dlv_sample0000000000000",
@@ -155,10 +156,153 @@ export const SAMPLE_EVENT: TemplateEvent = {
 	data: {
 		issue: {
 			id: "iss_sample",
+			number: 42,
 			identifier: "ENG-42",
+			team: { id: "team_sample", name: "Engineering", key: "ENG" },
 			title: 'Fix the "remember me" redirect loop',
+			description: "Signing in with remember me checked redirects back to /login.",
 			status: "todo",
 			priority: "high",
+			assignee: null,
+			creator: {
+				id: "usr_sample",
+				name: "Ada Lovelace",
+				email: "ada@example.com",
+				image: null,
+				type: "human",
+			},
+			labels: [{ id: "lbl_sample", name: "Bug", color: "#ef4444" }],
+			commentCount: 0,
+			repository: null,
+			pullRequest: null,
+			feedback: null,
+			attachments: [],
+			createdAt: "2026-01-01T12:00:00.000Z",
+			updatedAt: "2026-01-01T12:00:00.000Z",
 		},
 	},
 };
+
+// ---------------------------------------------------------------------------
+// Editor support: suggestions and highlighting
+// ---------------------------------------------------------------------------
+
+export interface TemplateSuggestion {
+	path: string;
+	/** What sits there — a sample value, or which events carry it. */
+	hint: string;
+}
+
+/**
+ * Hand-written hints where the sample value alone would mislead — fields that
+ * are null until something sets them, and fields the sample event lacks
+ * because they belong to other event kinds.
+ */
+const HINT_OVERRIDES: Record<string, string> = {
+	summary: "one line: what happened, to what, by whom",
+	actor: "who did it; null for system events",
+	"actor.onBehalfOf": "the human an agent acted for; null otherwise",
+	data: "the event's entities — differs per event kind",
+	"data.issue.assignee": "null until assigned; a user object after",
+	"data.issue.repository": "null unless scoped to a repository",
+	"data.issue.pullRequest": "null until a PR is linked",
+	"data.issue.feedback": "null unless converted from feedback",
+	"data.issue.attachments": "files on the issue",
+	"data.issue.labels": "the issue's labels",
+};
+
+/** Fields the sample `issue.created` event cannot show. */
+const EXTRA_SUGGESTIONS: TemplateSuggestion[] = [
+	{ path: "data.changes", hint: "what moved, on *.updated and *.status_changed" },
+	{ path: "data.comment", hint: "the reply, on comment events" },
+	{ path: "data.comment.body", hint: "comment events" },
+	{ path: "data.comment.id", hint: "comment events" },
+	{ path: "data.comment.createdAt", hint: "comment events" },
+	{ path: "data.feedback", hint: "the feedback, on feedback.* events" },
+	{ path: "data.feedback.identifier", hint: '"FB-12" — feedback.* events' },
+	{ path: "data.feedback.title", hint: "feedback.* events" },
+	{ path: "data.feedback.number", hint: "feedback.* events" },
+	{ path: "data.feedback.status", hint: "feedback.* events" },
+	{ path: "data.feedback.description", hint: "feedback.* events" },
+];
+
+function hintFor(value: unknown): string {
+	if (value === null) return "null in the sample";
+	if (typeof value === "string") {
+		const quoted = JSON.stringify(value);
+		return quoted.length <= 42 ? quoted : `${quoted.slice(0, 41)}…"`;
+	}
+	if (Array.isArray(value)) return "array — {{{…}}} inserts it as JSON";
+	if (typeof value === "object") return "object — {{{…}}} inserts it as JSON";
+	return String(value);
+}
+
+function flatten(value: unknown, path: string, into: TemplateSuggestion[]): void {
+	if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+		into.push({ path, hint: HINT_OVERRIDES[path] ?? hintFor(value) });
+		for (const [key, child] of Object.entries(value)) flatten(child, `${path}.${key}`, into);
+		return;
+	}
+	into.push({ path, hint: HINT_OVERRIDES[path] ?? hintFor(value) });
+}
+
+/** Everything the editor offers, `summary` first, in event order. */
+export const TEMPLATE_SUGGESTIONS: TemplateSuggestion[] = (() => {
+	const suggestions: TemplateSuggestion[] = [
+		{ path: "summary", hint: HINT_OVERRIDES.summary ?? "" },
+	];
+	for (const [key, value] of Object.entries(SAMPLE_EVENT)) flatten(value, key, suggestions);
+	suggestions.push(...EXTRA_SUGGESTIONS);
+	return suggestions;
+})();
+
+const KNOWN_PATHS = new Set(TEMPLATE_SUGGESTIONS.map((entry) => entry.path));
+
+/**
+ * Whether a path names something deliveries can carry. Paths under objects
+ * whose shape varies (`data.changes.title.from`) and array indexing into the
+ * sample (`data.issue.labels.0.name`) count as known; anything else is likely
+ * a typo, which is what the editor's highlighting flags.
+ */
+export function isKnownPath(path: string): boolean {
+	if (KNOWN_PATHS.has(path)) return true;
+	if (resolve(SAMPLE_EVENT, path) !== undefined) return true;
+	return ["data.changes.", "data.comment.", "data.feedback."].some((prefix) =>
+		path.startsWith(prefix),
+	);
+}
+
+/** The suggestions matching a partly-typed path, for the completion menu. */
+export function suggestTemplatePaths(token: string, limit = 8): TemplateSuggestion[] {
+	const query = token.toLowerCase();
+	return TEMPLATE_SUGGESTIONS.filter((entry) => entry.path.toLowerCase().startsWith(query)).slice(
+		0,
+		limit,
+	);
+}
+
+export interface TemplateSegment {
+	text: string;
+	kind: "text" | "known" | "unknown";
+}
+
+/**
+ * The template cut into runs for the editor's highlight layer: plain text,
+ * placeholders whose path the events carry, and placeholders that look like
+ * typos. Concatenating the segments always reproduces the template exactly —
+ * the layer renders *instead of* the textarea's own text, so a dropped
+ * character would corrupt what the person sees.
+ */
+export function segmentTemplate(template: string): TemplateSegment[] {
+	const segments: TemplateSegment[] = [];
+	let last = 0;
+	for (const match of template.matchAll(PLACEHOLDER)) {
+		if (match.index > last)
+			segments.push({ text: template.slice(last, match.index), kind: "text" });
+		const path = match[1] ?? match[2] ?? "";
+		segments.push({ text: match[0], kind: isKnownPath(path) ? "known" : "unknown" });
+		last = match.index + match[0].length;
+	}
+	if (last < template.length) segments.push({ text: template.slice(last), kind: "text" });
+	return segments;
+}

@@ -83,7 +83,13 @@ import {
 	type WebhookEvent,
 	type WebhookFormat,
 } from "@/lib/domain/webhooks";
-import { renderTemplate, SAMPLE_EVENT, validateTemplate } from "@/lib/domain/webhook-templates";
+import {
+	renderTemplate,
+	SAMPLE_EVENT,
+	segmentTemplate,
+	suggestTemplatePaths,
+	validateTemplate,
+} from "@/lib/domain/webhook-templates";
 import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
@@ -861,10 +867,34 @@ function FormatPicker(format: Signal<string | null>, template: Signal<string>) {
 	);
 }
 
+const TEMPLATE_EDITOR_ID = "webhook-template-editor";
+const TEMPLATE_OVERLAY_ID = "webhook-template-overlay";
+
+const segmentClass = (kind: string) =>
+	cn(
+		kind === "known" && "font-medium text-primary",
+		kind === "unknown" && "text-amber-600 underline decoration-dotted dark:text-amber-500",
+	);
+
+/** What the caret is in the middle of completing, or null when idle. */
+interface CompletionState {
+	/** Where the partly-typed path begins in the template. */
+	start: number;
+	token: string;
+	/** How many braces opened the placeholder — 2 escaped, 3 raw. */
+	opens: number;
+}
+
 /**
- * The custom body, edited with a live preview so quoting mistakes surface
- * while typing rather than as a failed delivery. The preview renders the same
- * sample event the server validates against.
+ * The custom body, edited with highlighting, path completion, and a live
+ * preview, so quoting mistakes and typo'd paths surface while typing rather
+ * than as a failed delivery. The preview renders the same sample event the
+ * server validates against.
+ *
+ * Highlighting is the classic overlay trick: the textarea's own text is
+ * transparent (the caret is not), and a pointer-transparent layer behind it
+ * renders the same characters with the placeholders tinted. The two stay
+ * aligned because they share font, padding, wrapping, and scroll offsets.
  */
 function TemplateEditor(template: Signal<string>) {
 	const preview = template.bind((value) => {
@@ -874,22 +904,178 @@ function TemplateEditor(template: Signal<string>) {
 		return { ok: true, text: renderTemplate(value, SAMPLE_EVENT) };
 	});
 
+	const segments = template.bind((value) =>
+		segmentTemplate(value).map((segment, index) => ({
+			...segment,
+			// Content in the key on purpose: segments have no identity across
+			// edits, so an edited run must remount rather than patch a neighbor.
+			key: `${index}:${segment.kind}:${segment.text}`,
+		})),
+	);
+
+	const completion = signal<CompletionState | null>(null);
+	const menuIndex = signal(0);
+	const matches = derived([completion], (state) =>
+		state === null ? [] : suggestTemplatePaths(state.token),
+	);
+
+	const editorElement = (): HTMLTextAreaElement | null =>
+		document.getElementById(TEMPLATE_EDITOR_ID) as HTMLTextAreaElement | null;
+
+	/** Re-derive the completion context from wherever the caret now sits. */
+	const refreshCompletion = () => {
+		const element = editorElement();
+		if (element === null || element.selectionStart !== element.selectionEnd) {
+			completion.set(null);
+			return;
+		}
+		const caret = element.selectionStart ?? 0;
+		const opened = /(\{\{\{?)\s*([\w.]*)$/.exec(element.value.slice(0, caret));
+		if (opened === null) {
+			completion.set(null);
+			return;
+		}
+		const token = opened[2] ?? "";
+		const state: CompletionState = {
+			start: caret - token.length,
+			token,
+			opens: (opened[1] ?? "{{").length,
+		};
+		const previous = completion.get();
+		if (previous === null || previous.start !== state.start || previous.token !== state.token) {
+			menuIndex.set(0);
+			completion.set(state);
+		}
+	};
+
+	const accept = (path: string) => {
+		const element = editorElement();
+		const state = completion.get();
+		if (element === null || state === null) return;
+
+		const value = element.value;
+		const caretBefore = element.selectionStart ?? state.start + state.token.length;
+		const after = value.slice(caretBefore);
+		// Only add the closers the person has not already typed.
+		const closersPresent = (/^\}{0,3}/.exec(after)?.[0] ?? "").length;
+		const closersNeeded = Math.max(0, state.opens - closersPresent);
+
+		template.set(value.slice(0, state.start) + path + "}".repeat(closersNeeded) + after);
+		completion.set(null);
+
+		const caretAfter = state.start + path.length + closersNeeded + closersPresent;
+		requestAnimationFrame(() => {
+			const restored = editorElement();
+			restored?.focus();
+			restored?.setSelectionRange(caretAfter, caretAfter);
+		});
+	};
+
+	const onKeydown = (event: KeyboardEvent) => {
+		const list = matches.get();
+		if (completion.get() === null || list.length === 0) return;
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			menuIndex.set((menuIndex.get() + 1) % list.length);
+		} else if (event.key === "ArrowUp") {
+			event.preventDefault();
+			menuIndex.set((menuIndex.get() - 1 + list.length) % list.length);
+		} else if (event.key === "Enter" || event.key === "Tab") {
+			event.preventDefault();
+			accept(list[menuIndex.get()]!.path);
+		} else if (event.key === "Escape") {
+			// Swallowed so the dialog stays open; a second Escape closes it.
+			event.stopPropagation();
+			completion.set(null);
+		}
+	};
+
+	const syncScroll = () => {
+		const element = editorElement();
+		const overlay = document.getElementById(TEMPLATE_OVERLAY_ID);
+		if (element === null || overlay === null) return;
+		overlay.scrollTop = element.scrollTop;
+		overlay.scrollLeft = element.scrollLeft;
+	};
+
 	return Div(
 		{ class: "flex flex-col gap-1.5" },
-		Textarea({
-			value: template,
-			spellcheck: false,
-			autocapitalize: "off",
-			"aria-label": "Body template",
-			placeholder: '{\n\t"text": "{{summary}}"\n}',
-			class: "max-h-48 min-h-24 font-mono text-[12px] md:text-[12px]",
-		}),
+		Div(
+			{ class: "relative rounded-md dark:bg-input/30" },
+			Div(
+				{
+					id: TEMPLATE_OVERLAY_ID,
+					"aria-hidden": "true",
+					class:
+						"pointer-events-none absolute inset-0 overflow-hidden rounded-md border border-transparent px-3 py-2 font-mono text-[12px] break-words whitespace-pre-wrap text-foreground/90",
+				},
+				ForEach(
+					segments,
+					(segment) => segment.key,
+					(segment) =>
+						Span(
+							{ class: segment.bind((value) => segmentClass(value.kind)) },
+							segment.bind("text"),
+						),
+				),
+				// Keeps a trailing empty line the same height the textarea gives it.
+				Span({}, "​"),
+			),
+			Textarea({
+				id: TEMPLATE_EDITOR_ID,
+				value: template,
+				spellcheck: false,
+				autocapitalize: "off",
+				"aria-label": "Body template",
+				placeholder: '{\n\t"text": "{{summary}}"\n}',
+				class:
+					"relative max-h-48 min-h-24 bg-transparent font-mono text-[12px] text-transparent caret-foreground md:text-[12px] dark:bg-transparent",
+				onKeydown,
+				onInput: refreshCompletion,
+				onKeyup: refreshCompletion,
+				onClick: refreshCompletion,
+				onBlur: () => completion.set(null),
+				onScroll: syncScroll,
+			}),
+			If(
+				matches.bind((list) => list.length > 0),
+				Div(
+					{
+						class:
+							"absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-md",
+					},
+					ForEach(
+						matches,
+						(match) => match.path,
+						(match) =>
+							Div(
+								{
+									class: derived([menuIndex, matches, match], (index, list, entry) =>
+										cn(
+											"flex cursor-pointer items-baseline gap-2 px-2.5 py-1.5",
+											list[index]?.path === entry.path && "bg-secondary",
+										),
+									),
+									// preventDefault keeps focus (and the completion state) in
+									// the textarea so the click can land on `accept`.
+									onMousedown: (event) => event.preventDefault(),
+									onClick: () => accept(match.get().path),
+								},
+								Span({ class: "shrink-0 font-mono text-[12px]" }, match.bind("path")),
+								Span(
+									{ class: "min-w-0 truncate text-[11px] text-muted-foreground" },
+									match.bind("hint"),
+								),
+							),
+					),
+				),
+			),
+		),
 		P(
 			{ class: "text-[11px] text-muted-foreground" },
-			"Any path into the event works: {{event}}, {{workspace.name}}, {{actor.name}}, " +
-				"{{data.issue.identifier}}, {{data.issue.title}} — plus {{summary}}, a one-line " +
-				"description. {{…}} escapes for use inside strings; {{{…}}} inserts raw JSON, " +
-				"e.g. {{{data.issue}}}.",
+			"Type {{ to list every path the event carries — {{summary}}, {{event}}, " +
+				"{{data.issue.identifier}}, and the rest. {{…}} escapes for use inside strings; " +
+				"{{{…}}} inserts raw JSON, e.g. {{{data.issue}}}. Unknown paths are underlined.",
 		),
 		Div(
 			{ class: "flex flex-col gap-1 rounded-md border border-border bg-secondary/30 px-3 py-2" },
