@@ -9,6 +9,7 @@ import {
 	listIssueTemplates,
 	requireIssueTemplate,
 	resolveTemplateAssignee,
+	resolveTemplateRepository,
 	setTemplateLabels,
 } from "@/lib/server/templates.server";
 import { handler, json } from "./$types";
@@ -51,6 +52,7 @@ export const POST = handler({
 			status: body.status,
 			priority: body.priority,
 			assigneeId: await resolveTemplateAssignee(workspace.id, body.assigneeId),
+			repositoryId: await resolveTemplateRepository(workspace.id, body.repositoryId),
 			createdBy: user.id,
 			createdAt: now,
 			updatedAt: now,

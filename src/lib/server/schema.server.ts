@@ -23,7 +23,7 @@ import type {
 import type { GitProviderId, IndexState, PullRequestState } from "@/lib/domain/providers";
 import type { HarnessKind } from "@/lib/domain/agents";
 import type { WebhookFilter } from "@/lib/domain/webhook-filters";
-import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
+import type { DeliveryStatus, WebhookEvent, WebhookFormat } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
 export * from "./auth-schema.server";
@@ -592,6 +592,10 @@ export const webhook = sqliteTable(
 		 * event it is subscribed to. Evaluated at enqueue time.
 		 */
 		filter: text("filter", { mode: "json" }).$type<WebhookFilter>(),
+		/** How the body is shaped — canonical JSON, a `{"text": …}` wrapper, or a template. */
+		format: text("format").$type<WebhookFormat>().notNull().default("json"),
+		/** The `custom` format's body template. Null for the built-in formats. */
+		template: text("template"),
 		enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
 		createdBy: text("createdBy")
 			.notNull()
@@ -821,6 +825,12 @@ export const issueTemplate = sqliteTable(
 		status: text("status").$type<IssueStatus>().notNull().default("backlog"),
 		priority: text("priority").$type<IssuePriority>().notNull().default("none"),
 		assigneeId: text("assigneeId").references(() => user.id, { onDelete: "set null" }),
+		/**
+		 * The repository new issues start scoped to, when the template pins one.
+		 * `set null` for the same reason as team: unlinking a repository should
+		 * not delete the templates that pointed at it.
+		 */
+		repositoryId: text("repositoryId").references(() => repository.id, { onDelete: "set null" }),
 		createdBy: text("createdBy")
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
@@ -856,6 +866,10 @@ export const issueTemplateRelations = relations(issueTemplate, ({ one, many }) =
 	}),
 	team: one(team, { fields: [issueTemplate.teamId], references: [team.id] }),
 	assignee: one(user, { fields: [issueTemplate.assigneeId], references: [user.id] }),
+	repository: one(repository, {
+		fields: [issueTemplate.repositoryId],
+		references: [repository.id],
+	}),
 	labels: many(issueTemplateLabel),
 }));
 

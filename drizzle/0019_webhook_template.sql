@@ -1,0 +1,1 @@
+ALTER TABLE `webhook` ADD `template` text;

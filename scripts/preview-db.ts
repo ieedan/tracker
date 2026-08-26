@@ -21,6 +21,7 @@ import {
 	createDatabase,
 	createDatabaseToken,
 	databaseUrl,
+	deleteDatabase,
 	getDatabase,
 	previewDatabaseName,
 	type TursoAuth,
@@ -86,6 +87,35 @@ function migrate(env: Record<string, string>): void {
 		throw new Error("drizzle-kit migrate failed against the preview database");
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A just-recreated database is not necessarily reachable yet — same-name
+ * recreation can route to the deleted instance for a moment — so the migrate
+ * after a recreate gets a few tries where a first migrate gets one.
+ */
+async function migrateWithRetries(env: Record<string, string>, attempts: number): Promise<void> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			migrate(env);
+			return;
+		} catch (error) {
+			if (attempt >= attempts) throw error;
+			console.log(`preview: migrate attempt ${attempt} failed — retrying in 5s`);
+			await sleep(5000);
+		}
+	}
+}
+
+/** The API can list a database for a moment after its deletion is accepted. */
+async function waitForDeletion(auth: TursoAuth, name: string): Promise<void> {
+	for (let attempt = 0; attempt < 15; attempt++) {
+		if ((await getDatabase(auth, name)) === null) return;
+		await sleep(2000);
+	}
+	throw new Error(`preview: ${name} is still listed after deletion`);
+}
+
 /**
  * Environment overrides for this build, or `{}` when this is not a preview.
  *
@@ -108,21 +138,23 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 	const { auth, parent, branch } = config;
 	const name = previewDatabaseName(branch);
 
-	let database = await getDatabase(auth, name);
-	if (database === null) {
-		const template = await getDatabase(auth, parent);
-		if (template === null) {
-			throw new Error(`preview: the template database ${parent} does not exist`);
-		}
+	const template = await getDatabase(auth, parent);
+	if (template === null) {
+		throw new Error(`preview: the template database ${parent} does not exist`);
+	}
+	const createFromTemplate = async () => {
 		console.log(`preview: creating ${name} from ${parent}`);
-		database = await createDatabase(auth, {
+		return await createDatabase(auth, {
 			name,
 			group: config.group ?? template.group,
 			seedFrom: parent,
 		});
-	} else {
-		console.log(`preview: reusing ${name}`);
-	}
+	};
+
+	let database = await getDatabase(auth, name);
+	const reused = database !== null;
+	if (database === null) database = await createFromTemplate();
+	else console.log(`preview: reusing ${name}`);
 
 	const overrides: Record<string, string> = {
 		DATABASE_URL: databaseUrl(database),
@@ -139,7 +171,23 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 
 	// The copy carries the template's migration history, so this applies only
 	// what the branch has added on top of it.
-	migrate(overrides);
+	try {
+		migrate(overrides);
+	} catch (error) {
+		// A fresh copy that cannot migrate is a real bug in the migrations.
+		if (!reused) throw error;
+		// A reused copy can hold history the branch has since rewritten — a
+		// migration renumbered after colliding with main, or a rebase. The
+		// reviewer state it carries is already unreachable behind a failing
+		// migrate, so start the branch's preview over from the template.
+		console.log(`preview: ${name} no longer matches this branch's migrations — recreating`);
+		await deleteDatabase(auth, name);
+		await waitForDeletion(auth, name);
+		database = await createFromTemplate();
+		overrides.DATABASE_URL = databaseUrl(database);
+		overrides.DATABASE_AUTH_TOKEN = await createDatabaseToken(auth, name);
+		await migrateWithRetries(overrides, 5);
+	}
 	console.log(`preview: ${name} ready at ${overrides.DATABASE_URL}`);
 
 	return overrides;

@@ -15,7 +15,14 @@ import {
 	type FilterGroup,
 	type FilterRule,
 } from "./webhook-filters";
-import { DELIVERY_STATUSES, normalizeHeaders, validateHeaders, WEBHOOK_EVENTS } from "./webhooks";
+import {
+	DELIVERY_STATUSES,
+	normalizeHeaders,
+	validateHeaders,
+	WEBHOOK_EVENTS,
+	WEBHOOK_FORMATS,
+} from "./webhooks";
+import { MAX_TEMPLATE_LENGTH, validateTemplate } from "./webhook-templates";
 
 export const GitProviderSchema = v.picklist(GIT_PROVIDERS);
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
@@ -247,6 +254,17 @@ export const WebhookHeadersSchema = v.pipe(
 	}),
 );
 
+/** A non-null template must render to valid JSON, whatever format rides along. */
+const WebhookTemplateSchema = v.pipe(
+	v.string(),
+	v.maxLength(MAX_TEMPLATE_LENGTH),
+	v.rawCheck(({ dataset, addIssue }) => {
+		if (!dataset.typed) return;
+		const problem = validateTemplate(dataset.value);
+		if (problem !== null) addIssue({ message: problem });
+	}),
+);
+
 export const WebhookSchema = v.object({
 	id: v.string(),
 	url: v.string(),
@@ -256,6 +274,10 @@ export const WebhookSchema = v.object({
 	headers: v.record(v.string(), v.string()),
 	/** The condition tree, or null when the webhook takes every event. */
 	filter: v.nullable(FilterGroupSchema),
+	/** How the body is shaped — canonical JSON, a `{"text": …}` wrapper, or a template. */
+	format: v.picklist(WEBHOOK_FORMATS),
+	/** The `custom` format's body template. Null for the built-in formats. */
+	template: v.nullable(v.string()),
 	enabled: v.boolean(),
 	createdAt: v.string(),
 	/** Rolling health, so a broken endpoint is visible without opening it. */
@@ -309,6 +331,8 @@ export const CreateWebhookBody = v.object({
 	headers: v.optional(WebhookHeadersSchema, {}),
 	/** Null, or omitted, means every event the subscription covers. */
 	filter: v.optional(v.nullable(WebhookFilterSchema), null),
+	format: v.optional(v.picklist(WEBHOOK_FORMATS), "json"),
+	template: v.optional(v.nullable(WebhookTemplateSchema), null),
 });
 
 export const UpdateWebhookBody = v.partial(
@@ -318,6 +342,9 @@ export const UpdateWebhookBody = v.partial(
 		headers: WebhookHeadersSchema,
 		/** Explicit null clears the conditions. */
 		filter: v.nullable(WebhookFilterSchema),
+		format: v.picklist(WEBHOOK_FORMATS),
+		/** Explicit null clears the template. */
+		template: v.nullable(WebhookTemplateSchema),
 		enabled: v.boolean(),
 	}),
 );
@@ -712,6 +739,10 @@ export const IssueTemplateSchema = v.object({
 	status: IssueStatusSchema,
 	priority: IssuePrioritySchema,
 	assignee: v.nullable(UserSummary),
+	/** The repository new issues start scoped to, or null. Same shape as on an issue. */
+	repository: v.nullable(
+		v.object({ id: v.string(), fullName: v.string(), provider: GitProviderSchema }),
+	),
 	labels: v.array(LabelSchema),
 	createdAt: v.string(),
 	updatedAt: v.string(),
@@ -731,6 +762,8 @@ export const CreateIssueTemplateBody = v.object({
 	status: v.optional(IssueStatusSchema, "backlog"),
 	priority: v.optional(IssuePrioritySchema, "none"),
 	assigneeId: v.optional(v.nullable(v.string()), null),
+	/** One of the workspace's linked repositories, or null for no default scope. */
+	repositoryId: v.optional(v.nullable(v.string()), null),
 	labelIds: v.optional(v.array(v.string()), []),
 });
 
@@ -744,6 +777,7 @@ export const UpdateIssueTemplateBody = v.partial(
 		status: IssueStatusSchema,
 		priority: IssuePrioritySchema,
 		assigneeId: v.nullable(v.string()),
+		repositoryId: v.nullable(v.string()),
 		labelIds: v.array(v.string()),
 	}),
 );

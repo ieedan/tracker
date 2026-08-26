@@ -24,6 +24,7 @@ import { isIP } from "node:net";
 import { and, desc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { matchesFilter, type FilterSubject } from "@/lib/domain/webhook-filters";
+import { renderTemplate, renderText, type TemplateEvent } from "@/lib/domain/webhook-templates";
 import {
 	DELIVERY_HEADER,
 	DELIVERY_TIMEOUT_MS,
@@ -202,15 +203,17 @@ export async function enqueue(
 	const rows = subscribed.map((hook) => {
 		const id = nanoid();
 		// The delivery id is inside the signed body as well as in a header, so a
-		// receiver can deduplicate on it without trusting headers.
-		const body = JSON.stringify({
+		// receiver can deduplicate on it without trusting headers. That holds in
+		// both formats: the text wrapper carries the same JSON, id included.
+		const event = {
 			id,
 			event: payload.event,
 			createdAt: createdAt.toISOString(),
 			workspace: payload.workspace,
 			actor: payload.actor,
 			data: payload.data,
-		});
+		};
+		const body = bodyFor(hook, event);
 
 		return {
 			id,
@@ -229,6 +232,19 @@ export async function enqueue(
 
 	await db.insert(webhookDelivery).values(rows);
 	return rows.map((row) => row.id);
+}
+
+/**
+ * The delivery body for one webhook. A `custom` hook whose template is somehow
+ * missing falls back to the canonical JSON — a body the receiver may not
+ * expect still beats an event that silently never leaves.
+ */
+function bodyFor(hook: WebhookRow, event: TemplateEvent): string {
+	if (hook.format === "text") return JSON.stringify({ text: renderText(event) });
+	if (hook.format === "custom" && hook.template !== null) {
+		return renderTemplate(hook.template, event);
+	}
+	return JSON.stringify(event);
 }
 
 /**
