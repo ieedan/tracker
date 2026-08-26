@@ -401,6 +401,10 @@ export const CreateCommentBody = v.object({
 	attachmentIds: v.optional(v.array(v.string())),
 });
 
+export const UpdateCommentBody = v.object({
+	body: trimmed(1, 10_000),
+});
+
 export const AddMemberBody = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email()),
 	role: v.optional(WorkspaceRoleSchema, "member"),

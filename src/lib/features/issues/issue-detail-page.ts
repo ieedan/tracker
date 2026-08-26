@@ -46,7 +46,7 @@ import { createIssueOpen, openCreateIssue } from "./create-issue-dialog";
 import { isTyping } from "@/lib/client/is-typing";
 import { AssigneePicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
 import { IssueLabelPicker } from "./label-picker";
-import { IssueTimeline } from "./activity-feed";
+import { IssueTimeline, type CommentActions } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
@@ -65,6 +65,8 @@ interface PageData {
 	teams: Team[];
 	members: Member[];
 	labels: Label[];
+	/** From the app layout — whose comments get an Edit and a Delete. */
+	user: { id: string };
 }
 
 export function IssueDetailPage({
@@ -81,6 +83,40 @@ export function IssueDetailPage({
 
 	const comments = signal(data.get().comments);
 	data.onChange((next) => comments.set(next.comments));
+
+	// Edit and delete return whether they landed, so the row knows to keep its
+	// editor or confirmation up when the server refused.
+	const commentActions: CommentActions = {
+		viewerId: data.bind((value) => value.user.id),
+		isAdmin: data.bind((value) => value.workspace.role === "admin"),
+		onEdit: async (id, body) => {
+			const { data: updated, error } = await api.PATCH(
+				"/api/v1/workspaces/[slug]/issues/[identifier]/comments/[commentId]",
+				{
+					params: { slug: params.slug.get(), identifier: issue.get().identifier, commentId: id },
+					body: { body },
+				},
+			);
+			if (error !== undefined) {
+				toastError(messageOf(error, "Could not update the comment"));
+				return false;
+			}
+			comments.set(comments.get().map((entry) => (entry.id === id ? updated : entry)));
+			return true;
+		},
+		onDelete: async (id) => {
+			const { error } = await api.DELETE(
+				"/api/v1/workspaces/[slug]/issues/[identifier]/comments/[commentId]",
+				{ params: { slug: params.slug.get(), identifier: issue.get().identifier, commentId: id } },
+			);
+			if (error !== undefined) {
+				toastError(messageOf(error, "Could not delete the comment"));
+				return false;
+			}
+			comments.set(comments.get().filter((entry) => entry.id !== id));
+			return true;
+		},
+	};
 
 	const activity = signal(data.get().activity);
 	data.onChange((next) => activity.set(next.activity));
@@ -244,6 +280,7 @@ export function IssueDetailPage({
 						issue,
 						params,
 						issue.bind((value) => value.repository?.id),
+						commentActions,
 					),
 				),
 			),
@@ -573,6 +610,7 @@ function CommentThread(
 	issue: Readable<Issue>,
 	params: { slug: Readable<string>; identifier: Readable<string> },
 	repositoryId: Readable<string | undefined>,
+	actions: CommentActions,
 ) {
 	const draft = signal("");
 	const posting = signal(false);
@@ -630,7 +668,7 @@ function CommentThread(
 
 		Div(
 			{ class: "flex flex-col gap-4" },
-			IssueTimeline({ comments, activity, issue, slug: params.slug }),
+			IssueTimeline({ comments, activity, issue, slug: params.slug, actions }),
 		),
 
 		Div(
