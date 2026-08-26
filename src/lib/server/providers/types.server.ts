@@ -41,6 +41,40 @@ export interface InstallationContext {
 	externalId: string;
 }
 
+/**
+ * A pull request changing, as the provider pushed it to us.
+ *
+ * Everything needed to act on the change is in here, so the delivery never has
+ * to be turned back into an API call: a webhook that answered by fetching what
+ * it was just told would be slower *and* rate limited.
+ */
+export interface RemotePullRequestEvent {
+	/** The provider's id for this delivery, for logs. */
+	deliveryId: string;
+	/** `opened`, `closed`, `reopened`, `edited`, `ready_for_review`, … */
+	action: string;
+	/** Identified the way a stored repository is — by external id, not by name. */
+	repository: { externalId: string; owner: string; name: string };
+	pull: RemotePullRequest;
+	/** The description, for scanning mentions. */
+	body: string;
+	/** The source branch, for scanning mentions. */
+	headRef: string;
+	/** Who on the provider caused it, so the change can be attributed. */
+	sender: { externalId: string; login: string };
+}
+
+/** What reading a delivery produced. */
+export type WebhookDelivery =
+	/** Signed correctly and about a pull request. */
+	| { kind: "pull_request"; event: RemotePullRequestEvent }
+	/** Signed correctly, but nothing here acts on it. */
+	| { kind: "ignored" }
+	/** Missing or wrong signature — the delivery is not from the provider. */
+	| { kind: "unsigned" }
+	/** No webhook secret configured, so no delivery can be trusted. */
+	| { kind: "unconfigured" };
+
 export interface GitProvider {
 	id: GitProviderId;
 
@@ -80,4 +114,13 @@ export interface GitProvider {
 
 	/** Whether this adapter has the credentials it needs. */
 	configured(): boolean;
+
+	/**
+	 * Verifies one inbound delivery and narrows it to what this app acts on.
+	 *
+	 * Takes the raw body rather than parsed JSON because the signature covers
+	 * the bytes: re-serialising the object first would change them, and the
+	 * comparison would fail for reasons nobody could see.
+	 */
+	readWebhook(raw: string, headers: Headers): WebhookDelivery;
 }

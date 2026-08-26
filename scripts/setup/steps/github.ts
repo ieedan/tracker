@@ -129,6 +129,12 @@ async function githubApp(
 	appName: string,
 	extra: string[] = [],
 ): Promise<Record<string, string>> {
+	// Generated before the instructions rather than after, because it is one of
+	// the things being typed into the form on the other screen.
+	const carried = existing.GITHUB_APP_WEBHOOK_SECRET;
+	const webhookSecret = filled(carried) ? carried : randomBytes(20).toString("hex");
+	const local = origin.includes("localhost") || origin.includes("127.0.0.1");
+
 	instructions({
 		title: "GitHub App",
 		url: "https://github.com/settings/apps/new",
@@ -139,19 +145,26 @@ async function githubApp(
 			["Add callback URL", `${origin}/api/v1/github/callback`],
 			["Setup URL", `${origin}/api/v1/github/callback`],
 			["Request user authorization (OAuth) during installation", "leave unchecked"],
-			["Webhook", "uncheck Active"],
+			["Webhook", "leave Active checked"],
+			["Webhook URL", `${origin}/api/v1/github/webhook`],
+			["Webhook secret", webhookSecret],
+			["Subscribe to events", "Pull requests"],
 			["Account permissions", "Email addresses — Read-only"],
 			["Repository permissions", "Contents, Metadata, Pull requests — all Read-only"],
 			["Where can this GitHub App be installed?", "Any account"],
 		],
 		after: [
 			"Both callback URLs are needed: the first is where signing in returns, the second is where installing returns. Email addresses is what lets sign-in read an address — without it people arrive with none and cannot be created.",
+			"The webhook is what keeps a linked pull request's state, and the issue's status, right without anybody refreshing. Leave it off and everything still works; a pull request's state is then only re-read when somebody opens the issue.",
+			...(local
+				? [
+						"GitHub cannot reach localhost, so the webhook will fail to deliver until you put a tunnel (`gh webhook forward`, ngrok, Cloudflare Tunnel) in front of it and use that URL instead.",
+					]
+				: []),
 			"Create the app. The App ID and Client ID are on the next page; the slug is the last part of github.com/apps/<slug>. Generate a client secret and a private key at the bottom.",
 			...extra,
 		],
 	});
-
-	const webhookSecret = existing.GITHUB_APP_WEBHOOK_SECRET;
 
 	return {
 		GITHUB_CLIENT_ID: await askEnv({
@@ -180,9 +193,7 @@ async function githubApp(
 			initial: existing.GITHUB_APP_SLUG ?? "",
 		}),
 		GITHUB_APP_PRIVATE_KEY: await askPrivateKey(existing.GITHUB_APP_PRIVATE_KEY ?? ""),
-		GITHUB_APP_WEBHOOK_SECRET: filled(webhookSecret)
-			? webhookSecret
-			: randomBytes(20).toString("hex"),
+		GITHUB_APP_WEBHOOK_SECRET: webhookSecret,
 		// The App supersedes the development stand-in, and leaving both set is
 		// only confusing.
 		GITHUB_DEV_TOKEN: "",

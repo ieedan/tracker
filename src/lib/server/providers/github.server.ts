@@ -11,7 +11,7 @@
  * Installation tokens last an hour, so they are minted on demand and cached
  * until shortly before they expire.
  */
-import { createSign } from "node:crypto";
+import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 import type { PullRequestState } from "@/lib/domain/providers";
 import { env } from "@/lib/env.server";
 import type {
@@ -19,6 +19,7 @@ import type {
 	InstallationContext,
 	RemotePullRequest,
 	RemoteRepository,
+	WebhookDelivery,
 } from "./types.server";
 
 /** github.com by default; an Enterprise Server install sets its own root. */
@@ -181,6 +182,93 @@ function toPullRequest(row: GhPullRequest): RemotePullRequest {
 	};
 }
 
+// --- inbound deliveries -----------------------------------------------------
+
+/** The `pull_request` payload, narrowed to the parts that are read. */
+interface GhPullRequestEvent {
+	action: string;
+	pull_request: GhPullRequest & { body: string | null; head: { ref: string } };
+	repository: GhRepository;
+	sender: { id: number; login: string } | null;
+}
+
+/**
+ * The delivery's signature, checked against the shared secret.
+ *
+ * `sha256=` prefixed hex, compared in constant time — a signature check that
+ * returns early on the first wrong character tells an attacker how much of a
+ * guess was right, which is enough to find the rest one byte at a time.
+ */
+function signatureMatches(raw: string, presented: string): boolean {
+	const expected = `sha256=${createHmac("sha256", env.GITHUB_APP_WEBHOOK_SECRET)
+		.update(raw)
+		.digest("hex")}`;
+
+	const left = Buffer.from(presented);
+	const right = Buffer.from(expected);
+	if (left.length !== right.length) {
+		timingSafeEqual(right, right);
+		return false;
+	}
+	return timingSafeEqual(left, right);
+}
+
+function readDelivery(raw: string, headers: Headers): WebhookDelivery {
+	// No secret means no delivery can be told apart from a forgery, and a
+	// forged pull request event moves somebody's issues. Closed is the only
+	// safe default.
+	if (env.GITHUB_APP_WEBHOOK_SECRET === "") return { kind: "unconfigured" };
+
+	const presented = headers.get("x-hub-signature-256") ?? "";
+	if (presented === "" || !signatureMatches(raw, presented)) return { kind: "unsigned" };
+
+	// Only pull requests, and only the actions that change what an issue should
+	// say. `synchronize` fires on every push to the branch and carries nothing
+	// new; answering it would multiply this endpoint's work by the size of the
+	// day's commits.
+	if (headers.get("x-github-event") !== "pull_request") return { kind: "ignored" };
+
+	let payload: GhPullRequestEvent;
+	try {
+		payload = JSON.parse(raw) as GhPullRequestEvent;
+	} catch {
+		return { kind: "ignored" };
+	}
+
+	const acted = new Set([
+		"opened",
+		"reopened",
+		"closed",
+		"edited",
+		"ready_for_review",
+		"converted_to_draft",
+	]);
+	if (!acted.has(payload.action)) return { kind: "ignored" };
+
+	const pull = payload.pull_request;
+	if (pull === undefined || payload.repository === undefined) return { kind: "ignored" };
+
+	return {
+		kind: "pull_request",
+		event: {
+			deliveryId: headers.get("x-github-delivery") ?? "",
+			action: payload.action,
+			repository: {
+				externalId: `${payload.repository.id}`,
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			pull: toPullRequest(pull),
+			body: pull.body ?? "",
+			headRef: pull.head?.ref ?? "",
+			sender: {
+				externalId: payload.sender === null ? "" : `${payload.sender.id}`,
+				login: payload.sender?.login ?? "",
+			},
+		},
+	};
+}
+
 export const github: GitProvider = {
 	id: "github",
 
@@ -249,4 +337,6 @@ export const github: GitProvider = {
 		const encoded = path.split("/").map(encodeURIComponent).join("/");
 		return `https://github.com/${repository.owner}/${repository.name}/blob/${ref}/${encoded}`;
 	},
+
+	readWebhook: readDelivery,
 };
