@@ -196,12 +196,15 @@ export const VIEW_STATUSES: Record<IssueView, readonly IssueStatus[] | null> = {
 };
 
 /**
- * Where a bare URL lands. `all` rather than Linear's `active`, so every link
- * and bookmark made before the tabs existed still shows what it used to
- * instead of quietly dropping Done and Canceled — flip this one constant to
- * open on Active instead.
+ * Where a bare URL lands. Active, Linear's default: the work in flight is what
+ * you almost always came to look at, and Done and Canceled pile up forever.
+ * Nothing is hidden for good — the All tab is one click away, and an explicit
+ * `?view=` in the URL always wins, so a shared link still lands where it said.
  */
-export const DEFAULT_VIEW: IssueView = "all";
+export const DEFAULT_VIEW: IssueView = "active";
+
+/** The tab that admits everything — where an empty view offers to send you. */
+export const ALL_VIEW: IssueView = "all";
 
 const VIEW_PARAM = "view";
 

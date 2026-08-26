@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/server/db.server";
 import { unreadCount } from "@/lib/server/notifications.server";
 import { workspace, workspaceMember } from "@/lib/server/schema.server";
-import { toWorkspace } from "@/lib/server/serialize.server";
+import { toWorkspace, userImageUrl } from "@/lib/server/serialize.server";
 import type { LoadEvent } from "./$types";
 
 /**
@@ -27,7 +27,9 @@ export default async function load({ locals }: LoadEvent) {
 	if (rows.length === 0) redirect(303, "/workspaces/new");
 
 	return {
-		user: locals.user,
+		// `locals.user` carries the picture column as it is stored, which for one
+		// uploaded here is an object key rather than something an `<img>` can load.
+		user: { ...locals.user, image: userImageUrl(locals.user.id, locals.user.image) },
 		workspaces: rows.map((row) => toWorkspace(row.workspace, row.role)),
 		unread: await unreadCount(locals.user.id),
 	};

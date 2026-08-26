@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { preferDefaultTeam } from "@/lib/domain/issues";
 import { ConvertFeedbackBody, IssueSchema } from "@/lib/domain/schemas";
+import { creationActivity, recordActivity } from "@/lib/server/activity.server";
 import { db } from "@/lib/server/db.server";
 import { emitFeedbackEvent, emitIssueEvent } from "@/lib/server/events.server";
 import {
@@ -98,6 +99,10 @@ export const POST = handler({
 
 		const created = await getIssueById(issueId);
 		if (created === undefined) error(500, "issue vanished after insert");
+
+		// A conversion carries the feedback's labels and whatever the form set, so
+		// the new issue's timeline starts out saying so.
+		await recordActivity(issueId, user.id, creationActivity(created));
 
 		const after = await getFeedbackById(row.id);
 		if (after !== undefined) {

@@ -53,7 +53,7 @@ import { relativeTime } from "@/lib/format";
 import { issueCreated, openCreateIssue } from "./create-issue-dialog";
 import { AddFilterButton, FilterBar, type FilterContext } from "./filter-bar";
 import {
-	DEFAULT_VIEW,
+	ALL_VIEW,
 	ISSUE_VIEW_LABELS,
 	matchesFilters,
 	matchesView,
@@ -376,7 +376,7 @@ function Header(
 		}),
 		H1(
 			{ class: "text-[15px] font-semibold tracking-tight" },
-			data.bind((value) => value.team?.name ?? "All issues"),
+			data.bind((value) => value.team?.name ?? "Issues"),
 		),
 		If(
 			data.bind((value) => value.team !== null),
@@ -460,8 +460,10 @@ function EmptyState(
 		)
 		.ElseIf(
 			// A tab can come up empty while the workspace is full of work, so
-			// offer the way back out rather than claiming there is nothing.
-			view.bind((tab) => tab !== DEFAULT_VIEW),
+			// offer the way back out rather than claiming there is nothing. The
+			// way out is All — the only tab that hides nothing, and the one the
+			// default Active tab needs when the work in flight has run dry.
+			view.bind((tab) => tab !== ALL_VIEW),
 			Empty(
 				EmptyHeader(
 					EmptyMedia({ variant: "icon" }, LayoutList({ "aria-hidden": true })),
@@ -470,8 +472,8 @@ function EmptyState(
 				),
 				EmptyContent(
 					Button(
-						{ size: "sm", variant: "secondary", onClick: () => applyView(DEFAULT_VIEW) },
-						`Show ${ISSUE_VIEW_LABELS[DEFAULT_VIEW].toLowerCase()} issues`,
+						{ size: "sm", variant: "secondary", onClick: () => applyView(ALL_VIEW) },
+						`Show ${ISSUE_VIEW_LABELS[ALL_VIEW].toLowerCase()} issues`,
 					),
 				),
 			),

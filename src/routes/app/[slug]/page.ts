@@ -6,7 +6,7 @@ import type { PageProps } from "./$types";
 export default function Page(props: PageProps) {
 	return Fragment(
 		PageMeta({
-			title: props.data.bind((data) => pageTitle("All issues", data.workspace.name)),
+			title: props.data.bind((data) => pageTitle("Issues", data.workspace.name)),
 			description: props.data.bind(
 				(data) => `Every open and closed issue across the ${data.workspace.name} workspace.`,
 			),

@@ -275,9 +275,14 @@ export const PATCH = handler({
 				to: updated.repository?.fullName ?? null,
 			});
 		}
-		// Passing the same label set back is not a change, so diff rather than trust.
-		const movedLabels = labelMovement(labelsBefore, updated.labels);
-		if (movedLabels.length > 0) timeline.push({ type: "labels_changed", labels: movedLabels });
+		// Only when the edit touched labels at all: an untouched set has no
+		// snapshot to diff against, and diffing the issue's labels against nothing
+		// would report every one of them as just added.
+		if (diff.labels !== undefined) {
+			// Passing the same label set back is not a change, so diff rather than trust.
+			const movedLabels = labelMovement(labelsBefore, updated.labels);
+			if (movedLabels.length > 0) timeline.push({ type: "labels_changed", labels: movedLabels });
+		}
 
 		await recordActivity(before.id, user.id, timeline);
 

@@ -142,7 +142,7 @@ function Sidebar(
 		Div(
 			{ class: "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" },
 			NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
-			NavItem(url, activeSlug, "/app/:slug", LayoutList, "All issues"),
+			NavItem(url, activeSlug, "/app/:slug", LayoutList, "Issues"),
 			NavItem(url, activeSlug, "/app/:slug/feedback", MessageSquareQuote, "User feedback"),
 			NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
 			TeamNav(data, activeSlug, url),
