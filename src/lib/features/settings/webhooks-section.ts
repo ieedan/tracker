@@ -54,6 +54,8 @@ import {
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { Label } from "@/lib/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/lib/components/ui/radio-group";
+import { Textarea } from "@/lib/components/ui/textarea";
 // `Label` is the form-control component in this file; the domain type is the
 // issue label, so it comes in under a name that says which.
 import type {
@@ -68,14 +70,26 @@ import type {
 import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
 	DEFAULT_WEBHOOK_EVENTS,
+	DEFAULT_WEBHOOK_FORMAT,
 	MAX_CUSTOM_HEADERS,
 	validateHeaders,
 	WEBHOOK_EVENT_GROUPS,
 	WEBHOOK_EVENT_HINTS,
 	WEBHOOK_EVENT_LABELS,
 	WEBHOOK_EVENTS,
+	WEBHOOK_FORMAT_HINTS,
+	WEBHOOK_FORMAT_LABELS,
+	WEBHOOK_FORMATS,
 	type WebhookEvent,
+	type WebhookFormat,
 } from "@/lib/domain/webhooks";
+import {
+	renderTemplate,
+	SAMPLE_EVENT,
+	segmentTemplate,
+	suggestTemplatePaths,
+	validateTemplate,
+} from "@/lib/domain/webhook-templates";
 import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
@@ -333,6 +347,13 @@ function ConditionSummary(hook: Readable<Webhook>) {
 				headerCount.bind((count) => `${count} custom header${count === 1 ? "" : "s"}`),
 			),
 		),
+		If(
+			hook.bind((value) => value.format !== "json"),
+			Span(
+				{ class: "shrink-0 text-[11px] text-muted-foreground" },
+				hook.bind((value) => WEBHOOK_FORMAT_LABELS[value.format]),
+			),
+		),
 	);
 }
 
@@ -390,6 +411,10 @@ function WebhookDialog(
 	const cells = eventCells();
 	const chosen = signal<WebhookEvent[]>([...DEFAULT_WEBHOOK_EVENTS]);
 	const headers = signal<HeaderRow[]>([]);
+	// `string | null` because that is what the radio primitive binds; narrowed
+	// back to the picklist at submit time.
+	const format = signal<string | null>(DEFAULT_WEBHOOK_FORMAT);
+	const template = signal("");
 	const match = signal<FilterMatch>("all");
 	const rules = signal<BuilderNode[]>([]);
 
@@ -417,6 +442,8 @@ function WebhookDialog(
 		headers.set(
 			Object.entries(hook?.headers ?? {}).map(([name, value]) => newHeaderRow(name, value)),
 		);
+		format.set(hook?.format ?? DEFAULT_WEBHOOK_FORMAT);
+		template.set(hook?.template ?? "");
 
 		const builder = toBuilder(hook?.filter ?? null);
 		match.set(builder.match);
@@ -527,6 +554,18 @@ function WebhookDialog(
 		}
 
 		const filter = fromBuilder(match.get(), rules.get());
+		const payloadFormat = asFormat(format.get());
+		const templateText = template.get().trim() === "" ? null : template.get();
+		if (payloadFormat === "custom") {
+			const problem =
+				templateText === null
+					? "a custom format needs a template body"
+					: validateTemplate(templateText);
+			if (problem !== null) {
+				toastError(problem);
+				return;
+			}
+		}
 
 		saving.set(true);
 		const result =
@@ -539,6 +578,8 @@ function WebhookDialog(
 							events: chosen.get(),
 							headers: collected,
 							filter,
+							format: payloadFormat,
+							template: templateText,
 						},
 					})
 				: await api.PATCH("/api/v1/workspaces/[slug]/webhooks/[id]", {
@@ -548,6 +589,8 @@ function WebhookDialog(
 							events: chosen.get(),
 							headers: collected,
 							filter,
+							format: payloadFormat,
+							template: templateText,
 						},
 					});
 		saving.set(false);
@@ -671,7 +714,8 @@ function WebhookDialog(
 
 				// Events sit in their own column and stay put while the left side
 				// grows; headers and conditions want the width the rail leaves.
-				Div({ class: "md:col-start-2 md:row-span-4 md:row-start-1" }, EventPicker(cells, recount)),
+				Div({ class: "md:col-start-2 md:row-span-5 md:row-start-1" }, EventPicker(cells, recount)),
+				Div({ class: "md:col-start-1" }, FormatPicker(format, template)),
 				Div({ class: "md:col-start-1" }, HeadersEditor(headers)),
 				Div({ class: "md:col-start-1" }, ConditionsEditor(match, rules, chosen, catalog)),
 			),
@@ -765,6 +809,292 @@ function DialogTabButton(
 			},
 		},
 		label,
+	);
+}
+
+/** The picker's string, narrowed back to the picklist. */
+const asFormat = (value: string | null): WebhookFormat =>
+	value === "text" || value === "custom" ? value : "json";
+
+/**
+ * How the body is shaped. Most receivers want the JSON event; the text wrapper
+ * exists for endpoints that take freeform text and hand it to an agent — a
+ * Claude Code routine's API trigger, a Slack incoming webhook — and the custom
+ * template for endpoints that dictate their own body shape.
+ */
+function FormatPicker(format: Signal<string | null>, template: Signal<string>) {
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Span({ class: "text-[13px] font-medium" }, "Payload format"),
+		RadioGroup(
+			{
+				value: format,
+				onValueChange: (next) => {
+					if (typeof next !== "string") return;
+					format.set(next);
+					// Seed an empty editor so picking "custom" shows something that
+					// already works rather than a blank box and a validation error.
+					if (next === "custom" && template.get().trim() === "") {
+						template.set('{\n\t"text": "{{summary}}"\n}');
+					}
+				},
+				class: "flex flex-col gap-0 rounded-md border border-border",
+			},
+			...WEBHOOK_FORMATS.map((entry, index) =>
+				Div(
+					{
+						class: cn("flex items-start gap-2.5 px-3 py-2", index > 0 && "border-t border-border"),
+					},
+					RadioGroupItem({ id: `webhook-format-${entry}`, value: entry, class: "mt-0.5" }),
+					Label(
+						{
+							for: `webhook-format-${entry}`,
+							class: "flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5",
+						},
+						Span({ class: "text-[13px] font-normal" }, WEBHOOK_FORMAT_LABELS[entry]),
+						Span(
+							{ class: "text-[11px] font-normal text-muted-foreground" },
+							WEBHOOK_FORMAT_HINTS[entry],
+						),
+					),
+				),
+			),
+		),
+		If(
+			format.bind((value) => value === "custom"),
+			TemplateEditor(template),
+		),
+	);
+}
+
+const TEMPLATE_EDITOR_ID = "webhook-template-editor";
+const TEMPLATE_OVERLAY_ID = "webhook-template-overlay";
+
+const segmentClass = (kind: string) =>
+	cn(
+		kind === "known" && "font-medium text-primary",
+		kind === "unknown" && "text-amber-600 underline decoration-dotted dark:text-amber-500",
+	);
+
+/** What the caret is in the middle of completing, or null when idle. */
+interface CompletionState {
+	/** Where the partly-typed path begins in the template. */
+	start: number;
+	token: string;
+	/** How many braces opened the placeholder — 2 escaped, 3 raw. */
+	opens: number;
+}
+
+/**
+ * The custom body, edited with highlighting, path completion, and a live
+ * preview, so quoting mistakes and typo'd paths surface while typing rather
+ * than as a failed delivery. The preview renders the same sample event the
+ * server validates against.
+ *
+ * Highlighting is the classic overlay trick: the textarea's own text is
+ * transparent (the caret is not), and a pointer-transparent layer behind it
+ * renders the same characters with the placeholders tinted. The two stay
+ * aligned because they share font, padding, wrapping, and scroll offsets.
+ */
+function TemplateEditor(template: Signal<string>) {
+	const preview = template.bind((value) => {
+		const problem =
+			value.trim() === "" ? "a custom format needs a template body" : validateTemplate(value);
+		if (problem !== null) return { ok: false, text: problem };
+		return { ok: true, text: renderTemplate(value, SAMPLE_EVENT) };
+	});
+
+	const segments = template.bind((value) =>
+		segmentTemplate(value).map((segment, index) => ({
+			...segment,
+			// Content in the key on purpose: segments have no identity across
+			// edits, so an edited run must remount rather than patch a neighbor.
+			key: `${index}:${segment.kind}:${segment.text}`,
+		})),
+	);
+
+	const completion = signal<CompletionState | null>(null);
+	const menuIndex = signal(0);
+	const matches = derived([completion], (state) =>
+		state === null ? [] : suggestTemplatePaths(state.token),
+	);
+
+	const editorElement = (): HTMLTextAreaElement | null =>
+		document.getElementById(TEMPLATE_EDITOR_ID) as HTMLTextAreaElement | null;
+
+	/** Re-derive the completion context from wherever the caret now sits. */
+	const refreshCompletion = () => {
+		const element = editorElement();
+		if (element === null || element.selectionStart !== element.selectionEnd) {
+			completion.set(null);
+			return;
+		}
+		const caret = element.selectionStart ?? 0;
+		const opened = /(\{\{\{?)\s*([\w.]*)$/.exec(element.value.slice(0, caret));
+		if (opened === null) {
+			completion.set(null);
+			return;
+		}
+		const token = opened[2] ?? "";
+		const state: CompletionState = {
+			start: caret - token.length,
+			token,
+			opens: (opened[1] ?? "{{").length,
+		};
+		const previous = completion.get();
+		if (previous === null || previous.start !== state.start || previous.token !== state.token) {
+			menuIndex.set(0);
+			completion.set(state);
+		}
+	};
+
+	const accept = (path: string) => {
+		const element = editorElement();
+		const state = completion.get();
+		if (element === null || state === null) return;
+
+		const value = element.value;
+		const caretBefore = element.selectionStart ?? state.start + state.token.length;
+		const after = value.slice(caretBefore);
+		// Only add the closers the person has not already typed.
+		const closersPresent = (/^\}{0,3}/.exec(after)?.[0] ?? "").length;
+		const closersNeeded = Math.max(0, state.opens - closersPresent);
+
+		template.set(value.slice(0, state.start) + path + "}".repeat(closersNeeded) + after);
+		completion.set(null);
+
+		const caretAfter = state.start + path.length + closersNeeded + closersPresent;
+		requestAnimationFrame(() => {
+			const restored = editorElement();
+			restored?.focus();
+			restored?.setSelectionRange(caretAfter, caretAfter);
+		});
+	};
+
+	const onKeydown = (event: KeyboardEvent) => {
+		const list = matches.get();
+		if (completion.get() === null || list.length === 0) return;
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			menuIndex.set((menuIndex.get() + 1) % list.length);
+		} else if (event.key === "ArrowUp") {
+			event.preventDefault();
+			menuIndex.set((menuIndex.get() - 1 + list.length) % list.length);
+		} else if (event.key === "Enter" || event.key === "Tab") {
+			event.preventDefault();
+			accept(list[menuIndex.get()]!.path);
+		} else if (event.key === "Escape") {
+			// Swallowed so the dialog stays open; a second Escape closes it.
+			event.stopPropagation();
+			completion.set(null);
+		}
+	};
+
+	const syncScroll = () => {
+		const element = editorElement();
+		const overlay = document.getElementById(TEMPLATE_OVERLAY_ID);
+		if (element === null || overlay === null) return;
+		overlay.scrollTop = element.scrollTop;
+		overlay.scrollLeft = element.scrollLeft;
+	};
+
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Div(
+			{ class: "relative rounded-md dark:bg-input/30" },
+			Div(
+				{
+					id: TEMPLATE_OVERLAY_ID,
+					"aria-hidden": "true",
+					class:
+						"pointer-events-none absolute inset-0 overflow-hidden rounded-md border border-transparent px-3 py-2 font-mono text-[12px] break-words whitespace-pre-wrap text-foreground/90",
+				},
+				ForEach(
+					segments,
+					(segment) => segment.key,
+					(segment) =>
+						Span(
+							{ class: segment.bind((value) => segmentClass(value.kind)) },
+							segment.bind("text"),
+						),
+				),
+				// Keeps a trailing empty line the same height the textarea gives it.
+				Span({}, "​"),
+			),
+			Textarea({
+				id: TEMPLATE_EDITOR_ID,
+				value: template,
+				spellcheck: false,
+				autocapitalize: "off",
+				"aria-label": "Body template",
+				placeholder: '{\n\t"text": "{{summary}}"\n}',
+				class:
+					"relative max-h-48 min-h-24 bg-transparent font-mono text-[12px] text-transparent caret-foreground md:text-[12px] dark:bg-transparent",
+				onKeydown,
+				onInput: refreshCompletion,
+				onKeyup: refreshCompletion,
+				onClick: refreshCompletion,
+				onBlur: () => completion.set(null),
+				onScroll: syncScroll,
+			}),
+			If(
+				matches.bind((list) => list.length > 0),
+				Div(
+					{
+						class:
+							"absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-md",
+					},
+					ForEach(
+						matches,
+						(match) => match.path,
+						(match) =>
+							Div(
+								{
+									class: derived([menuIndex, matches, match], (index, list, entry) =>
+										cn(
+											"flex cursor-pointer items-baseline gap-2 px-2.5 py-1.5",
+											list[index]?.path === entry.path && "bg-secondary",
+										),
+									),
+									// preventDefault keeps focus (and the completion state) in
+									// the textarea so the click can land on `accept`.
+									onMousedown: (event) => event.preventDefault(),
+									onClick: () => accept(match.get().path),
+								},
+								Span({ class: "shrink-0 font-mono text-[12px]" }, match.bind("path")),
+								Span(
+									{ class: "min-w-0 truncate text-[11px] text-muted-foreground" },
+									match.bind("hint"),
+								),
+							),
+					),
+				),
+			),
+		),
+		P(
+			{ class: "text-[11px] text-muted-foreground" },
+			"Type {{ to list every path the event carries — {{summary}}, {{event}}, " +
+				"{{data.issue.identifier}}, and the rest. {{…}} escapes for use inside strings; " +
+				"{{{…}}} inserts raw JSON, e.g. {{{data.issue}}}. Unknown paths are underlined.",
+		),
+		Div(
+			{ class: "flex flex-col gap-1 rounded-md border border-border bg-secondary/30 px-3 py-2" },
+			Span(
+				{ class: "text-[11px] font-medium text-muted-foreground" },
+				"Preview, against a sample issue.created event",
+			),
+			Span(
+				{
+					class: preview.bind((value) =>
+						cn(
+							"font-mono text-[11px] break-all whitespace-pre-wrap",
+							value.ok ? "text-foreground/80" : "text-destructive",
+						),
+					),
+				},
+				preview.bind((value) => value.text),
+			),
+		),
 	);
 }
 

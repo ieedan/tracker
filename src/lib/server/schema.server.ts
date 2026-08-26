@@ -23,7 +23,7 @@ import type {
 import type { GitProviderId, IndexState, PullRequestState } from "@/lib/domain/providers";
 import type { HarnessKind } from "@/lib/domain/agents";
 import type { WebhookFilter } from "@/lib/domain/webhook-filters";
-import type { DeliveryStatus, WebhookEvent } from "@/lib/domain/webhooks";
+import type { DeliveryStatus, WebhookEvent, WebhookFormat } from "@/lib/domain/webhooks";
 import { user } from "./auth-schema.server";
 
 export * from "./auth-schema.server";
@@ -592,6 +592,10 @@ export const webhook = sqliteTable(
 		 * event it is subscribed to. Evaluated at enqueue time.
 		 */
 		filter: text("filter", { mode: "json" }).$type<WebhookFilter>(),
+		/** How the body is shaped — canonical JSON, a `{"text": …}` wrapper, or a template. */
+		format: text("format").$type<WebhookFormat>().notNull().default("json"),
+		/** The `custom` format's body template. Null for the built-in formats. */
+		template: text("template"),
 		enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
 		createdBy: text("createdBy")
 			.notNull()

@@ -74,6 +74,35 @@ export const WEBHOOK_EVENT_HINTS: Record<WebhookEvent, string> = {
 	"feedback.deleted": "Feedback is removed.",
 };
 
+/**
+ * The shape of the request body.
+ *
+ * `json` is the canonical event object. `text` wraps that same object as
+ * `{"text": "<summary + JSON>"}` — the shape freeform-text receivers take,
+ * such as a Claude Code routine's API trigger or a Slack incoming webhook,
+ * so an agent picking the event up gets the issue it is about without the
+ * receiver having to parse a custom payload. `custom` renders the webhook's
+ * own template — see `webhook-templates.ts` — for receivers whose body shape
+ * is fixed by someone else.
+ */
+export const WEBHOOK_FORMATS = ["json", "text", "custom"] as const;
+export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
+
+export const DEFAULT_WEBHOOK_FORMAT: WebhookFormat = "json";
+
+export const WEBHOOK_FORMAT_LABELS: Record<WebhookFormat, string> = {
+	json: "JSON event",
+	text: "Agent text",
+	custom: "Custom template",
+};
+
+export const WEBHOOK_FORMAT_HINTS: Record<WebhookFormat, string> = {
+	json: "The event as a JSON object. For receivers written against this API.",
+	text: 'The event wrapped as {"text": …} — a summary line, then the JSON. For Claude Code routine triggers, Slack, and other freeform-text receivers.',
+	custom:
+		"Your own JSON body, with {{…}} placeholders filled from the event. For receivers that dictate their shape.",
+};
+
 export const DELIVERY_STATUSES = ["pending", "succeeded", "failed"] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 

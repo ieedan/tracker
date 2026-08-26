@@ -48,6 +48,12 @@ export const POST = handler({
 			error(400, cause instanceof Error ? cause.message : "that URL cannot receive webhooks");
 		}
 
+		// The template itself is validated by the schema; what only this pair of
+		// fields can say is that the custom format has nothing to render without one.
+		if (body.format === "custom" && body.template === null) {
+			error(400, "the custom format needs a template");
+		}
+
 		const secret = newWebhookSecret();
 		const row = {
 			id: nanoid(),
@@ -58,6 +64,8 @@ export const POST = handler({
 			events: body.events,
 			headers: body.headers,
 			filter: body.filter,
+			format: body.format,
+			template: body.template,
 			enabled: true,
 			createdBy: membership.user.id,
 			createdAt: new Date(),

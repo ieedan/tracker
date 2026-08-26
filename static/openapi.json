@@ -7659,6 +7659,35 @@
 													}
 												]
 											},
+											"repository": {
+												"anyOf": [
+													{
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"fullName": {
+																"type": "string"
+															},
+															"provider": {
+																"enum": [
+																	"github"
+																],
+																"type": "string"
+															}
+														},
+														"required": [
+															"id",
+															"fullName",
+															"provider"
+														]
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"labels": {
 												"type": "array",
 												"items": {
@@ -7698,6 +7727,7 @@
 											"status",
 											"priority",
 											"assignee",
+											"repository",
 											"labels",
 											"createdAt",
 											"updatedAt"
@@ -7784,6 +7814,17 @@
 										"default": "none"
 									},
 									"assigneeId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
+									},
+									"repositoryId": {
 										"anyOf": [
 											{
 												"type": "string"
@@ -7943,6 +7984,35 @@
 												}
 											]
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": [
+																"github"
+															],
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"labels": {
 											"type": "array",
 											"items": {
@@ -7982,6 +8052,7 @@
 										"status",
 										"priority",
 										"assignee",
+										"repository",
 										"labels",
 										"createdAt",
 										"updatedAt"
@@ -8074,6 +8145,16 @@
 										"type": "string"
 									},
 									"assigneeId": {
+										"anyOf": [
+											{
+												"type": "string"
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
+									"repositoryId": {
 										"anyOf": [
 											{
 												"type": "string"
@@ -8229,6 +8310,35 @@
 												}
 											]
 										},
+										"repository": {
+											"anyOf": [
+												{
+													"type": "object",
+													"properties": {
+														"id": {
+															"type": "string"
+														},
+														"fullName": {
+															"type": "string"
+														},
+														"provider": {
+															"enum": [
+																"github"
+															],
+															"type": "string"
+														}
+													},
+													"required": [
+														"id",
+														"fullName",
+														"provider"
+													]
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"labels": {
 											"type": "array",
 											"items": {
@@ -8268,6 +8378,7 @@
 										"status",
 										"priority",
 										"assignee",
+										"repository",
 										"labels",
 										"createdAt",
 										"updatedAt"
@@ -10456,6 +10567,24 @@
 													}
 												]
 											},
+											"format": {
+												"enum": [
+													"json",
+													"text",
+													"custom"
+												],
+												"type": "string"
+											},
+											"template": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"enabled": {
 												"type": "boolean"
 											},
@@ -10505,6 +10634,8 @@
 											"events",
 											"headers",
 											"filter",
+											"format",
+											"template",
 											"enabled",
 											"createdAt",
 											"lastDeliveryAt",
@@ -10694,6 +10825,27 @@
 											}
 										],
 										"default": null
+									},
+									"format": {
+										"enum": [
+											"json",
+											"text",
+											"custom"
+										],
+										"type": "string",
+										"default": "json"
+									},
+									"template": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 10000
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
 									}
 								},
 								"required": [
@@ -10870,6 +11022,24 @@
 														}
 													]
 												},
+												"format": {
+													"enum": [
+														"json",
+														"text",
+														"custom"
+													],
+													"type": "string"
+												},
+												"template": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
 												"enabled": {
 													"type": "boolean"
 												},
@@ -10919,6 +11089,8 @@
 												"events",
 												"headers",
 												"filter",
+												"format",
+												"template",
 												"enabled",
 												"createdAt",
 												"lastDeliveryAt",
@@ -11123,6 +11295,25 @@
 											}
 										]
 									},
+									"format": {
+										"enum": [
+											"json",
+											"text",
+											"custom"
+										],
+										"type": "string"
+									},
+									"template": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 10000
+											},
+											{
+												"type": "null"
+											}
+										]
+									},
 									"enabled": {
 										"type": "boolean"
 									}
@@ -11295,6 +11486,24 @@
 												}
 											]
 										},
+										"format": {
+											"enum": [
+												"json",
+												"text",
+												"custom"
+											],
+											"type": "string"
+										},
+										"template": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"enabled": {
 											"type": "boolean"
 										},
@@ -11344,6 +11553,8 @@
 										"events",
 										"headers",
 										"filter",
+										"format",
+										"template",
 										"enabled",
 										"createdAt",
 										"lastDeliveryAt",
