@@ -50,8 +50,9 @@ going back and forth between dashboards:
    exact CORS policy to paste, with your origin already in it; the browser PUTs
    straight to the bucket, so uploads fail without it.
 4. **GitHub** — one GitHub App, covering both sign-in and repositories, with
-   its two callback URLs and its permissions spelled out. It is optional;
-   skipping it leaves both features off rather than half-working.
+   its two callback URLs, its webhook URL and secret, and its permissions
+   spelled out. It is optional; skipping it leaves both features off rather
+   than half-working.
 
 It ends by writing `.env.production`, pushing every value to Vercel (via the
 `vercel` CLI, if installed), then offering the two irreversible steps last:
@@ -143,7 +144,9 @@ deployment made before the push fails validation and has to be redeployed.
   render in place, everything else becomes a chip. Up to 100MB each.
 - **Repositories** — link any number of GitHub repositories to a workspace,
   scope issues to one, reference files with `@`, and attach a pull request to
-  an issue 1:1.
+  an issue 1:1. With the App's webhook configured, a pull request named after
+  an issue links itself, starts it when it opens and finishes it when it
+  merges.
 - **User feedback** — an ingest endpoint anyone can point a widget or a support
   script at, a workspace tab to triage what arrives, one click to turn a piece
   of feedback into an issue, and an optional public board where the people who
@@ -293,6 +296,43 @@ points at GitHub Enterprise Server.
 
 Re-index from Settings when the tree has moved on; the row says how many files
 it holds, which ref they came from, and whether the provider capped the tree.
+
+### Pull requests that link and close themselves
+
+With the App's webhook pointed at `/api/v1/github/webhook`, GitHub delivers
+every pull request event and nobody has to paste a link or move a status by
+hand:
+
+| A pull request…                               | …does this                         |
+| --------------------------------------------- | ---------------------------------- |
+| titled `ENG-42: …`, or on branch `…/eng-42-…` | links itself to ENG-42             |
+| whose body says `fixes ENG-42`                | links itself to ENG-42             |
+| whose body only says `see ENG-42`             | nothing — that is a reference      |
+| opened, reopened, or taken out of draft       | moves its issue to **In Progress** |
+| merged                                        | moves its issue to **Done**        |
+| closed unmerged                               | nothing — the issue is not done    |
+
+Where the identifier appears is what separates naming an issue from claiming
+it. Nobody titles a pull request after an issue they are merely referring to,
+so a title or branch closes it as surely as `fixes` would; in a description
+they might be doing either, which is what the keyword is for. A link somebody
+made by hand counts as a claim too. Everything else a pull request names is
+left alone, because moving somebody's issue because a description pointed at it
+is the kind of automation people turn off.
+
+Statuses only ever move forward, and never out of **Done** or **Canceled** —
+those are decisions, and a reopened pull request is not an argument against
+one. The change lands on the issue's timeline and in the inbox of whoever owns
+or filed it, attributed to the GitHub account that caused it where that account
+belongs to a member, and otherwise to whoever connected the installation.
+
+Deliveries are authenticated by their `sha256` signature over the raw body,
+against `GITHUB_APP_WEBHOOK_SECRET`. A blank secret refuses every delivery
+rather than trusting an unsigned one, since a forged pull request event moves
+somebody's issues — the endpoint then answers 404, and a pull request's state
+is instead re-read whenever somebody opens the issue, which is what happens
+with no webhook configured at all. Applying a delivery is idempotent: GitHub
+retries, and the same event arriving twice must not write two timeline entries.
 
 ## User feedback
 
@@ -511,7 +551,8 @@ src/
 └ routes/
    ├ api/auth/[...all]/  better-auth's own surface
    ├ api/v1/             the documented REST API
-   │  └ webhooks/drain/  cron-authorized delivery retries
+   │  ├ webhooks/drain/  cron-authorized delivery retries
+   │  └ github/webhook/  inbound pull request events, signature-authorized
    ├ app/[slug]/         the product, behind a session
    │  ├ team/[key]/      one team's issues
    │  ├ feedback/        the triage tab, and FB-12
