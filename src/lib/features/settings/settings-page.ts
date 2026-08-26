@@ -3,9 +3,11 @@ import {
 	ForEach,
 	H1,
 	H2,
+	If,
 	Input,
 	P,
 	Span,
+	mediaQuery,
 	signal,
 	type Child,
 	type Readable,
@@ -39,6 +41,11 @@ export function SettingsPage({
 	data: Readable<PageData>;
 	params: { slug: Readable<string> };
 }) {
+	// Webhooks and feedback intake are configuration-heavy — event matrices,
+	// condition builders, payload templates — and phone screens make them worse,
+	// not smaller. They only mount where there is room; a note stands in below.
+	const wide = mediaQuery("(min-width: 768px)");
+
 	return Div(
 		{ class: "flex min-h-0 flex-1 flex-col" },
 		Div(
@@ -54,13 +61,26 @@ export function SettingsPage({
 				LabelsSection(data, params),
 				TemplatesSection(params.slug),
 				RepositoriesSection(params),
-				FeedbackSection(
-					data.bind((value) => value.workspace),
-					params,
+				If(
+					wide,
+					FeedbackSection(
+						data.bind((value) => value.workspace),
+						params,
+					),
 				),
 				WorkspaceAgentsSection(params.slug),
-				WebhooksSection(params.slug, copy),
+				If(wide, WebhooksSection(params.slug, copy)),
 				ApiKeysSection(copy),
+				If(
+					wide.bind((value) => !value),
+					Div(
+						{
+							class:
+								"rounded-md border border-dashed border-border p-3 text-[12px] text-muted-foreground",
+						},
+						"Feedback intake and webhooks are set up on a larger screen.",
+					),
+				),
 			),
 		),
 	);
