@@ -21,6 +21,7 @@ import {
 	createDatabase,
 	createDatabaseToken,
 	databaseUrl,
+	deleteDatabase,
 	getDatabase,
 	previewDatabaseName,
 	type TursoAuth,
@@ -108,21 +109,23 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 	const { auth, parent, branch } = config;
 	const name = previewDatabaseName(branch);
 
-	let database = await getDatabase(auth, name);
-	if (database === null) {
-		const template = await getDatabase(auth, parent);
-		if (template === null) {
-			throw new Error(`preview: the template database ${parent} does not exist`);
-		}
+	const template = await getDatabase(auth, parent);
+	if (template === null) {
+		throw new Error(`preview: the template database ${parent} does not exist`);
+	}
+	const createFromTemplate = async () => {
 		console.log(`preview: creating ${name} from ${parent}`);
-		database = await createDatabase(auth, {
+		return await createDatabase(auth, {
 			name,
 			group: config.group ?? template.group,
 			seedFrom: parent,
 		});
-	} else {
-		console.log(`preview: reusing ${name}`);
-	}
+	};
+
+	let database = await getDatabase(auth, name);
+	const reused = database !== null;
+	if (database === null) database = await createFromTemplate();
+	else console.log(`preview: reusing ${name}`);
 
 	const overrides: Record<string, string> = {
 		DATABASE_URL: databaseUrl(database),
@@ -135,7 +138,22 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 
 	// The copy carries the template's migration history, so this applies only
 	// what the branch has added on top of it.
-	migrate(overrides);
+	try {
+		migrate(overrides);
+	} catch (error) {
+		// A fresh copy that cannot migrate is a real bug in the migrations.
+		if (!reused) throw error;
+		// A reused copy can hold history the branch has since rewritten — a
+		// migration renumbered after colliding with main, or a rebase. The
+		// reviewer state it carries is already unreachable behind a failing
+		// migrate, so start the branch's preview over from the template.
+		console.log(`preview: ${name} no longer matches this branch's migrations — recreating`);
+		await deleteDatabase(auth, name);
+		database = await createFromTemplate();
+		overrides.DATABASE_URL = databaseUrl(database);
+		overrides.DATABASE_AUTH_TOKEN = await createDatabaseToken(auth, name);
+		migrate(overrides);
+	}
 	console.log(`preview: ${name} ready at ${overrides.DATABASE_URL}`);
 
 	return overrides;
