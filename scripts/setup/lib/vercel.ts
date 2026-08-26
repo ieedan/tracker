@@ -138,17 +138,30 @@ export async function link(cwd: string): Promise<{ ok: boolean; configured: bool
 	return { ok: true, configured: await configure(cwd) };
 }
 
-/** Replaces one environment variable on one target. */
-export function setEnv(key: string, value: string, target: VercelTarget): boolean {
-	// `env add` refuses to overwrite, so the old value goes first. A key that was
-	// never there makes the removal fail harmlessly.
-	spawnSync("vercel", ["env", "rm", key, target, "--yes"], { stdio: "ignore" });
-	const added = spawnSync("vercel", ["env", "add", key, target], {
+/** Sets one environment variable on one target, replacing any current value. */
+export function setEnv(
+	key: string,
+	value: string,
+	target: VercelTarget,
+): { ok: boolean; error: string } {
+	// `--force` is what allows an overwrite; without it `env add` fails on a key
+	// that already exists. The value goes over stdin rather than `--value` so it
+	// does not sit in the process list.
+	//
+	// A `PUBLIC_` variable is inlined into the browser bundle, so it is not a
+	// secret and Vercel refuses to store it as one — it has to be marked
+	// non-sensitive explicitly, since the CLI's default is the opposite.
+	const visibility = key.startsWith("PUBLIC_") ? ["--no-sensitive", "--visibility", "config"] : [];
+	const added = spawnSync("vercel", ["env", "add", key, target, "--force", ...visibility], {
 		input: value,
-		stdio: ["pipe", "ignore", "pipe"],
+		stdio: ["pipe", "pipe", "pipe"],
 		encoding: "utf8",
 	});
-	return added.status === 0;
+	if (added.status === 0) return { ok: true, error: "" };
+
+	const output = `${added.stdout ?? ""}${added.stderr ?? ""}`;
+	const message = output.match(/"message":\s*"([^"]+)"/)?.[1] ?? output.split("\n").at(-2) ?? "";
+	return { ok: false, error: message.trim() };
 }
 
 export function deploy(production: boolean): boolean {
