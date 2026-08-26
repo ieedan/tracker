@@ -31,8 +31,10 @@
  * # What is supported
  *
  * Headings, paragraphs with soft line breaks, `**bold**`, `*italic*`,
- * `~~strikethrough~~`, `` `code` ``, fenced code blocks, bulleted and numbered
- * lists (nested, and with block content inside an item), blockquotes,
+ * `~~strikethrough~~`, `` `code` ``, fenced code blocks (highlighted through
+ * lib/components/highlight.ts when the info string names a language it
+ * knows), bulleted and numbered lists (nested, and with block content inside
+ * an item), blockquotes,
  * horizontal rules, `[links](url)`, `<autolinks>`, and bare URLs. `@file`
  * references keep the pill they already had — they are markdown links, so they
  * come through the same path rather than a second one.
@@ -64,6 +66,7 @@ import {
 	type ClassValue,
 	type Readable,
 } from "@implementjs/core";
+import { highlightCode } from "@/lib/components/highlight";
 import { cn } from "@/lib/utils";
 
 /**
@@ -451,12 +454,11 @@ function renderBlock(block: Block): Child {
 					// comment column — a pasted command should not widen the page.
 					class:
 						"my-2 overflow-x-auto rounded-md border border-border bg-secondary/40 p-3 text-[12px] leading-relaxed",
-					// The info string is kept as a hint rather than used to
-					// highlight: there is no highlighter here, and a class named
-					// after the language is what one would look for later.
 					"data-language": block.language === "" ? undefined : block.language,
 				},
-				Code({ class: "font-mono" }, block.text),
+				// The info string picks the tokenizer; a language it does not
+				// know renders exactly as it did before there was one.
+				Code({ class: "font-mono" }, ...highlightCode(block.language, block.text)),
 			);
 
 		case "list": {

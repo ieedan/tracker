@@ -589,6 +589,7 @@ export function CreateIssueDialog() {
 						repository: () => chosenRepository.get()?.id,
 						placeholder: "Add description… @ to reference a file",
 						rows: 4,
+						toolbar: true,
 						onSubmit: () => void submit(),
 					}),
 					AttachmentGrid({
