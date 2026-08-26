@@ -1,0 +1,1 @@
+ALTER TABLE `webhook_delivery` ADD `responseBody` text;

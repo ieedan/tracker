@@ -619,6 +619,10 @@ export const webhookDelivery = sqliteTable(
 		status: text("status").$type<DeliveryStatus>().notNull().default("pending"),
 		attempts: integer("attempts").notNull().default(0),
 		responseStatus: integer("responseStatus"),
+		/** What the endpoint sent back, truncated — the difference between seeing "400" and knowing why. */
+		responseBody: text("responseBody"),
+		/** How long the latest attempt took, in milliseconds. */
+		durationMs: integer("durationMs"),
 		error: text("error"),
 		/** When the next attempt becomes due. Null once it is settled. */
 		nextAttemptAt: timestamp("nextAttemptAt"),

@@ -271,12 +271,35 @@ export const WebhookDeliverySchema = v.object({
 	status: v.picklist(DELIVERY_STATUSES),
 	attempts: v.number(),
 	responseStatus: v.nullable(v.number()),
+	/** How long the latest attempt took, in milliseconds. */
+	durationMs: v.nullable(v.number()),
 	error: v.nullable(v.string()),
 	nextAttemptAt: v.nullable(v.string()),
 	deliveredAt: v.nullable(v.string()),
 	createdAt: v.string(),
 });
 export type WebhookDelivery = v.InferOutput<typeof WebhookDeliverySchema>;
+
+/**
+ * One delivery in full: the list row plus the exact body that was signed and
+ * sent, and what the endpoint said back. Fetched per delivery — payloads are
+ * too big to ship with every row of the log.
+ */
+export const WebhookDeliveryDetailSchema = v.object({
+	...WebhookDeliverySchema.entries,
+	/** The exact JSON bytes that were signed and sent. */
+	payload: v.string(),
+	/** The endpoint's response body, truncated. Null when empty or never reached. */
+	responseBody: v.nullable(v.string()),
+	/**
+	 * The headers the delivery went out with, signature included — enough to
+	 * replay the request verbatim from a terminal. Behind admin + webhooks:read,
+	 * like the custom headers already are; the signature is an HMAC and does not
+	 * reveal the secret.
+	 */
+	requestHeaders: v.record(v.string(), v.string()),
+});
+export type WebhookDeliveryDetail = v.InferOutput<typeof WebhookDeliveryDetailSchema>;
 
 export const CreateWebhookBody = v.object({
 	url: v.pipe(v.string(), v.trim(), v.url("must be an absolute http(s) URL")),

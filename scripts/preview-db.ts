@@ -164,6 +164,10 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 	const { baseURL, trusted } = previewOrigins();
 	if (baseURL !== null) overrides.BETTER_AUTH_URL = baseURL;
 	if (trusted.length > 0) overrides.BETTER_AUTH_TRUSTED_ORIGINS = trusted.join(",");
+	// Logged because a host missing here is otherwise invisible: the build still
+	// succeeds and only a sign-in from the host that was left out fails, as
+	// "Invalid origin", long after the fact.
+	console.log(`preview: origins ${trusted.join(" ") || "(none — sign-in will be rejected)"}`);
 
 	// The copy carries the template's migration history, so this applies only
 	// what the branch has added on top of it.

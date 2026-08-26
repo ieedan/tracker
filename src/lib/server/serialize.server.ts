@@ -14,6 +14,7 @@ import type {
 	UserSummary,
 	Webhook,
 	WebhookDelivery,
+	WebhookDeliveryDetail,
 	Workspace,
 } from "@/lib/domain/schemas";
 import { feedbackIdentifier } from "@/lib/domain/feedback";
@@ -328,9 +329,22 @@ export function toDelivery(row: DeliveryRow): WebhookDelivery {
 		status: row.status,
 		attempts: row.attempts,
 		responseStatus: row.responseStatus,
+		durationMs: row.durationMs,
 		error: row.error,
 		nextAttemptAt: iso(row.nextAttemptAt),
 		deliveredAt: iso(row.deliveredAt),
 		createdAt: row.createdAt.toISOString(),
+	};
+}
+
+export function toDeliveryDetail(
+	row: DeliveryRow,
+	requestHeaders: Record<string, string>,
+): WebhookDeliveryDetail {
+	return {
+		...toDelivery(row),
+		payload: row.payload,
+		responseBody: row.responseBody,
+		requestHeaders,
 	};
 }

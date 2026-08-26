@@ -29,6 +29,7 @@ import {
 	DELIVERY_TIMEOUT_MS,
 	EVENT_HEADER,
 	MAX_DELIVERY_ATTEMPTS,
+	MAX_STORED_RESPONSE_BODY,
 	RETRY_BACKOFF_MS,
 	SIGNATURE_HEADER,
 	TIMESTAMP_HEADER,
@@ -295,14 +296,42 @@ export async function drainDue(limit = 50): Promise<{ attempted: number }> {
 type DeliveryRow = typeof webhookDelivery.$inferSelect;
 type WebhookRow = typeof webhook.$inferSelect;
 
+/**
+ * The headers a delivery goes out with. The webhook's own headers go on first,
+ * so the pipeline's always win: a workspace can add an `Authorization` its
+ * gateway wants; it can never rewrite the signature the receiver verifies
+ * against. Also what the delivery detail endpoint hands out, so a copied curl
+ * command carries a signature the receiver actually accepts.
+ */
+export function requestHeadersFor(
+	hook: Pick<WebhookRow, "headers" | "secret">,
+	delivery: Pick<DeliveryRow, "id" | "event" | "payload">,
+	sentAt: Date,
+): Record<string, string> {
+	return {
+		...customHeaders(hook.headers),
+		"content-type": "application/json",
+		"user-agent": "tracker-webhooks/1",
+		[EVENT_HEADER]: delivery.event,
+		[DELIVERY_HEADER]: delivery.id,
+		[TIMESTAMP_HEADER]: sentAt.toISOString(),
+		[SIGNATURE_HEADER]: sign(hook.secret, delivery.payload),
+	};
+}
+
 /** One HTTP attempt, and the bookkeeping for whatever it returns. */
 async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 	const attempts = delivery.attempts + 1;
 	const sentAt = new Date();
 
 	let responseStatus: number | null = null;
+	let responseBody: string | null = null;
+	let durationMs: number | null = null;
 	let failure: string | null = null;
 
+	// Started before the URL check so a refused URL reads as 0ms, and a timeout
+	// as the full eight seconds — the number says where the time went.
+	const started = Date.now();
 	try {
 		assertDeliverableUrl(hook.url, { allowLoopback: allowLoopbackTargets() });
 
@@ -310,28 +339,22 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 		// down instead of left hanging.
 		const response = await fetch(hook.url, {
 			method: "POST",
-			headers: {
-				// The webhook's own headers go on first, so the four below always
-				// win. A workspace can add an `Authorization` its gateway wants; it
-				// can never rewrite the signature the receiver verifies against.
-				...customHeaders(hook.headers),
-				"content-type": "application/json",
-				"user-agent": "tracker-webhooks/1",
-				[EVENT_HEADER]: delivery.event,
-				[DELIVERY_HEADER]: delivery.id,
-				[TIMESTAMP_HEADER]: sentAt.toISOString(),
-				[SIGNATURE_HEADER]: sign(hook.secret, delivery.payload),
-			},
+			headers: requestHeadersFor(hook, delivery, sentAt),
 			body: delivery.payload,
 			signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
 		});
 
 		responseStatus = response.status;
-		// The body is not used, but it must be drained or the socket leaks.
-		await response.text().catch(() => "");
+		// Draining the body is mandatory anyway — the socket leaks otherwise — so
+		// keep a slice of it: it is usually the only clue to *why* an endpoint
+		// refused a delivery.
+		const text = await response.text().catch(() => "");
+		durationMs = Date.now() - started;
+		responseBody = text === "" ? null : text.slice(0, MAX_STORED_RESPONSE_BODY);
 
 		if (!response.ok) failure = `endpoint responded ${response.status}`;
 	} catch (cause) {
+		durationMs = Date.now() - started;
 		failure = cause instanceof Error ? cause.message : String(cause);
 	}
 
@@ -342,6 +365,8 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 				status: "succeeded",
 				attempts,
 				responseStatus,
+				responseBody,
+				durationMs,
 				error: null,
 				nextAttemptAt: null,
 				deliveredAt: new Date(),
@@ -359,6 +384,8 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 			status: exhausted ? "failed" : "pending",
 			attempts,
 			responseStatus,
+			responseBody,
+			durationMs,
 			error: failure.slice(0, 500),
 			nextAttemptAt: exhausted ? null : new Date(Date.now() + backoff),
 		})

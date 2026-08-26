@@ -1,1 +1,0 @@
-ALTER TABLE `issue_template` ADD `repositoryId` text REFERENCES repository(id);
