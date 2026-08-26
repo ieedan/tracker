@@ -28,6 +28,17 @@ export const serverEnvSchema = {
 	BETTER_AUTH_SECRET: v.pipe(v.string(), v.minLength(16, "must be at least 16 characters")),
 	BETTER_AUTH_URL: v.pipe(v.string(), v.url("must be an absolute URL")),
 	/**
+	 * Extra origins the auth routes accept, comma-separated, beyond
+	 * `BETTER_AUTH_URL` — which better-auth trusts on its own.
+	 *
+	 * A Vercel preview answers on two hosts: the deployment URL, which is what
+	 * Vercel links from the pull request, and the branch URL. Only one of them
+	 * can be `BETTER_AUTH_URL`, and a sign-in POST from the other is rejected as
+	 * "Invalid origin" — so `scripts/preview-db.ts` names both here. Empty
+	 * everywhere else.
+	 */
+	BETTER_AUTH_TRUSTED_ORIGINS: v.optional(v.string(), ""),
+	/**
 	 * Authorises the webhook drain endpoint that retries failed deliveries.
 	 * Leave empty and the endpoint stays closed — the safe default, since an
 	 * open drain lets anyone make the server fire outbound requests.
