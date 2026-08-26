@@ -11466,6 +11466,16 @@
 													}
 												]
 											},
+											"durationMs": {
+												"anyOf": [
+													{
+														"type": "number"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"error": {
 												"anyOf": [
 													{
@@ -11506,6 +11516,7 @@
 											"status",
 											"attempts",
 											"responseStatus",
+											"durationMs",
 											"error",
 											"nextAttemptAt",
 											"deliveredAt",
@@ -11518,6 +11529,313 @@
 					},
 					"400": {
 						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/deliveries/{deliveryId}": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugWebhooksByIdDeliveriesByDeliveryId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "deliveryId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"event": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
+											],
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number"
+										},
+										"responseStatus": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"error": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"nextAttemptAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"deliveredAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"payload": {
+											"type": "string"
+										},
+										"responseBody": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"requestHeaders": {
+											"type": "object",
+											"propertyNames": {
+												"type": "string"
+											},
+											"additionalProperties": {
+												"type": "string"
+											}
+										}
+									},
+									"required": [
+										"id",
+										"event",
+										"status",
+										"attempts",
+										"responseStatus",
+										"durationMs",
+										"error",
+										"nextAttemptAt",
+										"deliveredAt",
+										"createdAt",
+										"payload",
+										"responseBody",
+										"requestHeaders"
+									]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/deliveries/{deliveryId}/redeliver": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugWebhooksByIdDeliveriesByDeliveryIdRedeliver",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "deliveryId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"event": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
+											],
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number"
+										},
+										"responseStatus": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"error": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"nextAttemptAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"deliveredAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"event",
+										"status",
+										"attempts",
+										"responseStatus",
+										"durationMs",
+										"error",
+										"nextAttemptAt",
+										"deliveredAt",
+										"createdAt"
+									]
+								}
+							}
+						}
 					}
 				}
 			}
@@ -11592,6 +11910,16 @@
 												}
 											]
 										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"error": {
 											"anyOf": [
 												{
@@ -11632,6 +11960,7 @@
 										"status",
 										"attempts",
 										"responseStatus",
+										"durationMs",
 										"error",
 										"nextAttemptAt",
 										"deliveredAt",
