@@ -11558,6 +11558,16 @@
 													}
 												]
 											},
+											"durationMs": {
+												"anyOf": [
+													{
+														"type": "number"
+													},
+													{
+														"type": "null"
+													}
+												]
+											},
 											"error": {
 												"anyOf": [
 													{
@@ -11598,6 +11608,7 @@
 											"status",
 											"attempts",
 											"responseStatus",
+											"durationMs",
 											"error",
 											"nextAttemptAt",
 											"deliveredAt",
@@ -11693,6 +11704,16 @@
 												}
 											]
 										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"error": {
 											"anyOf": [
 												{
@@ -11738,6 +11759,15 @@
 													"type": "null"
 												}
 											]
+										},
+										"requestHeaders": {
+											"type": "object",
+											"propertyNames": {
+												"type": "string"
+											},
+											"additionalProperties": {
+												"type": "string"
+											}
 										}
 									},
 									"required": [
@@ -11746,12 +11776,14 @@
 										"status",
 										"attempts",
 										"responseStatus",
+										"durationMs",
 										"error",
 										"nextAttemptAt",
 										"deliveredAt",
 										"createdAt",
 										"payload",
-										"responseBody"
+										"responseBody",
+										"requestHeaders"
 									],
 									"$schema": "http://json-schema.org/draft-07/schema#"
 								}
@@ -11839,6 +11871,16 @@
 												}
 											]
 										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"error": {
 											"anyOf": [
 												{
@@ -11879,6 +11921,7 @@
 										"status",
 										"attempts",
 										"responseStatus",
+										"durationMs",
 										"error",
 										"nextAttemptAt",
 										"deliveredAt",
@@ -11962,6 +12005,16 @@
 												}
 											]
 										},
+										"durationMs": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
 										"error": {
 											"anyOf": [
 												{
@@ -12002,6 +12055,7 @@
 										"status",
 										"attempts",
 										"responseStatus",
+										"durationMs",
 										"error",
 										"nextAttemptAt",
 										"deliveredAt",

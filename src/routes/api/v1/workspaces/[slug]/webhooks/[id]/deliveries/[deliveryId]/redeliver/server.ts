@@ -37,12 +37,13 @@ export const POST = handler({
 			.limit(1);
 		const delivery = rows[0];
 		if (delivery === undefined) error(404, "no such delivery");
-		if (delivery.status === "pending") error(409, "this delivery is still queued");
 
 		// Re-arm the row rather than clone it: the delivery id is the receiver's
 		// idempotency key, and a resend of the same event should carry the same id.
-		// If the attempt is abandoned mid-flight, the row is due now and the cron
-		// drain picks it up.
+		// A pending row is allowed through — that is a scheduled retry being
+		// brought forward, which beats waiting out a two-hour backoff after the
+		// endpoint is fixed. If the attempt is abandoned mid-flight, the row is
+		// due now and the cron drain picks it up.
 		await db
 			.update(webhookDelivery)
 			.set({ status: "pending", nextAttemptAt: new Date() })

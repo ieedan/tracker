@@ -271,6 +271,8 @@ export const WebhookDeliverySchema = v.object({
 	status: v.picklist(DELIVERY_STATUSES),
 	attempts: v.number(),
 	responseStatus: v.nullable(v.number()),
+	/** How long the latest attempt took, in milliseconds. */
+	durationMs: v.nullable(v.number()),
 	error: v.nullable(v.string()),
 	nextAttemptAt: v.nullable(v.string()),
 	deliveredAt: v.nullable(v.string()),
@@ -289,6 +291,13 @@ export const WebhookDeliveryDetailSchema = v.object({
 	payload: v.string(),
 	/** The endpoint's response body, truncated. Null when empty or never reached. */
 	responseBody: v.nullable(v.string()),
+	/**
+	 * The headers the delivery went out with, signature included — enough to
+	 * replay the request verbatim from a terminal. Behind admin + webhooks:read,
+	 * like the custom headers already are; the signature is an HMAC and does not
+	 * reveal the secret.
+	 */
+	requestHeaders: v.record(v.string(), v.string()),
 });
 export type WebhookDeliveryDetail = v.InferOutput<typeof WebhookDeliveryDetailSchema>;
 
