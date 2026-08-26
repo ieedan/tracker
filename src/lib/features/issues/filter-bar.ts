@@ -24,6 +24,7 @@ import {
 	Div,
 	Dynamic,
 	ForEach,
+	Fragment,
 	If,
 	ImplementEffect,
 	ImplementLifecycle,
@@ -35,6 +36,7 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
+import { DrawerCtx } from "@implementjs/primitives";
 import {
 	Check,
 	ChevronRight,
@@ -382,6 +384,7 @@ function FilterChip(
 					Drawer(
 						{ open: valueMenuOpen },
 						DrawerContent(
+							KeepKeyboardDown(),
 							DrawerTitle({ class: "sr-only" }, FILTER_FIELD_LABELS[field]),
 							DrawerDescription({ class: "sr-only" }, "Pick the values to filter by."),
 							ValueStep(valueField, filters, context, onChange, valueMenuOpen),
@@ -453,6 +456,20 @@ export function AddFilterButton(
 }
 
 /**
+ * Stops a just-opened values drawer from focusing its search box: the focus
+ * trap's default is the first tabbable, which is the search input — and a
+ * focused input pops the on-screen keyboard over the half-open sheet. The
+ * panel takes the initial focus instead; tapping the field still brings the
+ * keyboard up.
+ */
+function KeepKeyboardDown() {
+	return DrawerCtx.Use((state) => {
+		state.registerInitialFocus(state.contentElement);
+		return Fragment();
+	});
+}
+
+/**
  * The drawer flow: the first drawer lists the dimensions, tapping one stacks a
  * second drawer with that dimension's values — the same searchable multi-select
  * the desktop panel uses. The values drawer is mounted inside the first one, so
@@ -520,6 +537,7 @@ function MobileAddFilter(
 				Drawer(
 					{ open: valuesOpen },
 					DrawerContent(
+						KeepKeyboardDown(),
 						DrawerTitle(
 							{ class: "sr-only" },
 							activeField.bind((field) => (field === null ? "Values" : FILTER_FIELD_LABELS[field])),
