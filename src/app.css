@@ -216,6 +216,17 @@
 			font-size: 16px !important;
 		}
 	}
+
+	/* A command list is popover-coloured because it usually IS a popover. Inside
+	   a drawer it is the sheet's own content, and the lighter popover surface
+	   read as a second, mismatched panel — most visibly in the nested filter
+	   drawers. Floating menus opened *from* a drawer portal out of it, so they
+	   keep their popover colour. `!important` because Tailwind's utilities
+	   layer would otherwise win over this base-layer rule regardless of
+	   specificity. */
+	[data-slot="drawer-content"] [data-slot="command"] {
+		background-color: transparent !important;
+	}
 }
 
 @layer utilities {
