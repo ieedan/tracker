@@ -315,6 +315,7 @@ export function toWebhook(
 		headers: row.headers ?? {},
 		filter: row.filter ?? null,
 		format: row.format,
+		template: row.template ?? null,
 		enabled: row.enabled,
 		createdAt: row.createdAt.toISOString(),
 		lastDeliveryAt: iso(health?.lastAt ?? null),

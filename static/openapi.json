@@ -10570,9 +10570,20 @@
 											"format": {
 												"enum": [
 													"json",
-													"text"
+													"text",
+													"custom"
 												],
 												"type": "string"
+											},
+											"template": {
+												"anyOf": [
+													{
+														"type": "string"
+													},
+													{
+														"type": "null"
+													}
+												]
 											},
 											"enabled": {
 												"type": "boolean"
@@ -10624,6 +10635,7 @@
 											"headers",
 											"filter",
 											"format",
+											"template",
 											"enabled",
 											"createdAt",
 											"lastDeliveryAt",
@@ -10817,10 +10829,23 @@
 									"format": {
 										"enum": [
 											"json",
-											"text"
+											"text",
+											"custom"
 										],
 										"type": "string",
 										"default": "json"
+									},
+									"template": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 10000
+											},
+											{
+												"type": "null"
+											}
+										],
+										"default": null
 									}
 								},
 								"required": [
@@ -11000,9 +11025,20 @@
 												"format": {
 													"enum": [
 														"json",
-														"text"
+														"text",
+														"custom"
 													],
 													"type": "string"
+												},
+												"template": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
 												},
 												"enabled": {
 													"type": "boolean"
@@ -11054,6 +11090,7 @@
 												"headers",
 												"filter",
 												"format",
+												"template",
 												"enabled",
 												"createdAt",
 												"lastDeliveryAt",
@@ -11261,9 +11298,21 @@
 									"format": {
 										"enum": [
 											"json",
-											"text"
+											"text",
+											"custom"
 										],
 										"type": "string"
+									},
+									"template": {
+										"anyOf": [
+											{
+												"type": "string",
+												"maxLength": 10000
+											},
+											{
+												"type": "null"
+											}
+										]
 									},
 									"enabled": {
 										"type": "boolean"
@@ -11440,9 +11489,20 @@
 										"format": {
 											"enum": [
 												"json",
-												"text"
+												"text",
+												"custom"
 											],
 											"type": "string"
+										},
+										"template": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
 										},
 										"enabled": {
 											"type": "boolean"
@@ -11494,6 +11554,7 @@
 										"headers",
 										"filter",
 										"format",
+										"template",
 										"enabled",
 										"createdAt",
 										"lastDeliveryAt",

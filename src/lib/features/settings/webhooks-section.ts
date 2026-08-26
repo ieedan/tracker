@@ -55,6 +55,7 @@ import {
 } from "@/lib/components/ui/dropdown-menu";
 import { Label } from "@/lib/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/lib/components/ui/radio-group";
+import { Textarea } from "@/lib/components/ui/textarea";
 // `Label` is the form-control component in this file; the domain type is the
 // issue label, so it comes in under a name that says which.
 import type {
@@ -82,6 +83,7 @@ import {
 	type WebhookEvent,
 	type WebhookFormat,
 } from "@/lib/domain/webhooks";
+import { renderTemplate, SAMPLE_EVENT, validateTemplate } from "@/lib/domain/webhook-templates";
 import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
@@ -340,8 +342,11 @@ function ConditionSummary(hook: Readable<Webhook>) {
 			),
 		),
 		If(
-			hook.bind((value) => value.format === "text"),
-			Span({ class: "shrink-0 text-[11px] text-muted-foreground" }, WEBHOOK_FORMAT_LABELS.text),
+			hook.bind((value) => value.format !== "json"),
+			Span(
+				{ class: "shrink-0 text-[11px] text-muted-foreground" },
+				hook.bind((value) => WEBHOOK_FORMAT_LABELS[value.format]),
+			),
 		),
 	);
 }
@@ -403,6 +408,7 @@ function WebhookDialog(
 	// `string | null` because that is what the radio primitive binds; narrowed
 	// back to the picklist at submit time.
 	const format = signal<string | null>(DEFAULT_WEBHOOK_FORMAT);
+	const template = signal("");
 	const match = signal<FilterMatch>("all");
 	const rules = signal<BuilderNode[]>([]);
 
@@ -431,6 +437,7 @@ function WebhookDialog(
 			Object.entries(hook?.headers ?? {}).map(([name, value]) => newHeaderRow(name, value)),
 		);
 		format.set(hook?.format ?? DEFAULT_WEBHOOK_FORMAT);
+		template.set(hook?.template ?? "");
 
 		const builder = toBuilder(hook?.filter ?? null);
 		match.set(builder.match);
@@ -541,7 +548,18 @@ function WebhookDialog(
 		}
 
 		const filter = fromBuilder(match.get(), rules.get());
-		const payloadFormat: WebhookFormat = format.get() === "text" ? "text" : "json";
+		const payloadFormat = asFormat(format.get());
+		const templateText = template.get().trim() === "" ? null : template.get();
+		if (payloadFormat === "custom") {
+			const problem =
+				templateText === null
+					? "a custom format needs a template body"
+					: validateTemplate(templateText);
+			if (problem !== null) {
+				toastError(problem);
+				return;
+			}
+		}
 
 		saving.set(true);
 		const result =
@@ -555,6 +573,7 @@ function WebhookDialog(
 							headers: collected,
 							filter,
 							format: payloadFormat,
+							template: templateText,
 						},
 					})
 				: await api.PATCH("/api/v1/workspaces/[slug]/webhooks/[id]", {
@@ -565,6 +584,7 @@ function WebhookDialog(
 							headers: collected,
 							filter,
 							format: payloadFormat,
+							template: templateText,
 						},
 					});
 		saving.set(false);
@@ -689,7 +709,7 @@ function WebhookDialog(
 				// Events sit in their own column and stay put while the left side
 				// grows; headers and conditions want the width the rail leaves.
 				Div({ class: "md:col-start-2 md:row-span-5 md:row-start-1" }, EventPicker(cells, recount)),
-				Div({ class: "md:col-start-1" }, FormatPicker(format)),
+				Div({ class: "md:col-start-1" }, FormatPicker(format, template)),
 				Div({ class: "md:col-start-1" }, HeadersEditor(headers)),
 				Div({ class: "md:col-start-1" }, ConditionsEditor(match, rules, chosen, catalog)),
 			),
@@ -786,12 +806,17 @@ function DialogTabButton(
 	);
 }
 
+/** The picker's string, narrowed back to the picklist. */
+const asFormat = (value: string | null): WebhookFormat =>
+	value === "text" || value === "custom" ? value : "json";
+
 /**
  * How the body is shaped. Most receivers want the JSON event; the text wrapper
  * exists for endpoints that take freeform text and hand it to an agent — a
- * Claude Code routine's API trigger, a Slack incoming webhook.
+ * Claude Code routine's API trigger, a Slack incoming webhook — and the custom
+ * template for endpoints that dictate their own body shape.
  */
-function FormatPicker(format: Signal<string | null>) {
+function FormatPicker(format: Signal<string | null>, template: Signal<string>) {
 	return Div(
 		{ class: "flex flex-col gap-1.5" },
 		Span({ class: "text-[13px] font-medium" }, "Payload format"),
@@ -799,7 +824,13 @@ function FormatPicker(format: Signal<string | null>) {
 			{
 				value: format,
 				onValueChange: (next) => {
-					if (typeof next === "string") format.set(next);
+					if (typeof next !== "string") return;
+					format.set(next);
+					// Seed an empty editor so picking "custom" shows something that
+					// already works rather than a blank box and a validation error.
+					if (next === "custom" && template.get().trim() === "") {
+						template.set('{\n\t"text": "{{summary}}"\n}');
+					}
 				},
 				class: "flex flex-col gap-0 rounded-md border border-border",
 			},
@@ -821,6 +852,61 @@ function FormatPicker(format: Signal<string | null>) {
 						),
 					),
 				),
+			),
+		),
+		If(
+			format.bind((value) => value === "custom"),
+			TemplateEditor(template),
+		),
+	);
+}
+
+/**
+ * The custom body, edited with a live preview so quoting mistakes surface
+ * while typing rather than as a failed delivery. The preview renders the same
+ * sample event the server validates against.
+ */
+function TemplateEditor(template: Signal<string>) {
+	const preview = template.bind((value) => {
+		const problem =
+			value.trim() === "" ? "a custom format needs a template body" : validateTemplate(value);
+		if (problem !== null) return { ok: false, text: problem };
+		return { ok: true, text: renderTemplate(value, SAMPLE_EVENT) };
+	});
+
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Textarea({
+			value: template,
+			spellcheck: false,
+			autocapitalize: "off",
+			"aria-label": "Body template",
+			placeholder: '{\n\t"text": "{{summary}}"\n}',
+			class: "max-h-48 min-h-24 font-mono text-[12px] md:text-[12px]",
+		}),
+		P(
+			{ class: "text-[11px] text-muted-foreground" },
+			"Any path into the event works: {{event}}, {{workspace.name}}, {{actor.name}}, " +
+				"{{data.issue.identifier}}, {{data.issue.title}} — plus {{summary}}, a one-line " +
+				"description. {{…}} escapes for use inside strings; {{{…}}} inserts raw JSON, " +
+				"e.g. {{{data.issue}}}.",
+		),
+		Div(
+			{ class: "flex flex-col gap-1 rounded-md border border-border bg-secondary/30 px-3 py-2" },
+			Span(
+				{ class: "text-[11px] font-medium text-muted-foreground" },
+				"Preview, against a sample issue.created event",
+			),
+			Span(
+				{
+					class: preview.bind((value) =>
+						cn(
+							"font-mono text-[11px] break-all whitespace-pre-wrap",
+							value.ok ? "text-foreground/80" : "text-destructive",
+						),
+					),
+				},
+				preview.bind((value) => value.text),
 			),
 		),
 	);

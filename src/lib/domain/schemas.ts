@@ -22,6 +22,7 @@ import {
 	WEBHOOK_EVENTS,
 	WEBHOOK_FORMATS,
 } from "./webhooks";
+import { MAX_TEMPLATE_LENGTH, validateTemplate } from "./webhook-templates";
 
 export const GitProviderSchema = v.picklist(GIT_PROVIDERS);
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
@@ -253,6 +254,17 @@ export const WebhookHeadersSchema = v.pipe(
 	}),
 );
 
+/** A non-null template must render to valid JSON, whatever format rides along. */
+const WebhookTemplateSchema = v.pipe(
+	v.string(),
+	v.maxLength(MAX_TEMPLATE_LENGTH),
+	v.rawCheck(({ dataset, addIssue }) => {
+		if (!dataset.typed) return;
+		const problem = validateTemplate(dataset.value);
+		if (problem !== null) addIssue({ message: problem });
+	}),
+);
+
 export const WebhookSchema = v.object({
 	id: v.string(),
 	url: v.string(),
@@ -262,8 +274,10 @@ export const WebhookSchema = v.object({
 	headers: v.record(v.string(), v.string()),
 	/** The condition tree, or null when the webhook takes every event. */
 	filter: v.nullable(FilterGroupSchema),
-	/** How the body is shaped — the canonical JSON event, or a `{"text": …}` wrapper. */
+	/** How the body is shaped — canonical JSON, a `{"text": …}` wrapper, or a template. */
 	format: v.picklist(WEBHOOK_FORMATS),
+	/** The `custom` format's body template. Null for the built-in formats. */
+	template: v.nullable(v.string()),
 	enabled: v.boolean(),
 	createdAt: v.string(),
 	/** Rolling health, so a broken endpoint is visible without opening it. */
@@ -318,6 +332,7 @@ export const CreateWebhookBody = v.object({
 	/** Null, or omitted, means every event the subscription covers. */
 	filter: v.optional(v.nullable(WebhookFilterSchema), null),
 	format: v.optional(v.picklist(WEBHOOK_FORMATS), "json"),
+	template: v.optional(v.nullable(WebhookTemplateSchema), null),
 });
 
 export const UpdateWebhookBody = v.partial(
@@ -328,6 +343,8 @@ export const UpdateWebhookBody = v.partial(
 		/** Explicit null clears the conditions. */
 		filter: v.nullable(WebhookFilterSchema),
 		format: v.picklist(WEBHOOK_FORMATS),
+		/** Explicit null clears the template. */
+		template: v.nullable(WebhookTemplateSchema),
 		enabled: v.boolean(),
 	}),
 );

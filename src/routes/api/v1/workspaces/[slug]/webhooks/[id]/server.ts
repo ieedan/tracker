@@ -22,7 +22,27 @@ export const PATCH = handler({
 		// Explicitly nullable: `null` clears the conditions, absent leaves them.
 		if (body.filter !== undefined) changes.filter = body.filter;
 		if (body.format !== undefined) changes.format = body.format;
+		if (body.template !== undefined) changes.template = body.template;
 		if (body.enabled !== undefined) changes.enabled = body.enabled;
+
+		// Format and template are checked as the pair the row will *end up* with,
+		// so setting the format in one request and the template in another works —
+		// but no sequence of PATCHes leaves a custom webhook with nothing to render.
+		if (body.format === "custom" || body.template !== undefined) {
+			const existing = await db
+				.select({ format: webhook.format, template: webhook.template })
+				.from(webhook)
+				.where(and(eq(webhook.workspaceId, membership.workspace.id), eq(webhook.id, params.id)))
+				.limit(1);
+			const current = existing[0];
+			if (current === undefined) error(404, "no such webhook");
+
+			const effectiveFormat = body.format ?? current.format;
+			const effectiveTemplate = body.template === undefined ? current.template : body.template;
+			if (effectiveFormat === "custom" && effectiveTemplate === null) {
+				error(400, "the custom format needs a template");
+			}
+		}
 
 		const updated = await db
 			.update(webhook)

@@ -592,8 +592,10 @@ export const webhook = sqliteTable(
 		 * event it is subscribed to. Evaluated at enqueue time.
 		 */
 		filter: text("filter", { mode: "json" }).$type<WebhookFilter>(),
-		/** How the body is shaped — the canonical JSON event, or a `{"text": …}` wrapper. */
+		/** How the body is shaped — canonical JSON, a `{"text": …}` wrapper, or a template. */
 		format: text("format").$type<WebhookFormat>().notNull().default("json"),
+		/** The `custom` format's body template. Null for the built-in formats. */
+		template: text("template"),
 		enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
 		createdBy: text("createdBy")
 			.notNull()
