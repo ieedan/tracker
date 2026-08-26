@@ -329,7 +329,10 @@ export function IssueListPage({
 
 		Div(
 			{
-				class: ["min-h-0 flex-1 overflow-y-auto", anySelected.bind((on) => (on ? "pb-16" : ""))],
+				class: [
+					"min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+					anySelected.bind((on) => (on ? "pb-16" : "")),
+				],
 			},
 			If(
 				visible.bind((list) => list.length === 0),

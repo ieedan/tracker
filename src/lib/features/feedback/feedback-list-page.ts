@@ -113,7 +113,7 @@ export function FeedbackListPage({
 		),
 
 		Div(
-			{ class: "min-h-0 flex-1 overflow-y-auto" },
+			{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto" },
 			If(
 				visible.bind((list) => list.length === 0),
 				EmptyState(query, statusFilter, data),

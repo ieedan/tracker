@@ -178,13 +178,15 @@ export function MembersSection(
 			Div(
 				{ class: "flex flex-col gap-3" },
 				Div(
-					{ class: "flex gap-2" },
+					// The input's intrinsic minimum is wider than a phone leaves it, so
+					// the row wraps rather than pushing the page sideways.
+					{ class: "flex flex-wrap gap-2" },
 					Input({
 						value: email,
 						type: "email",
 						placeholder: "teammate@example.com",
 						class:
-							"h-8 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
+							"h-8 min-w-40 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
 						onKeydown: (event) => {
 							if (event.key === "Enter") void addByEmail();
 						},

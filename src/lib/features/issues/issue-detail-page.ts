@@ -377,7 +377,7 @@ export function IssueDetailPage({
 			),
 
 			Div(
-				{ class: "min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },
+				{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },
 				Div(
 					{ class: "mx-auto flex max-w-3xl flex-col gap-6" },
 					EditableTitle(issue, update),

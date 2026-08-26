@@ -152,7 +152,9 @@ function OptionGroup<T extends string>(
 						disabled: saving,
 						class: active.bind((isActive) =>
 							cn(
-								"h-auto w-full items-start justify-start gap-2 rounded-md border px-2.5 py-2 text-left",
+								// `whitespace-normal` undoes the button base's nowrap: the
+								// hint has to wrap on a phone, not push the page sideways.
+								"h-auto w-full items-start justify-start gap-2 rounded-md border px-2.5 py-2 text-left whitespace-normal",
 								isActive ? "border-primary bg-accent/50" : "border-transparent hover:bg-accent/40",
 							),
 						),

@@ -287,7 +287,7 @@ export function InboxPage({
 			Div(
 				{
 					class:
-						"flex max-h-[40dvh] w-full shrink-0 flex-col overflow-y-auto border-b border-border md:max-h-none md:w-[380px] md:border-r md:border-b-0",
+						"flex max-h-[40dvh] w-full shrink-0 flex-col overflow-x-hidden overflow-y-auto border-b border-border md:max-h-none md:w-[380px] md:border-r md:border-b-0",
 				},
 				If(
 					visible.bind((list) => list.length === 0),
@@ -302,7 +302,7 @@ export function InboxPage({
 
 			// Right: whatever is selected.
 			Div(
-				{ class: "flex min-w-0 flex-1 flex-col overflow-y-auto" },
+				{ class: "flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto" },
 				DetailPane(selected, params, setRead),
 			),
 		),
