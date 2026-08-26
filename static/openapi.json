@@ -4989,6 +4989,287 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/issues/{identifier}/comments/{commentId}": {
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugIssuesByIdentifierCommentsByCommentId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "commentId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"body": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 10000
+									}
+								},
+								"required": [
+									"body"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"body": {
+											"type": "string"
+										},
+										"author": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"body",
+										"author",
+										"attachments",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugIssuesByIdentifierCommentsByCommentId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "commentId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/issues/{identifier}/pull-request": {
 			"get": {
 				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifierPullRequest",
@@ -11330,6 +11611,283 @@
 					},
 					"400": {
 						"description": "the request failed validation"
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/deliveries/{deliveryId}": {
+			"get": {
+				"operationId": "getApiV1WorkspacesBySlugWebhooksByIdDeliveriesByDeliveryId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "deliveryId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"event": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
+											],
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number"
+										},
+										"responseStatus": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"error": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"nextAttemptAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"deliveredAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"payload": {
+											"type": "string"
+										},
+										"responseBody": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										}
+									},
+									"required": [
+										"id",
+										"event",
+										"status",
+										"attempts",
+										"responseStatus",
+										"error",
+										"nextAttemptAt",
+										"deliveredAt",
+										"createdAt",
+										"payload",
+										"responseBody"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/v1/workspaces/{slug}/webhooks/{id}/deliveries/{deliveryId}/redeliver": {
+			"post": {
+				"operationId": "postApiV1WorkspacesBySlugWebhooksByIdDeliveriesByDeliveryIdRedeliver",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "deliveryId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"event": {
+											"enum": [
+												"issue.created",
+												"issue.updated",
+												"issue.assigned",
+												"issue.status_changed",
+												"issue.deleted",
+												"comment.created",
+												"feedback.created",
+												"feedback.updated",
+												"feedback.status_changed",
+												"feedback.converted",
+												"feedback.comment_created",
+												"feedback.deleted"
+											],
+											"type": "string"
+										},
+										"status": {
+											"enum": [
+												"pending",
+												"succeeded",
+												"failed"
+											],
+											"type": "string"
+										},
+										"attempts": {
+											"type": "number"
+										},
+										"responseStatus": {
+											"anyOf": [
+												{
+													"type": "number"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"error": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"nextAttemptAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"deliveredAt": {
+											"anyOf": [
+												{
+													"type": "string"
+												},
+												{
+													"type": "null"
+												}
+											]
+										},
+										"createdAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"event",
+										"status",
+										"attempts",
+										"responseStatus",
+										"error",
+										"nextAttemptAt",
+										"deliveredAt",
+										"createdAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
 					}
 				}
 			}

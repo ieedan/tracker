@@ -14,6 +14,7 @@ import type {
 	UserSummary,
 	Webhook,
 	WebhookDelivery,
+	WebhookDeliveryDetail,
 	Workspace,
 } from "@/lib/domain/schemas";
 import { feedbackIdentifier } from "@/lib/domain/feedback";
@@ -332,5 +333,13 @@ export function toDelivery(row: DeliveryRow): WebhookDelivery {
 		nextAttemptAt: iso(row.nextAttemptAt),
 		deliveredAt: iso(row.deliveredAt),
 		createdAt: row.createdAt.toISOString(),
+	};
+}
+
+export function toDeliveryDetail(row: DeliveryRow): WebhookDeliveryDetail {
+	return {
+		...toDelivery(row),
+		payload: row.payload,
+		responseBody: row.responseBody,
 	};
 }

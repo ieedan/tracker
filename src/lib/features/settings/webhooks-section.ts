@@ -20,7 +20,15 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Copy, Pencil, Plus, Send, Trash2, Webhook as WebhookIcon } from "@implementjs/lucide";
+import {
+	ChevronRight,
+	Copy,
+	Pencil,
+	Plus,
+	Send,
+	Trash2,
+	Webhook as WebhookIcon,
+} from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
@@ -43,6 +51,7 @@ import type {
 	Team,
 	Webhook,
 	WebhookDelivery,
+	WebhookDeliveryDetail,
 } from "@/lib/domain/schemas";
 import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
@@ -55,7 +64,7 @@ import {
 	WEBHOOK_EVENTS,
 	type WebhookEvent,
 } from "@/lib/domain/webhooks";
-import { relativeTime } from "@/lib/format";
+import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { fromBuilder, toBuilder, type BuilderNode } from "./webhook-builder";
 import { ConditionsEditor, emptyCatalog, type ConditionCatalog } from "./webhook-conditions";
@@ -74,6 +83,10 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 	/** Which webhook's delivery log is expanded, and its rows. */
 	const openLog = signal("");
 	const deliveries = signal<WebhookDelivery[]>([]);
+
+	/** Which delivery is expanded inside the log, and its full record. */
+	const openDelivery = signal("");
+	const detail = signal<WebhookDeliveryDetail | null>(null);
 
 	/**
 	 * The workspace's own values, so a condition on an assignee or a label is
@@ -160,6 +173,7 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 	};
 
 	const toggleLog = async (id: string) => {
+		openDelivery.set("");
 		if (openLog.get() === id) {
 			openLog.set("");
 			return;
@@ -167,6 +181,48 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 		openLog.set(id);
 		deliveries.set([]);
 		await showLog(id);
+	};
+
+	const fetchDetail = async (webhookId: string, deliveryId: string) => {
+		const { data, error } = await api.GET(
+			"/api/v1/workspaces/[slug]/webhooks/[id]/deliveries/[deliveryId]",
+			{ params: { slug: slug.get(), id: webhookId, deliveryId } },
+		);
+		if (error !== undefined) {
+			openDelivery.set("");
+			toastError(messageOf(error, "Could not load the delivery"));
+			return;
+		}
+		// A slow response must not land under whichever row is open by then.
+		if (openDelivery.get() === deliveryId) detail.set(data);
+	};
+
+	const toggleDetail = async (webhookId: string, deliveryId: string) => {
+		if (openDelivery.get() === deliveryId) {
+			openDelivery.set("");
+			return;
+		}
+		openDelivery.set(deliveryId);
+		detail.set(null);
+		await fetchDetail(webhookId, deliveryId);
+	};
+
+	/** Sends a settled delivery again, then refreshes whatever is showing it. */
+	const resend = async (webhookId: string, deliveryId: string) => {
+		const { data, error } = await api.POST(
+			"/api/v1/workspaces/[slug]/webhooks/[id]/deliveries/[deliveryId]/redeliver",
+			{ params: { slug: slug.get(), id: webhookId, deliveryId } },
+		);
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not resend the delivery"));
+			return;
+		}
+		if (data.status === "succeeded") toastSuccess(`Delivered (${data.responseStatus ?? 200})`);
+		else toastError(`Resend failed: ${data.error ?? "no response"}`);
+
+		await load();
+		if (openLog.get() === webhookId) await showLog(webhookId);
+		if (openDelivery.get() === deliveryId) await fetchDetail(webhookId, deliveryId);
 	};
 
 	const edit = (hook: Webhook) => {
@@ -301,7 +357,14 @@ export function WebhooksSection(slug: Readable<string>, copy: (value: string) =>
 
 							If(
 								derived([openLog], (open) => open === hook.get().id),
-								DeliveryLog(deliveries),
+								DeliveryLog(
+									deliveries,
+									openDelivery,
+									detail,
+									(deliveryId) => void toggleDetail(hook.get().id, deliveryId),
+									(deliveryId) => void resend(hook.get().id, deliveryId),
+									copy,
+								),
 							),
 						),
 				),
@@ -780,7 +843,14 @@ function HealthDot(hook: Readable<Webhook>) {
 	});
 }
 
-function DeliveryLog(deliveries: Readable<WebhookDelivery[]>) {
+function DeliveryLog(
+	deliveries: Readable<WebhookDelivery[]>,
+	openDelivery: Readable<string>,
+	detail: Readable<WebhookDeliveryDetail | null>,
+	toggleDetail: (deliveryId: string) => void,
+	resend: (deliveryId: string) => void,
+	copy: (value: string) => Promise<void>,
+) {
 	return Div(
 		{ class: "border-t border-border bg-secondary/30 px-3 py-2" },
 		If(
@@ -797,42 +867,222 @@ function DeliveryLog(deliveries: Readable<WebhookDelivery[]>) {
 		ForEach(
 			deliveries,
 			(delivery) => delivery.id,
-			(delivery) =>
-				Div(
-					{ class: "flex items-center gap-3 py-1 text-[11px]" },
-					Span(
+			(delivery) => {
+				const expanded = derived(
+					[openDelivery],
+					(open) => open !== "" && open === delivery.get().id,
+				);
+
+				return Div(
+					{ class: "flex flex-col" },
+					Div(
 						{
-							class: delivery.bind((value) =>
+							class:
+								"flex cursor-pointer select-none items-center gap-3 rounded py-1 text-[11px] hover:bg-secondary/60",
+							title: "View this delivery",
+							onClick: () => toggleDetail(delivery.get().id),
+						},
+						ChevronRight({
+							class: expanded.bind((open) =>
 								cn(
-									"w-16 shrink-0 font-medium",
-									value.status === "succeeded"
-										? "text-green-500"
-										: value.status === "failed"
-											? "text-destructive"
-											: "text-muted-foreground",
+									"size-3 shrink-0 text-muted-foreground transition-transform",
+									open && "rotate-90",
 								),
 							),
-						},
-						delivery.bind("status"),
-					),
-					Span({ class: "w-40 shrink-0 font-mono text-muted-foreground" }, delivery.bind("event")),
-					Span(
-						{ class: "min-w-0 flex-1 truncate text-muted-foreground" },
-						delivery.bind(
-							(value) =>
-								value.error ??
-								(value.responseStatus === null ? "" : `HTTP ${value.responseStatus}`),
+						}),
+						Span(
+							{
+								class: delivery.bind((value) =>
+									cn(
+										"w-16 shrink-0 font-medium",
+										value.status === "succeeded"
+											? "text-green-500"
+											: value.status === "failed"
+												? "text-destructive"
+												: "text-muted-foreground",
+									),
+								),
+							},
+							delivery.bind("status"),
+						),
+						Span(
+							{ class: "w-40 shrink-0 font-mono text-muted-foreground" },
+							delivery.bind("event"),
+						),
+						Span(
+							{ class: "min-w-0 flex-1 truncate text-muted-foreground" },
+							delivery.bind(
+								(value) =>
+									value.error ??
+									(value.responseStatus === null ? "" : `HTTP ${value.responseStatus}`),
+							),
+						),
+						Span(
+							{ class: "shrink-0 text-muted-foreground" },
+							delivery.bind((value) => (value.attempts > 1 ? `${value.attempts} attempts` : "")),
+						),
+						Span(
+							{ class: "w-10 shrink-0 text-right text-muted-foreground" },
+							delivery.bind((value) => relativeTime(value.createdAt)),
 						),
 					),
-					Span(
-						{ class: "shrink-0 text-muted-foreground" },
-						delivery.bind((value) => (value.attempts > 1 ? `${value.attempts} attempts` : "")),
-					),
-					Span(
-						{ class: "w-10 shrink-0 text-right text-muted-foreground" },
-						delivery.bind((value) => relativeTime(value.createdAt)),
+
+					If(expanded, DeliveryDetailPanel(delivery, detail, resend, copy)),
+				);
+			},
+		),
+	);
+}
+
+/** One labelled value in the detail panel's facts row. */
+const fact = (label: string, value: Readable<string>) =>
+	Div(
+		{ class: "flex flex-col gap-0.5" },
+		Span({ class: "text-[10px] uppercase tracking-wide text-muted-foreground" }, label),
+		Span({ class: "text-[11px]" }, value),
+	);
+
+/** `{"error": ...}` back into something a person scans, or the raw text as-is. */
+function prettyJson(raw: string): string {
+	try {
+		return JSON.stringify(JSON.parse(raw), null, 2);
+	} catch {
+		return raw;
+	}
+}
+
+const codeBlockClass =
+	"max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background/80 p-2 font-mono text-[11px]";
+
+/**
+ * Everything known about one delivery: when it ran, the payload that was
+ * signed and sent, and what the endpoint said back — the difference between
+ * seeing "endpoint responded 400" and knowing why.
+ */
+function DeliveryDetailPanel(
+	delivery: Readable<WebhookDelivery>,
+	detail: Readable<WebhookDeliveryDetail | null>,
+	resend: (deliveryId: string) => void,
+	copy: (value: string) => Promise<void>,
+) {
+	return Div(
+		{
+			class:
+				"mb-1 ml-6 flex flex-col gap-2.5 rounded-md border border-border bg-background/60 p-2.5",
+		},
+
+		Div(
+			{ class: "flex items-start justify-between gap-3" },
+			Div(
+				{ class: "grid flex-1 grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-4" },
+				fact(
+					"Attempts",
+					delivery.bind((value) => `${value.attempts}`),
+				),
+				fact(
+					"Response",
+					delivery.bind((value) =>
+						value.responseStatus === null ? "no response" : `HTTP ${value.responseStatus}`,
 					),
 				),
+				fact(
+					"Queued",
+					delivery.bind((value) => fullTime(value.createdAt)),
+				),
+				fact(
+					"Delivered",
+					delivery.bind((value) =>
+						value.deliveredAt !== null
+							? fullTime(value.deliveredAt)
+							: value.nextAttemptAt !== null
+								? `retries ${fullTime(value.nextAttemptAt)}`
+								: "—",
+					),
+				),
+			),
+			// A settled delivery can be sent again — same id, same payload — so a
+			// fixed endpoint can catch up on what it missed. Pending rows are still
+			// the queue's business.
+			If(
+				delivery.bind((value) => value.status !== "pending"),
+				Button(
+					{
+						size: "xs",
+						variant: "outline",
+						type: "button",
+						class: "shrink-0 gap-1 text-[11px]",
+						onClick: () => resend(delivery.get().id),
+					},
+					Send({ class: "size-3" }),
+					"Resend",
+				),
+			),
+		),
+
+		If(
+			delivery.bind((value) => value.error !== null),
+			Div(
+				{
+					class:
+						"rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[11px] text-destructive",
+				},
+				delivery.bind((value) => value.error ?? ""),
+			),
+		),
+
+		If(
+			detail.bind((value) => value === null),
+			P({ class: "text-[11px] text-muted-foreground" }, "Loading…"),
+		),
+
+		If(
+			detail.bind((value) => value !== null),
+			Div(
+				{ class: "flex flex-col gap-2.5" },
+				Div(
+					{ class: "flex flex-col gap-1" },
+					Div(
+						{ class: "flex items-center justify-between gap-2" },
+						Span({ class: "text-[11px] font-medium" }, "Request payload"),
+						Button(
+							{
+								size: "icon-sm",
+								variant: "ghost",
+								title: "Copy payload",
+								onClick: () => {
+									const value = detail.get();
+									if (value !== null) void copy(value.payload);
+								},
+							},
+							Copy({ class: "size-3" }),
+						),
+					),
+					Div(
+						{ class: codeBlockClass },
+						detail.bind((value) => (value === null ? "" : prettyJson(value.payload))),
+					),
+				),
+				Div(
+					{ class: "flex flex-col gap-1" },
+					Span({ class: "text-[11px] font-medium" }, "Response body"),
+					If(
+						detail.bind((value) => value !== null && value.responseBody !== null),
+						Div(
+							{ class: codeBlockClass },
+							detail.bind((value) =>
+								value === null || value.responseBody === null ? "" : prettyJson(value.responseBody),
+							),
+						),
+					),
+					If(
+						detail.bind((value) => value !== null && value.responseBody === null),
+						P(
+							{ class: "text-[11px] text-muted-foreground" },
+							"Nothing captured — the endpoint sent an empty body, was never reached, or this delivery predates response capture.",
+						),
+					),
+				),
+			),
 		),
 	);
 }

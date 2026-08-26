@@ -29,6 +29,7 @@ import {
 	DELIVERY_TIMEOUT_MS,
 	EVENT_HEADER,
 	MAX_DELIVERY_ATTEMPTS,
+	MAX_STORED_RESPONSE_BODY,
 	RETRY_BACKOFF_MS,
 	SIGNATURE_HEADER,
 	TIMESTAMP_HEADER,
@@ -301,6 +302,7 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 	const sentAt = new Date();
 
 	let responseStatus: number | null = null;
+	let responseBody: string | null = null;
 	let failure: string | null = null;
 
 	try {
@@ -327,8 +329,11 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 		});
 
 		responseStatus = response.status;
-		// The body is not used, but it must be drained or the socket leaks.
-		await response.text().catch(() => "");
+		// Draining the body is mandatory anyway — the socket leaks otherwise — so
+		// keep a slice of it: it is usually the only clue to *why* an endpoint
+		// refused a delivery.
+		const text = await response.text().catch(() => "");
+		responseBody = text === "" ? null : text.slice(0, MAX_STORED_RESPONSE_BODY);
 
 		if (!response.ok) failure = `endpoint responded ${response.status}`;
 	} catch (cause) {
@@ -342,6 +347,7 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 				status: "succeeded",
 				attempts,
 				responseStatus,
+				responseBody,
 				error: null,
 				nextAttemptAt: null,
 				deliveredAt: new Date(),
@@ -359,6 +365,7 @@ async function attempt(delivery: DeliveryRow, hook: WebhookRow): Promise<void> {
 			status: exhausted ? "failed" : "pending",
 			attempts,
 			responseStatus,
+			responseBody,
 			error: failure.slice(0, 500),
 			nextAttemptAt: exhausted ? null : new Date(Date.now() + backoff),
 		})

@@ -278,6 +278,20 @@ export const WebhookDeliverySchema = v.object({
 });
 export type WebhookDelivery = v.InferOutput<typeof WebhookDeliverySchema>;
 
+/**
+ * One delivery in full: the list row plus the exact body that was signed and
+ * sent, and what the endpoint said back. Fetched per delivery — payloads are
+ * too big to ship with every row of the log.
+ */
+export const WebhookDeliveryDetailSchema = v.object({
+	...WebhookDeliverySchema.entries,
+	/** The exact JSON bytes that were signed and sent. */
+	payload: v.string(),
+	/** The endpoint's response body, truncated. Null when empty or never reached. */
+	responseBody: v.nullable(v.string()),
+});
+export type WebhookDeliveryDetail = v.InferOutput<typeof WebhookDeliveryDetailSchema>;
+
 export const CreateWebhookBody = v.object({
 	url: v.pipe(v.string(), v.trim(), v.url("must be an absolute http(s) URL")),
 	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), ""),
