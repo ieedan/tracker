@@ -15,15 +15,16 @@ OpenAPI 3.1 document.
 
 ```sh
 pnpm install
-docker compose up -d      # MinIO, for attachment storage
-pnpm setup:dev            # walks through .env, then offers to migrate and seed
+pnpm setup:dev            # walks through .env, starts storage, migrates and seeds
 pnpm dev
 ```
 
 `setup:dev` prompts for each value, validates answers against the same schemas
-the app enforces at build time, generates an auth secret, and can run the
-migrations and seed for you. Add `--yes` to take every default without prompts.
-Prefer doing it by hand? `cp .env.example .env`, then `pnpm db:migrate && pnpm db:seed`.
+the app enforces at build time, generates an auth secret, starts MinIO for
+attachment storage, and offers to run the migrations and the seed. An
+interrupted run leaves a draft and offers to resume; `--fresh` ignores it and
+starts over. Prefer doing it by hand? `cp .env.example .env`,
+`docker compose up -d`, then `pnpm db:migrate && pnpm db:seed`.
 
 Then sign in at http://localhost:5173 as **demo@tracker.dev** / **password123**.
 
@@ -56,16 +57,56 @@ It ends by writing `.env.production`, pushing every value to Vercel (via the
 `vercel` CLI, if installed), then offering the two irreversible steps last:
 migrating the production database, and `vercel deploy --prebuilt --prod`.
 
-Run it as often as you like — anything already set is reported and skipped, so a
-second run is how you fill in the part you postponed. `--all` revisits every
-answer. Nothing seeds demo data into production.
+Run it as often as you like — every answer already on disk comes back as the
+default, so a second run is how you fill in the part you postponed. Nothing
+seeds demo data into production.
 
 The webhook retry cron registers itself during `build`; it needs `CRON_SECRET`
 set, which the setup generates.
 
+## Preview deployments
+
+```sh
+pnpm setup:preview        # walks through .env.preview, then pushes it to Vercel
+```
+
+Every preview deployment gets a database of its own, so a pull request can
+migrate, seed and delete freely without touching production or the next
+reviewer's data.
+
+`setup:preview` creates one **template** database — migrated and seeded once —
+and mints a Turso API token scoped to a single organization and group. Both go
+into Vercel's Preview environment. From then on `scripts/build.ts` runs before
+every preview build and branches that template into
+`preview-<branch>-<hash>`, applies whatever migrations the branch has added on
+top, and points the deployment at it. `defineEnv` bakes the environment into the
+bundle, which is why this happens before `vite build` rather than at runtime.
+
+The name comes from the branch, not the deployment, so pushing again reuses the
+same database instead of discarding the state a reviewer built up. Sign in to any
+preview as **demo@tracker.dev** / **password123**.
+
+GitHub on previews is its own choice: a separate App (which keeps production's
+private key and its list of installations out of preview deployments), the
+production App, or nothing. Repository linking works either way. Sign-in only
+works on the one origin registered as a callback, because GitHub matches
+callback URLs exactly and every branch has a different one — better-auth's
+[`oAuthProxy`](https://better-auth.com/docs/plugins/oauth-proxy) plugin is what
+lifts that, and this app does not currently use it.
+
+`pnpm preview:prune` deletes the preview databases whose branch is gone from
+`origin`.
+
+None of it does anything until `.env.preview` reaches Vercel's Preview
+environment — a build reads the variables that exist when it starts, so a
+deployment made before the push fails validation and has to be redeployed.
+`pnpm setup push preview` sends the file without walking setup again, and
+`pnpm setup push prod` does the same for `.env.production`.
+
 | Script            | What it does                                                         |
 | ----------------- | -------------------------------------------------------------------- |
 | `setup:dev`       | Interactive `.env` for this machine                                  |
+| `setup:preview`   | Interactive `.env.preview`, plus per-deployment preview databases    |
 | `setup:prod`      | Interactive `.env.production` for a deployment                       |
 | `dev`             | Dev server, server-rendered, HMR                                     |
 | `build`           | Production build (writes `.vercel/output` and `static/openapi.json`) |
@@ -75,6 +116,7 @@ set, which the setup generates.
 | `db:generate`     | Generate a migration from the schema                                 |
 | `db:migrate`      | Apply migrations                                                     |
 | `db:seed`         | Seed the demo workspace (idempotent)                                 |
+| `preview:prune`   | Delete preview databases whose branch is gone                        |
 
 ## What it does
 
