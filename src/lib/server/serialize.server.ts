@@ -313,6 +313,7 @@ export function toWebhook(
 		// and this response is already behind admin + `webhooks:read`.
 		headers: row.headers ?? {},
 		filter: row.filter ?? null,
+		format: row.format,
 		enabled: row.enabled,
 		createdAt: row.createdAt.toISOString(),
 		lastDeliveryAt: iso(health?.lastAt ?? null),

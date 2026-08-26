@@ -4989,6 +4989,287 @@
 				}
 			}
 		},
+		"/api/v1/workspaces/{slug}/issues/{identifier}/comments/{commentId}": {
+			"patch": {
+				"operationId": "patchApiV1WorkspacesBySlugIssuesByIdentifierCommentsByCommentId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "commentId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"body": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 10000
+									}
+								},
+								"required": [
+									"body"
+								],
+								"$schema": "http://json-schema.org/draft-07/schema#"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"body": {
+											"type": "string"
+										},
+										"author": {
+											"type": "object",
+											"properties": {
+												"id": {
+													"type": "string"
+												},
+												"name": {
+													"type": "string"
+												},
+												"email": {
+													"type": "string"
+												},
+												"image": {
+													"anyOf": [
+														{
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												},
+												"type": {
+													"enum": [
+														"human",
+														"agent"
+													],
+													"type": "string"
+												},
+												"harness": {
+													"anyOf": [
+														{
+															"enum": [
+																"claude-code",
+																"cursor",
+																"codex",
+																"opencode",
+																"copilot",
+																"other"
+															],
+															"type": "string"
+														},
+														{
+															"type": "null"
+														}
+													]
+												}
+											},
+											"required": [
+												"id",
+												"name",
+												"email",
+												"image",
+												"type",
+												"harness"
+											]
+										},
+										"attachments": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"id": {
+														"type": "string"
+													},
+													"filename": {
+														"type": "string"
+													},
+													"contentType": {
+														"type": "string"
+													},
+													"size": {
+														"type": "number"
+													},
+													"url": {
+														"type": "string"
+													},
+													"uploadedBy": {
+														"type": "object",
+														"properties": {
+															"id": {
+																"type": "string"
+															},
+															"name": {
+																"type": "string"
+															},
+															"email": {
+																"type": "string"
+															},
+															"image": {
+																"anyOf": [
+																	{
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															},
+															"type": {
+																"enum": [
+																	"human",
+																	"agent"
+																],
+																"type": "string"
+															},
+															"harness": {
+																"anyOf": [
+																	{
+																		"enum": [
+																			"claude-code",
+																			"cursor",
+																			"codex",
+																			"opencode",
+																			"copilot",
+																			"other"
+																		],
+																		"type": "string"
+																	},
+																	{
+																		"type": "null"
+																	}
+																]
+															}
+														},
+														"required": [
+															"id",
+															"name",
+															"email",
+															"image",
+															"type",
+															"harness"
+														]
+													},
+													"createdAt": {
+														"type": "string"
+													}
+												},
+												"required": [
+													"id",
+													"filename",
+													"contentType",
+													"size",
+													"url",
+													"uploadedBy",
+													"createdAt"
+												]
+											}
+										},
+										"createdAt": {
+											"type": "string"
+										},
+										"updatedAt": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"id",
+										"body",
+										"author",
+										"attachments",
+										"createdAt",
+										"updatedAt"
+									],
+									"$schema": "http://json-schema.org/draft-07/schema#"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteApiV1WorkspacesBySlugIssuesByIdentifierCommentsByCommentId",
+				"parameters": [
+					{
+						"name": "slug",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "identifier",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"name": "commentId",
+						"in": "path",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {}
+							}
+						}
+					},
+					"400": {
+						"description": "the request failed validation"
+					}
+				}
+			}
+		},
 		"/api/v1/workspaces/{slug}/issues/{identifier}/pull-request": {
 			"get": {
 				"operationId": "getApiV1WorkspacesBySlugIssuesByIdentifierPullRequest",
@@ -10175,6 +10456,13 @@
 													}
 												]
 											},
+											"format": {
+												"enum": [
+													"json",
+													"text"
+												],
+												"type": "string"
+											},
 											"enabled": {
 												"type": "boolean"
 											},
@@ -10224,6 +10512,7 @@
 											"events",
 											"headers",
 											"filter",
+											"format",
 											"enabled",
 											"createdAt",
 											"lastDeliveryAt",
@@ -10413,6 +10702,14 @@
 											}
 										],
 										"default": null
+									},
+									"format": {
+										"enum": [
+											"json",
+											"text"
+										],
+										"type": "string",
+										"default": "json"
 									}
 								},
 								"required": [
@@ -10589,6 +10886,13 @@
 														}
 													]
 												},
+												"format": {
+													"enum": [
+														"json",
+														"text"
+													],
+													"type": "string"
+												},
 												"enabled": {
 													"type": "boolean"
 												},
@@ -10638,6 +10942,7 @@
 												"events",
 												"headers",
 												"filter",
+												"format",
 												"enabled",
 												"createdAt",
 												"lastDeliveryAt",
@@ -10842,6 +11147,13 @@
 											}
 										]
 									},
+									"format": {
+										"enum": [
+											"json",
+											"text"
+										],
+										"type": "string"
+									},
 									"enabled": {
 										"type": "boolean"
 									}
@@ -11014,6 +11326,13 @@
 												}
 											]
 										},
+										"format": {
+											"enum": [
+												"json",
+												"text"
+											],
+											"type": "string"
+										},
 										"enabled": {
 											"type": "boolean"
 										},
@@ -11063,6 +11382,7 @@
 										"events",
 										"headers",
 										"filter",
+										"format",
 										"enabled",
 										"createdAt",
 										"lastDeliveryAt",

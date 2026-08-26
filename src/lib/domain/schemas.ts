@@ -15,7 +15,13 @@ import {
 	type FilterGroup,
 	type FilterRule,
 } from "./webhook-filters";
-import { DELIVERY_STATUSES, normalizeHeaders, validateHeaders, WEBHOOK_EVENTS } from "./webhooks";
+import {
+	DELIVERY_STATUSES,
+	normalizeHeaders,
+	validateHeaders,
+	WEBHOOK_EVENTS,
+	WEBHOOK_FORMATS,
+} from "./webhooks";
 
 export const GitProviderSchema = v.picklist(GIT_PROVIDERS);
 export const IssueStatusSchema = v.picklist(ISSUE_STATUSES);
@@ -256,6 +262,8 @@ export const WebhookSchema = v.object({
 	headers: v.record(v.string(), v.string()),
 	/** The condition tree, or null when the webhook takes every event. */
 	filter: v.nullable(FilterGroupSchema),
+	/** How the body is shaped — the canonical JSON event, or a `{"text": …}` wrapper. */
+	format: v.picklist(WEBHOOK_FORMATS),
 	enabled: v.boolean(),
 	createdAt: v.string(),
 	/** Rolling health, so a broken endpoint is visible without opening it. */
@@ -286,6 +294,7 @@ export const CreateWebhookBody = v.object({
 	headers: v.optional(WebhookHeadersSchema, {}),
 	/** Null, or omitted, means every event the subscription covers. */
 	filter: v.optional(v.nullable(WebhookFilterSchema), null),
+	format: v.optional(v.picklist(WEBHOOK_FORMATS), "json"),
 });
 
 export const UpdateWebhookBody = v.partial(
@@ -295,6 +304,7 @@ export const UpdateWebhookBody = v.partial(
 		headers: WebhookHeadersSchema,
 		/** Explicit null clears the conditions. */
 		filter: v.nullable(WebhookFilterSchema),
+		format: v.picklist(WEBHOOK_FORMATS),
 		enabled: v.boolean(),
 	}),
 );

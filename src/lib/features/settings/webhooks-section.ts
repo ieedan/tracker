@@ -34,6 +34,7 @@ import {
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label } from "@/lib/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/lib/components/ui/radio-group";
 // `Label` is the form-control component in this file; the domain type is the
 // issue label, so it comes in under a name that says which.
 import type {
@@ -47,13 +48,18 @@ import type {
 import { describeFilter, type FilterMatch } from "@/lib/domain/webhook-filters";
 import {
 	DEFAULT_WEBHOOK_EVENTS,
+	DEFAULT_WEBHOOK_FORMAT,
 	MAX_CUSTOM_HEADERS,
 	validateHeaders,
 	WEBHOOK_EVENT_GROUPS,
 	WEBHOOK_EVENT_HINTS,
 	WEBHOOK_EVENT_LABELS,
 	WEBHOOK_EVENTS,
+	WEBHOOK_FORMAT_HINTS,
+	WEBHOOK_FORMAT_LABELS,
+	WEBHOOK_FORMATS,
 	type WebhookEvent,
+	type WebhookFormat,
 } from "@/lib/domain/webhooks";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -353,6 +359,10 @@ function ConditionSummary(hook: Readable<Webhook>) {
 				headerCount.bind((count) => `${count} custom header${count === 1 ? "" : "s"}`),
 			),
 		),
+		If(
+			hook.bind((value) => value.format === "text"),
+			Span({ class: "shrink-0 text-[11px] text-muted-foreground" }, WEBHOOK_FORMAT_LABELS.text),
+		),
 	);
 }
 
@@ -405,6 +415,9 @@ function WebhookDialog(
 	const cells = eventCells();
 	const chosen = signal<WebhookEvent[]>([...DEFAULT_WEBHOOK_EVENTS]);
 	const headers = signal<HeaderRow[]>([]);
+	// `string | null` because that is what the radio primitive binds; narrowed
+	// back to the picklist at submit time.
+	const format = signal<string | null>(DEFAULT_WEBHOOK_FORMAT);
 	const match = signal<FilterMatch>("all");
 	const rules = signal<BuilderNode[]>([]);
 
@@ -424,6 +437,7 @@ function WebhookDialog(
 		headers.set(
 			Object.entries(hook?.headers ?? {}).map(([name, value]) => newHeaderRow(name, value)),
 		);
+		format.set(hook?.format ?? DEFAULT_WEBHOOK_FORMAT);
 
 		const builder = toBuilder(hook?.filter ?? null);
 		match.set(builder.match);
@@ -443,6 +457,7 @@ function WebhookDialog(
 		}
 
 		const filter = fromBuilder(match.get(), rules.get());
+		const payloadFormat: WebhookFormat = format.get() === "text" ? "text" : "json";
 
 		saving.set(true);
 		const result =
@@ -455,6 +470,7 @@ function WebhookDialog(
 							events: chosen.get(),
 							headers: collected,
 							filter,
+							format: payloadFormat,
 						},
 					})
 				: await api.PATCH("/api/v1/workspaces/[slug]/webhooks/[id]", {
@@ -464,6 +480,7 @@ function WebhookDialog(
 							events: chosen.get(),
 							headers: collected,
 							filter,
+							format: payloadFormat,
 						},
 					});
 		saving.set(false);
@@ -559,7 +576,8 @@ function WebhookDialog(
 
 				// Events sit in their own column and stay put while the left side
 				// grows; headers and conditions want the width the rail leaves.
-				Div({ class: "md:col-start-2 md:row-span-4 md:row-start-1" }, EventPicker(cells, recount)),
+				Div({ class: "md:col-start-2 md:row-span-5 md:row-start-1" }, EventPicker(cells, recount)),
+				Div({ class: "md:col-start-1" }, FormatPicker(format)),
 				Div({ class: "md:col-start-1" }, HeadersEditor(headers)),
 				Div({ class: "md:col-start-1" }, ConditionsEditor(match, rules, chosen, catalog)),
 			),
@@ -584,6 +602,46 @@ function WebhookDialog(
 						onClick: () => void submit(),
 					},
 					isEdit.bind((editing) => (editing ? "Save changes" : "Create webhook")),
+				),
+			),
+		),
+	);
+}
+
+/**
+ * How the body is shaped. Most receivers want the JSON event; the text wrapper
+ * exists for endpoints that take freeform text and hand it to an agent — a
+ * Claude Code routine's API trigger, a Slack incoming webhook.
+ */
+function FormatPicker(format: Signal<string | null>) {
+	return Div(
+		{ class: "flex flex-col gap-1.5" },
+		Span({ class: "text-[13px] font-medium" }, "Payload format"),
+		RadioGroup(
+			{
+				value: format,
+				onValueChange: (next) => {
+					if (typeof next === "string") format.set(next);
+				},
+				class: "flex flex-col gap-0 rounded-md border border-border",
+			},
+			...WEBHOOK_FORMATS.map((entry, index) =>
+				Div(
+					{
+						class: cn("flex items-start gap-2.5 px-3 py-2", index > 0 && "border-t border-border"),
+					},
+					RadioGroupItem({ id: `webhook-format-${entry}`, value: entry, class: "mt-0.5" }),
+					Label(
+						{
+							for: `webhook-format-${entry}`,
+							class: "flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5",
+						},
+						Span({ class: "text-[13px] font-normal" }, WEBHOOK_FORMAT_LABELS[entry]),
+						Span(
+							{ class: "text-[11px] font-normal text-muted-foreground" },
+							WEBHOOK_FORMAT_HINTS[entry],
+						),
+					),
 				),
 			),
 		),

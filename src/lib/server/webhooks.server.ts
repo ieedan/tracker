@@ -201,15 +201,17 @@ export async function enqueue(
 	const rows = subscribed.map((hook) => {
 		const id = nanoid();
 		// The delivery id is inside the signed body as well as in a header, so a
-		// receiver can deduplicate on it without trusting headers.
-		const body = JSON.stringify({
+		// receiver can deduplicate on it without trusting headers. That holds in
+		// both formats: the text wrapper carries the same JSON, id included.
+		const event = {
 			id,
 			event: payload.event,
 			createdAt: createdAt.toISOString(),
 			workspace: payload.workspace,
 			actor: payload.actor,
 			data: payload.data,
-		});
+		};
+		const body = JSON.stringify(hook.format === "text" ? { text: renderText(event) } : event);
 
 		return {
 			id,
@@ -228,6 +230,50 @@ export async function enqueue(
 
 	await db.insert(webhookDelivery).values(rows);
 	return rows.map((row) => row.id);
+}
+
+/**
+ * A `text`-format receiver takes freeform text, not a schema — a Claude Code
+ * routine's API trigger reads the body's `text` field and hands it to an agent
+ * verbatim, and caps it at 65,536 characters. So: a summary line the agent can
+ * title its work from, then the canonical JSON it can parse for the rest.
+ */
+const MAX_TEXT_LENGTH = 60_000;
+
+function renderText(event: {
+	id: string;
+	event: WebhookEvent;
+	createdAt: string;
+	workspace: EventPayload["workspace"];
+	actor: EventPayload["actor"];
+	data: Record<string, unknown>;
+}): string {
+	const subject = subjectOf(event.data);
+	const by = event.actor === null ? "" : ` (by ${event.actor.name})`;
+	const headline =
+		`tracker ${event.event} in ${event.workspace.name}` +
+		(subject === null ? "" : `: ${subject}`) +
+		by;
+
+	const text = `${headline}\n\nFull event payload (JSON):\n${JSON.stringify(event, null, 2)}`;
+	if (text.length <= MAX_TEXT_LENGTH) return text;
+
+	const compact = `${headline}\n\nFull event payload (JSON):\n${JSON.stringify(event)}`;
+	if (compact.length <= MAX_TEXT_LENGTH) return compact;
+	return `${compact.slice(0, MAX_TEXT_LENGTH)}\n… (truncated)`;
+}
+
+/** `ENG-42 — Fix login redirect`, from whichever entity the event carries. */
+function subjectOf(data: Record<string, unknown>): string | null {
+	for (const key of ["issue", "feedback"]) {
+		const entity = data[key];
+		if (entity === null || typeof entity !== "object") continue;
+		const { identifier, title } = entity as { identifier?: unknown; title?: unknown };
+		if (typeof identifier === "string" && typeof title === "string") {
+			return `${identifier} — ${title}`;
+		}
+	}
+	return null;
 }
 
 /**

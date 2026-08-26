@@ -21,6 +21,7 @@ export const PATCH = handler({
 		if (body.headers !== undefined) changes.headers = body.headers;
 		// Explicitly nullable: `null` clears the conditions, absent leaves them.
 		if (body.filter !== undefined) changes.filter = body.filter;
+		if (body.format !== undefined) changes.format = body.format;
 		if (body.enabled !== undefined) changes.enabled = body.enabled;
 
 		const updated = await db
