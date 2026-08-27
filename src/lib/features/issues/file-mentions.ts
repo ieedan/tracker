@@ -1,13 +1,15 @@
 /**
- * `@` file references in a textarea.
- *
- * Attaches to an existing textarea rather than replacing it with an editor:
- * the description and comment boxes are plain text everywhere else, and a rich
- * editor here would be a second way to write the same field.
+ * `@` file references in the body composer.
  *
  * The rule for when the menu is open is the one people already know from every
  * other `@`: an `@` that starts a word, followed by no whitespace, with the
  * caret still inside that run.
+ *
+ * The run is read out of the markdown the composer is editing rather than out
+ * of the DOM — an unfinished mention is plain text either way, and the source
+ * is where the insertion has to land. Only the menu's position comes from the
+ * document, since where the `@` is on screen is a question only the screen can
+ * answer.
  */
 import {
 	Div,
@@ -23,7 +25,7 @@ import {
 } from "@implementjs/core";
 import { FileCode2 } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
-import { MentionLink } from "@/lib/components/markdown";
+import { rankPath } from "@/lib/domain/fuzzy";
 import { cn } from "@/lib/utils";
 
 export interface FileMatch {
@@ -55,43 +57,13 @@ export function activeMention(
 	return { query, start: at };
 }
 
-/**
- * Where a character sits, in pixels, inside a textarea.
- *
- * A textarea has no API for this — you cannot ask it where character 42 is —
- * so the standard trick is to build an invisible div with the exact same text
- * layout, put a marker at that offset, and read the marker's position. The
- * copied properties are the ones that affect where a glyph lands; getting one
- * wrong shifts the answer, which is why this takes them from the live element
- * rather than assuming the classes it was given.
- */
-const MIRRORED = [
-	"boxSizing",
-	"width",
-	"paddingTop",
-	"paddingRight",
-	"paddingBottom",
-	"paddingLeft",
-	"borderTopWidth",
-	"borderRightWidth",
-	"borderBottomWidth",
-	"borderLeftWidth",
-	"fontFamily",
-	"fontSize",
-	"fontWeight",
-	"fontStyle",
-	"letterSpacing",
-	"lineHeight",
-	"textTransform",
-	"textIndent",
-	"whiteSpace",
-	"wordSpacing",
-	"wordBreak",
-	"overflowWrap",
-] as const;
+/** Markdown, so the reference survives as a link wherever the body is rendered. */
+export function mentionMarkdown(match: FileMatch): string {
+	return `[@${match.path}](${match.url})`;
+}
 
 export interface CaretPoint {
-	/** Relative to the textarea's box, which is what an absolute child needs. */
+	/** Relative to the editor's box, which is what an absolute child needs. */
 	left: number;
 	top: number;
 	/** One line's height, so a menu can sit below the line rather than on it. */
@@ -100,138 +72,94 @@ export interface CaretPoint {
 	viewportTop: number;
 }
 
-export function caretPoint(element: HTMLTextAreaElement, offset: number): CaretPoint {
-	const computed = window.getComputedStyle(element);
-
-	const mirror = document.createElement("div");
-	for (const property of MIRRORED) {
-		mirror.style[property] = computed[property];
-	}
-	// Off-screen but laid out, so it wraps exactly as the real one does.
-	mirror.style.position = "absolute";
-	mirror.style.top = "0";
-	mirror.style.left = "-9999px";
-	mirror.style.visibility = "hidden";
-	mirror.style.whiteSpace = "pre-wrap";
-	mirror.style.overflowWrap = "break-word";
-
-	mirror.textContent = element.value.slice(0, offset);
-
-	// A zero-width marker: it has a position but does not push anything along.
-	const marker = document.createElement("span");
-	marker.textContent = "\u200b";
-	mirror.append(marker);
-
-	document.body.append(mirror);
-	const left = marker.offsetLeft;
-	const top = marker.offsetTop;
-	mirror.remove();
-
-	const lineHeight =
-		Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) * 1.2 || 16;
-
-	// The textarea may be scrolled; the caret's screen position is not its
-	// position in the text.
-	const relativeTop = top - element.scrollTop;
-	return {
-		left,
-		top: relativeTop,
-		lineHeight,
-		viewportTop: element.getBoundingClientRect().top + relativeTop,
-	};
-}
-
-/** Markdown, so the reference survives as a link wherever the body is rendered. */
-export function mentionMarkdown(match: FileMatch): string {
-	return `[@${match.path}](${match.url})`;
-}
-
 /**
- * Renders a body's `@file` references as links, leaving everything else alone.
+ * Where the `@` that opened the menu is drawn.
  *
- * Deliberately not the markdown renderer, even though one exists now: this
- * draws the overlay that sits *on top of* a live textarea, so its output has to
- * occupy exactly the same space as the raw characters underneath it. A
- * markdown render collapses `**bold**` to four fewer characters and the caret
- * stops landing where you clicked. Posted bodies — where there is no textarea
- * to line up with — go through `Markdown` instead.
- *
- * The pill itself is shared with that renderer, so a mention looks the same
- * while it is being written as it does once it is posted.
+ * Anchored to the `@` rather than to the caret so the menu stays put while the
+ * query is typed instead of creeping right with every character. The run is
+ * still plain text at this point, so it is one text node and the `@` is found
+ * by looking back along it.
  */
-const MENTION = /\[@([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+export function mentionPoint(host: HTMLElement): CaretPoint | null {
+	const selection = window.getSelection();
+	if (selection === null || selection.rangeCount === 0) return null;
 
-/** Whether a body has anything for {@link MentionText} to render differently. */
-export function hasMention(body: string): boolean {
-	// A global regex carries `lastIndex` between calls, so the pattern is
-	// re-created rather than shared.
-	return new RegExp(MENTION.source).test(body);
-}
+	const range = selection.getRangeAt(0);
+	const node = range.startContainer;
+	if (!host.contains(node) || node.nodeType !== Node.TEXT_NODE) return null;
 
-export function MentionText(body: Readable<string>, className?: string) {
-	return Span(
-		{ class: className },
-		Dynamic([body], (text) => Span({ class: "contents" }, ...renderMentions(text))),
-	);
-}
+	const at = (node as Text).data.lastIndexOf("@", Math.max(range.startOffset - 1, 0));
+	if (at === -1) return null;
 
-function renderMentions(text: string): Child[] {
-	const parts: Child[] = [];
-	let cursor = 0;
+	const marker = document.createRange();
+	marker.setStart(node, at);
+	marker.setEnd(node, at + 1);
+	const rect = marker.getBoundingClientRect();
+	const box = host.getBoundingClientRect();
 
-	// `matchAll` needs the global flag, and a global regex carries `lastIndex`
-	// between calls — so the pattern is re-created rather than shared.
-	for (const match of text.matchAll(new RegExp(MENTION.source, "g"))) {
-		const start = match.index;
-		if (start > cursor) parts.push(text.slice(cursor, start));
-
-		parts.push(MentionLink(match[1]!, match[2]!));
-		cursor = start + match[0].length;
-	}
-
-	if (cursor < text.length) parts.push(text.slice(cursor));
-	return parts;
+	return {
+		left: rect.left - box.left,
+		top: rect.top - box.top,
+		lineHeight: rect.height,
+		viewportTop: rect.top,
+	};
 }
 
 export interface MentionState {
 	open: Readable<boolean>;
 	matches: Readable<FileMatch[]>;
+	/** What has been typed after the `@`, so the menu can show what it matched. */
+	term: Readable<string>;
 	highlighted: Signal<number>;
 	/** Where the `@` is, so the menu can sit under it rather than under the box. */
 	anchor: Readable<CaretPoint | null>;
-	/** Wire these into the textarea. */
-	onInput: (event: { target: HTMLTextAreaElement }) => void;
-	onKeydown: (event: KeyboardEvent & { target: HTMLTextAreaElement }) => void;
+	/** Call after every edit: the body as it now reads, and where the caret is. */
+	refresh: (value: string, caret: number, host: HTMLElement | null) => void;
+	/** True when the menu answered the key, so the composer should not. */
+	onKeydown: (event: KeyboardEvent) => boolean;
+	close: () => void;
 	choose: (match: FileMatch) => void;
 }
 
 /**
- * Wires up `@` handling for one textarea.
+ * How many files the menu asks for. More than fits without scrolling, because
+ * a fuzzy query that matches broadly should still let the tenth-best answer be
+ * reached with the arrow keys rather than by typing more.
+ */
+const MENU_ROWS = 12;
+/** Long enough to coalesce a fast typist's keystrokes, short enough to feel live. */
+const SEARCH_DEBOUNCE_MS = 60;
+
+/**
+ * Wires up `@` handling for one composer.
  *
  * `slug` and `repository` are read at call time rather than captured, so the
  * same wiring keeps working when the issue is rescoped while the box is open.
+ * `insert` belongs to the composer, since replacing the run is an edit to the
+ * body like any other and has to go through the same round trip.
  */
 export function fileMentions(options: {
-	value: Signal<string>;
 	slug: () => string;
 	/** Narrow results to the issue's repository, when it has one. */
 	repository: () => string | undefined;
-	/** So the caret can be restored after an insertion. */
-	element: Signal<HTMLTextAreaElement | null>;
+	/** Replace the `@run` at `start` with the mention's markdown. */
+	insert: (start: number, markdown: string) => void;
 }): MentionState {
 	const matches = signal<FileMatch[]>([]);
 	const query = signal<{ query: string; start: number } | null>(null);
 	const highlighted = signal(0);
 	const anchor = signal<CaretPoint | null>(null);
 	const open = derived([query, matches], (current, list) => current !== null && list.length > 0);
+	const term = derived([query], (current) => current?.query ?? "");
 
 	let sequence = 0;
+	let pending: ReturnType<typeof setTimeout> | null = null;
 
-	const search = async (term: string) => {
+	const search = async (typed: string) => {
 		const mine = ++sequence;
 		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/files", {
 			params: { slug: options.slug() },
-			query: { q: term, repository: options.repository(), limit: 8 },
+			query: { q: typed, repository: options.repository(), limit: MENU_ROWS },
 		});
 		// A slower earlier request must not overwrite a faster later one.
 		if (mine !== sequence) return;
@@ -239,84 +167,94 @@ export function fileMentions(options: {
 		highlighted.set(0);
 	};
 
-	const refresh = (element: HTMLTextAreaElement) => {
-		const found = activeMention(element.value, element.selectionStart ?? 0);
-		query.set(found);
-		if (found === null) {
-			matches.set([]);
-			anchor.set(null);
+	/**
+	 * A loose query reaches a lot of the index, so a request per keystroke is
+	 * work nobody reads: everything but the last one is replaced before it
+	 * lands. Opening the menu is not debounced — `@` on its own should answer at
+	 * once — and the in-flight guard above still covers responses arriving out
+	 * of order.
+	 */
+	const scheduleSearch = (typed: string) => {
+		if (pending !== null) clearTimeout(pending);
+		if (typed === "") {
+			pending = null;
+			void search(typed);
 			return;
 		}
-		// Anchored to the `@` rather than to the caret: the menu should stay put
-		// while the query is typed, not creep right with every character.
-		anchor.set(caretPoint(element, found.start));
-		void search(found.query);
+		pending = setTimeout(() => {
+			pending = null;
+			void search(typed);
+		}, SEARCH_DEBOUNCE_MS);
 	};
 
-	const choose = (match: FileMatch) => {
-		const element = options.element.get();
-		const current = query.get();
-		if (element === null || current === null) return;
-
-		const caret = element.selectionStart ?? 0;
-		const inserted = `${mentionMarkdown(match)} `;
-		const next =
-			options.value.get().slice(0, current.start) + inserted + options.value.get().slice(caret);
-
-		options.value.set(next);
+	const close = () => {
+		if (pending !== null) clearTimeout(pending);
+		pending = null;
+		// Nothing in flight may land after this, or the menu would reopen itself.
+		sequence++;
 		query.set(null);
 		matches.set([]);
 		anchor.set(null);
+	};
 
-		// Put the caret after what was inserted, so typing carries on naturally.
-		const position = current.start + inserted.length;
-		queueMicrotask(() => {
-			element.focus();
-			element.setSelectionRange(position, position);
-		});
+	const choose = (match: FileMatch) => {
+		const current = query.get();
+		if (current === null) return;
+		close();
+		options.insert(current.start, mentionMarkdown(match));
 	};
 
 	return {
 		open,
 		matches,
+		term,
 		highlighted,
 		anchor,
-		onInput: (event) => refresh(event.target),
+		refresh: (value, caret, host) => {
+			const found = caret < 0 ? null : activeMention(value, caret);
+			query.set(found);
+			if (found === null) {
+				close();
+				return;
+			}
+			anchor.set(host === null ? null : mentionPoint(host));
+			scheduleSearch(found.query);
+		},
 		onKeydown: (event) => {
-			if (!open.get()) return;
+			if (!open.get()) return false;
 
 			if (event.key === "ArrowDown") {
 				event.preventDefault();
 				highlighted.update((index) => (index + 1) % matches.get().length);
-				return;
+				return true;
 			}
 			if (event.key === "ArrowUp") {
 				event.preventDefault();
 				highlighted.update((index) => (index - 1 + matches.get().length) % matches.get().length);
-				return;
+				return true;
 			}
 			// Tab completes the highlighted file rather than leaving the box. A
 			// menu that is showing a choice is what Tab is for; the composer only
 			// hands Tab on to the next control when there is no menu to answer it.
 			if (event.key === "Enter" || event.key === "Tab") {
 				const picked = matches.get()[highlighted.get()];
-				if (picked !== undefined) {
-					// Stops the Enter from also submitting the composer, and the Tab
-					// from also moving focus out of it.
-					event.preventDefault();
-					event.stopPropagation();
-					choose(picked);
-				}
-				return;
+				if (picked === undefined) return false;
+				// Stops the Enter from also breaking the line, and the Tab from
+				// also moving focus out of the box.
+				event.preventDefault();
+				event.stopPropagation();
+				choose(picked);
+				return true;
 			}
 			if (event.key === "Escape") {
 				event.preventDefault();
 				event.stopPropagation();
-				query.set(null);
-				matches.set([]);
-				anchor.set(null);
+				close();
+				return true;
 			}
+			return false;
 		},
+		close,
 		choose,
 	};
 }
@@ -324,8 +262,8 @@ export function fileMentions(options: {
 /**
  * The dropdown, positioned under the `@` that opened it.
  *
- * Absolutely placed inside the textarea's own relatively-positioned wrapper, so
- * the coordinates are the ones `caretPoint` measured.
+ * Absolutely placed inside the editor's own relatively-positioned wrapper, so
+ * the coordinates are the ones `mentionPoint` measured.
  *
  * Which way it opens is decided from the match count rather than by measuring
  * the rendered menu. Measuring would mean placing it, letting it lay out, then
@@ -340,6 +278,30 @@ const MENU_GAP = 4;
 
 function menuHeight(count: number): number {
 	return Math.min(count * ROW_HEIGHT + MENU_PADDING, MENU_MAX_HEIGHT);
+}
+
+/**
+ * `text` with the characters the query landed on picked out.
+ *
+ * A subsequence match is not obvious from the result alone — why
+ * `src/lib/server/mcp/tools.ts` answers `libmcp` is a question the row should
+ * not leave open — so the ranking is scored again here and the winning
+ * characters are emphasised. `slice` is the offset of `text` within the path
+ * the positions were measured against, since the basename is drawn on its own.
+ */
+function Emphasised(text: string, positions: number[], slice = 0): Child {
+	const parts: Child[] = [];
+	let cursor = 0;
+	for (const position of positions) {
+		const index = position - slice;
+		if (index < cursor || index >= text.length) continue;
+		if (index > cursor) parts.push(text.slice(cursor, index));
+		parts.push(Span({ class: "font-semibold text-foreground" }, text[index]!));
+		cursor = index + 1;
+	}
+	if (parts.length === 0) return text;
+	if (cursor < text.length) parts.push(text.slice(cursor));
+	return Span({ class: "contents" }, ...parts);
 }
 
 export function MentionMenu(state: MentionState, options: { class?: string } = {}) {
@@ -381,17 +343,18 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 			ForEach(
 				state.matches,
 				(match) => `${match.repositoryId}:${match.path}`,
-				(match) => {
-					const index = state.matches.get().findIndex((entry) => entry.path === match.get().path);
-					return Div(
+				// `index` comes from the list rather than being looked up, so a row
+				// that keeps its place across a re-query knows which place that is.
+				(match, index) =>
+					Div(
 						{
-							class: derived([state.highlighted], (current) =>
+							class: derived([state.highlighted, index], (current, position) =>
 								cn(
 									"flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px]",
-									current === index ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+									current === position ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
 								),
 							),
-							// `mousedown` rather than `click`: the textarea would blur first
+							// `mousedown` rather than `click`: the editor would blur first
 							// and close the menu before a click ever landed.
 							onMousedown: (event) => {
 								event.preventDefault();
@@ -401,14 +364,19 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 						FileCode2({ class: "size-3.5 shrink-0 text-muted-foreground" }),
 						Span(
 							{ class: "min-w-0 flex-1 truncate" },
-							match.bind((value) => value.path.slice(value.path.lastIndexOf("/") + 1)),
+							Dynamic([match, state.term], (value, typed) => {
+								const positions = rankPath(typed, value.path)?.positions ?? [];
+								const start = value.path.lastIndexOf("/") + 1;
+								return Emphasised(value.path.slice(start), positions, start);
+							}),
 						),
 						Span(
 							{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
-							match.bind((value) => value.path),
+							Dynamic([match, state.term], (value, typed) =>
+								Emphasised(value.path, rankPath(typed, value.path)?.positions ?? []),
+							),
 						),
-					);
-				},
+					),
 			),
 		),
 	);

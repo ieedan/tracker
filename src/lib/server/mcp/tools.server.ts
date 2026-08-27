@@ -21,11 +21,13 @@ import {
 	CreateCommentBody,
 	CreateIssueBody,
 	CreateLabelBody,
+	CreateWebhookBody,
 	IssueStatusSchema,
 	LinkPullRequestBody,
 	TransferIssueBody,
 	UpdateFeedbackBody,
 	UpdateIssueBody,
+	UpdateWebhookBody,
 } from "@/lib/domain/schemas";
 import { toolMedia, toolText, type ToolResult } from "./results.server";
 
@@ -117,6 +119,8 @@ const identifier = v.pipe(
 	v.toUpperCase(),
 	v.description('Issue identifier such as "ENG-42".'),
 );
+
+const webhookId = v.pipe(v.string(), v.description("Webhook id, from list_webhooks."));
 
 /** `?a=1&a=2` for arrays, and omitting anything blank. */
 function queryString(params: Record<string, unknown>): string {
@@ -535,6 +539,90 @@ export const MCP_TOOLS: McpTool[] = [
 		readOnly: true,
 		input: v.object({ ...workspaceArg }),
 		handle: async ({ event, slug }) => await callApi(event, "GET", `/api/v1/workspaces/${slug}`),
+	}),
+	scoped({
+		name: "list_webhooks",
+		title: "List webhooks",
+		description:
+			"The workspace's outgoing webhooks, with the events each listens for and how it is currently faring. Signing secrets are not included — they are shown once, when the webhook is created.",
+		readOnly: true,
+		input: v.object({ ...workspaceArg }),
+		handle: async ({ event, slug }) =>
+			await callApi(event, "GET", `/api/v1/workspaces/${slug}/webhooks`),
+	}),
+	scoped({
+		name: "create_webhook",
+		title: "Create a webhook",
+		description:
+			'Subscribe an endpoint to workspace events — this is how you get told about an issue rather than polling for it. Use `filter` to narrow what actually arrives, and the "text" format for a receiver that takes freeform text, such as a Claude Code routine trigger. The response carries the signing secret, and it is the only time it is readable: save it before you do anything else.',
+		readOnly: false,
+		input: v.object({ ...CreateWebhookBody.entries, ...workspaceArg }),
+		handle: async ({ input, event, slug }) =>
+			await callApi(event, "POST", `/api/v1/workspaces/${slug}/webhooks`, withoutWorkspace(input)),
+	}),
+	scoped({
+		name: "update_webhook",
+		title: "Update a webhook",
+		description:
+			"Change a webhook: what it listens for, its conditions, its headers, its body format, or whether it is enabled at all. Only the fields you pass are touched. The URL is not among them — the secret was issued against it, so pointing somewhere else means a new webhook.",
+		readOnly: false,
+		input: v.object({ id: webhookId, changes: UpdateWebhookBody, ...workspaceArg }),
+		handle: async ({ input, event, slug }) =>
+			await callApi(
+				event,
+				"PATCH",
+				`/api/v1/workspaces/${slug}/webhooks/${segment(input.id)}`,
+				input.changes,
+			),
+	}),
+	scoped({
+		name: "delete_webhook",
+		title: "Delete a webhook",
+		description:
+			"Remove a webhook and stop its deliveries for good. To pause one instead, update it with `enabled: false` — that keeps the endpoint and its secret.",
+		readOnly: false,
+		destructive: true,
+		input: v.object({ id: webhookId, ...workspaceArg }),
+		handle: async ({ input, event, slug }) =>
+			await callApi(event, "DELETE", `/api/v1/workspaces/${slug}/webhooks/${segment(input.id)}`),
+	}),
+	scoped({
+		name: "test_webhook",
+		title: "Send a test delivery",
+		description:
+			"Send a real, signed delivery with a synthetic payload, and wait for the result. Conditions are skipped, since there is no issue for them to match against. Use this to confirm a receiver you just pointed a webhook at actually answers.",
+		readOnly: false,
+		input: v.object({ id: webhookId, ...workspaceArg }),
+		handle: async ({ input, event, slug }) =>
+			await callApi(event, "POST", `/api/v1/workspaces/${slug}/webhooks/${segment(input.id)}/test`),
+	}),
+	scoped({
+		name: "list_webhook_deliveries",
+		title: "List a webhook's deliveries",
+		description:
+			"The delivery log for one webhook, newest first — where you look when a subscription has gone quiet. Each row carries the event, the endpoint's status code, and the error if there was one.",
+		readOnly: true,
+		input: v.object({
+			id: webhookId,
+			limit: v.optional(
+				v.pipe(
+					v.number(),
+					v.integer(),
+					v.minValue(1),
+					v.maxValue(100),
+					v.description("How many deliveries to return. Defaults to 25."),
+				),
+			),
+			...workspaceArg,
+		}),
+		handle: async ({ input, event, slug }) =>
+			await callApi(
+				event,
+				"GET",
+				`/api/v1/workspaces/${slug}/webhooks/${segment(input.id)}/deliveries${queryString({
+					limit: input.limit,
+				})}`,
+			),
 	}),
 	scoped({
 		name: "list_feedback",

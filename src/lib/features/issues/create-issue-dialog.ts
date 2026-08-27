@@ -188,7 +188,7 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 		[chosenWorkspace, slug],
 		(workspace, origin) => workspace?.slug ?? origin,
 	);
-	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
+	const descriptionRef = signal<HTMLElement | null>(null);
 	const hasDraft = signal(false);
 	/**
 	 * The expand toggle: the panel stops sizing to its content and takes a fixed
@@ -834,7 +834,6 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 						// Expanded, `rows` stops deciding: the box takes whatever height
 						// the panel has left and scrolls inside it.
 						fill: expanded,
-						toolbar: true,
 						onSubmit: () => void submit(),
 					}),
 					AttachmentGrid({
