@@ -78,8 +78,15 @@ async function post(method: string, params?: unknown, options: Options = {}) {
 
 async function call(name: string, args: Record<string, unknown> = {}, options: Options = {}) {
 	const { body } = await post("tools/call", { name, arguments: args }, options);
-	return (body as { result: { content: { type: string; text?: string }[]; isError?: boolean } })
-		.result;
+	return (
+		body as {
+			result: {
+				content: { type: string; text?: string }[];
+				structuredContent?: Record<string, unknown>;
+				isError?: boolean;
+			};
+		}
+	).result;
 }
 
 let failures = 0;
@@ -305,6 +312,31 @@ calls.length = 0;
 		result,
 	);
 	check("and is not an error", result.isError === undefined);
+	// Both halves of the envelope, for both kinds of client: the text is what a
+	// model reads, `structuredContent` is the same answer as fields for a client
+	// that would rather not parse JSON back out of a string.
+	check(
+		"and repeats it as structuredContent",
+		JSON.stringify(result.structuredContent) ===
+			JSON.stringify({ id: "agent_1", name: "Claude Code" }),
+		result.structuredContent,
+	);
+}
+{
+	// `structuredContent` is an object in the protocol, so a list — which most
+	// of these tools answer with — has to be wrapped rather than dropped.
+	nextApiResponse = () => json([{ key: "ENG" }]);
+	const result = await call("list_teams");
+	check(
+		"a list is wrapped under `result`",
+		JSON.stringify(result.structuredContent) === JSON.stringify({ result: [{ key: "ENG" }] }),
+		result.structuredContent,
+	);
+	check(
+		"and is still readable as text",
+		result.content[0]?.text?.includes("ENG") === true,
+		result.content,
+	);
 }
 {
 	calls.length = 0;

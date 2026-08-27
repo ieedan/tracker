@@ -166,7 +166,29 @@ async function callApi(
 	// read the same way before anything else looks at the body.
 	if (!response.ok) return await failureFrom(response);
 
-	return await jsonFrom(response);
+	return success(await jsonFrom(response));
+}
+
+/**
+ * An endpoint's JSON as both prose and data.
+ *
+ * Returning the value alone would make it a `text` block and nothing else,
+ * which is what a client that reads `structuredContent` — typed fields rather
+ * than JSON it has to parse back out of a string — would find missing. The
+ * text carries the same JSON for the clients that only read `content`.
+ *
+ * `structuredContent` is an object in the protocol, so a list is wrapped in
+ * one rather than dropped.
+ */
+function success(data: unknown): ToolResult {
+	return tool.structured(isPlainObject(data) ? data : { result: data }, {
+		type: "text",
+		text: JSON.stringify(data, null, 2),
+	});
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** A response body as data, falling back to its text when it is not JSON. */
