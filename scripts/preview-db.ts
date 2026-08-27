@@ -17,6 +17,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { DEMO_ACCOUNT } from "./lib/demo.ts";
 import {
 	createDatabase,
 	createDatabaseToken,
@@ -67,6 +68,28 @@ function previewOrigins(): { baseURL: string | null; trusted: string[] } {
 	// The branch URL leads, so the stable one is what absolute links are built
 	// from when both exist.
 	return { baseURL: trusted[0] ?? null, trusted };
+}
+
+/**
+ * The credentials behind a preview's one-click "Sign in as…" button.
+ *
+ * Reached only from the provisioning path below, and deliberately so: that is
+ * the branch where the deployment has just been pointed at a fresh copy of the
+ * template `setup:preview` seeded, which is the one case where the demo account
+ * is certain to be in the database and the database is certain to hold nothing
+ * but demo data. A preview that fell back to the project-wide `DATABASE_URL`
+ * takes neither for granted and gets no button.
+ *
+ * An explicit `DEMO_LOGIN_EMAIL` on the Vercel project wins, for a preview
+ * template seeded with something other than `scripts/seed.ts`.
+ */
+function demoLogin(): Record<string, string> {
+	if ((process.env.DEMO_LOGIN_EMAIL ?? "") !== "") return {};
+	console.log(`preview: one-click sign-in as ${DEMO_ACCOUNT.email}`);
+	return {
+		DEMO_LOGIN_EMAIL: DEMO_ACCOUNT.email,
+		DEMO_LOGIN_PASSWORD: DEMO_ACCOUNT.password,
+	};
 }
 
 function drizzleKit(): string {
@@ -168,6 +191,8 @@ export async function provisionPreviewDatabase(): Promise<Record<string, string>
 	// succeeds and only a sign-in from the host that was left out fails, as
 	// "Invalid origin", long after the fact.
 	console.log(`preview: origins ${trusted.join(" ") || "(none — sign-in will be rejected)"}`);
+
+	Object.assign(overrides, demoLogin());
 
 	// The copy carries the template's migration history, so this applies only
 	// what the branch has added on top of it.

@@ -131,6 +131,56 @@ export const githubSignInConfigured = (): boolean =>
 	env.GITHUB_CLIENT_ID !== "" && env.GITHUB_CLIENT_SECRET !== "";
 
 /**
+ * The demo account the one-click sign-in button uses, or `null` where there
+ * isn't one.
+ *
+ * Both halves have to be present. Half-configured is treated as off rather than
+ * as an attempt worth making: a button that always fails is worse than no
+ * button, and a blank password would otherwise be sent to better-auth as a
+ * genuine sign-in attempt.
+ *
+ * The password stays here. `/api/demo-login` signs in on the server and hands
+ * back the cookie, so it never reaches the page — which keeps this working
+ * unchanged if a deployment points it at an account whose password is not
+ * already printed in the README.
+ */
+export function demoSignIn(): { email: string; password: string } | null {
+	if (env.DEMO_LOGIN_EMAIL === "" || env.DEMO_LOGIN_PASSWORD === "") return null;
+	return { email: env.DEMO_LOGIN_EMAIL, password: env.DEMO_LOGIN_PASSWORD };
+}
+
+/** Extra origins beyond `baseURL`, which better-auth trusts on its own. */
+const extraTrustedOrigins = env.BETTER_AUTH_TRUSTED_ORIGINS.split(",")
+	.map((origin) => origin.trim())
+	.filter((origin) => origin !== "");
+
+/** Origins as `Origin` headers spell them — scheme, host and port, no path. */
+const trustedOrigins = new Set(
+	[env.BETTER_AUTH_URL, ...extraTrustedOrigins].flatMap((value) => {
+		try {
+			return [new URL(value).origin];
+		} catch {
+			// A malformed entry trusts nothing rather than everything.
+			return [];
+		}
+	}),
+);
+
+/**
+ * Whether a sign-in carrying this `Origin` may be honoured.
+ *
+ * better-auth applies exactly this rule to its own routes; `/api/demo-login`
+ * calls `auth.api` directly rather than going through the handler, so it has to
+ * apply it itself or it would be the one sign-in on the site a page on another
+ * origin could trigger.
+ *
+ * A missing header passes: a browser sends one on every cross-site request that
+ * could be used this way, and requiring it would only break `curl`.
+ */
+export const isTrustedOrigin = (origin: string | null): boolean =>
+	origin === null || origin === "" || trustedOrigins.has(origin);
+
+/**
  * The canonical URI of the MCP server, as RFC 8707 defines it.
  *
  * MCP clients MUST send this as the `resource` parameter on both the
@@ -155,9 +205,7 @@ export const auth = betterAuth({
 	basePath: "/api/auth",
 	// Added to `baseURL`, which better-auth trusts by itself — see the schema
 	// for why a preview deployment needs more than one.
-	trustedOrigins: env.BETTER_AUTH_TRUSTED_ORIGINS.split(",")
-		.map((origin) => origin.trim())
-		.filter((origin) => origin !== ""),
+	trustedOrigins: extraTrustedOrigins,
 	database: drizzleAdapter(db, { provider: "sqlite", schema }),
 	// `/token` belongs to the OAuth provider, not to better-auth's own handler.
 	disabledPaths: ["/token"],

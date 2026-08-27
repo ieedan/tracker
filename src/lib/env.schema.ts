@@ -39,6 +39,23 @@ export const serverEnvSchema = {
 	 */
 	BETTER_AUTH_TRUSTED_ORIGINS: v.optional(v.string(), ""),
 	/**
+	 * The account behind the one-click "Sign in as <name>" button on the login
+	 * page — for previews, where every reviewer would otherwise type the same
+	 * seeded credentials by hand.
+	 *
+	 * Both halves blank is the default and hides the button; the endpoint behind
+	 * it answers 404 in the same case, so the feature is off unless somebody
+	 * deliberately turned it on. `scripts/preview-db.ts` fills these in for a
+	 * Vercel preview automatically, because a preview database is a copy of the
+	 * template `setup:preview` seeded and the demo account is therefore known to
+	 * be in it.
+	 *
+	 * Never set these on a deployment whose database holds real data: anyone who
+	 * can open the login page can press the button and land in that account.
+	 */
+	DEMO_LOGIN_EMAIL: v.optional(v.string(), ""),
+	DEMO_LOGIN_PASSWORD: v.optional(v.string(), ""),
+	/**
 	 * Authorises the webhook drain endpoint that retries failed deliveries.
 	 * Leave empty and the endpoint stays closed — the safe default, since an
 	 * open drain lets anyone make the server fire outbound requests.
