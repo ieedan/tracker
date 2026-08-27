@@ -40,7 +40,7 @@ import {
 	type Signal,
 } from "@implementjs/core";
 import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
-import { renderMarkdown } from "@/lib/components/markdown";
+import { BODY_TEXT_CLASS, renderMarkdown } from "@/lib/components/markdown";
 import { cn } from "@/lib/utils";
 import { MentionMenu, fileMentions } from "./file-mentions";
 import { insertLink, toggleWrap, type SelectionState } from "./markdown-commands";
@@ -52,11 +52,16 @@ import { isBlank, paint, render, serialize, type SourceSelection } from "./markd
  * The same size, leading and margin rules a posted body is drawn with, so the
  * text does not move when a draft becomes a comment.
  */
-export const bodyComposerClass =
+export const bodyComposerClass = cn(
+	// 16px on a phone, and the same 13px as a posted body from `md` up. Below
+	// 16 the caret landing in here zooms the whole page on iOS — see
+	// `BODY_TEXT_CLASS`, which both this and the posted body take it from.
+	BODY_TEXT_CLASS,
 	// `pre-wrap` where a posted body collapses its whitespace: a space typed at
 	// the end of a line has to stay on screen and hold the caret's place, or
 	// the space you just pressed is one the box appears to have swallowed.
-	"w-full text-[13px] leading-relaxed break-words whitespace-pre-wrap outline-none [&>:first-child]:mt-0 [&>:last-child]:mb-0";
+	"w-full leading-relaxed break-words whitespace-pre-wrap outline-none [&>:first-child]:mt-0 [&>:last-child]:mb-0",
+);
 
 export interface BodyComposerOptions {
 	/** The body being written, as markdown. Two-way: editing writes into it. */
@@ -402,9 +407,12 @@ export function BodyComposer(options: BodyComposerOptions) {
 				{
 					// Sits on the first line rather than in the box: the box holds a
 					// paragraph even when the body is empty, and two things cannot
-					// share that line without one of them moving.
-					class:
-						"pointer-events-none absolute top-0 left-0 text-[13px] leading-relaxed text-muted-foreground",
+					// share that line without one of them moving. Same size as the box,
+					// or the words it stands in for would land somewhere else.
+					class: cn(
+						BODY_TEXT_CLASS,
+						"pointer-events-none absolute top-0 left-0 leading-relaxed text-muted-foreground",
+					),
 					"aria-hidden": true,
 				},
 				options.placeholder ?? "",

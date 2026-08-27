@@ -11,23 +11,18 @@ import {
 	Dynamic,
 	ForEach,
 	Fragment,
-	ImplementEffect,
 	Span,
-	signal,
+	derived,
 	type Child,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
 import { Plus, Tag } from "@implementjs/lucide";
-import { MenuCheckbox, applyIdDiff } from "@/lib/components/ui/menu-checkbox";
 import {
-	DropdownMenu,
-	DropdownMenuCheckboxGroup,
-	DropdownMenuCheckboxItem,
-	DropdownMenuContent,
-	DropdownMenuGroupHeading,
-	DropdownMenuTrigger,
-} from "@/lib/components/ui/dropdown-menu";
+	ResponsiveMenu,
+	type MenuOption,
+	type MenuTriggerOptions,
+} from "@/lib/components/ui/responsive-menu";
 import type { Label } from "@/lib/domain/schemas";
 
 const pillClass =
@@ -45,53 +40,32 @@ export interface IssueLabelPickerProps {
 }
 
 export function IssueLabelPicker({ selected, available, onToggle, open }: IssueLabelPickerProps) {
-	/**
-	 * The same menu, built fresh behind each trigger.
-	 *
-	 * The checked set has to be its own signal per copy: the checkbox group
-	 * writes back into it, and copies sharing one would fight over it.
-	 */
-	const menu = (trigger: Child, controlled?: Signal<boolean>) => {
-		const selectedIds = signal(selected.get().map((label) => label.id));
+	const options = derived([available], (labels) =>
+		labels.map((label): MenuOption => ({
+			value: label.id,
+			label: label.name,
+			icon: () =>
+				Span({
+					class: "size-2.5 shrink-0 rounded-full",
+					style: { backgroundColor: label.color },
+				}),
+		})),
+	);
+	const selectedIds = derived([selected], (labels) => labels.map((label) => label.id));
 
-		return DropdownMenu(
-			{ open: controlled },
-			ImplementEffect([selected], (labels) => selectedIds.set(labels.map((label) => label.id))),
+	/** The same menu, built fresh behind each trigger. */
+	const menu = (trigger: MenuTriggerOptions, face: () => Child, controlled?: Signal<boolean>) =>
+		ResponsiveMenu({
+			heading: "Labels",
+			search: "Add label…",
+			multiple: true,
+			open: controlled,
+			options,
+			selected: selectedIds,
+			onSelect: onToggle,
 			trigger,
-			DropdownMenuContent(
-				{ class: "w-56", align: "start", search: "Add label…", hotkeys: true },
-				DropdownMenuCheckboxGroup(
-					{
-						value: selectedIds,
-						onValueChange: (ids) => {
-							applyIdDiff(
-								selected.get().map((label) => label.id),
-								ids,
-								onToggle,
-							);
-						},
-					},
-					DropdownMenuGroupHeading("Labels"),
-					ForEach(
-						available,
-						(label) => label.id,
-						(label) =>
-							DropdownMenuCheckboxItem(
-								{
-									value: label.get().id,
-									indicator: MenuCheckbox(selectedIds, label.get().id),
-								},
-								Span({
-									class: "size-2.5 shrink-0 rounded-full",
-									style: { backgroundColor: label.get().color },
-								}),
-								Span({ class: "flex-1 truncate" }, label.bind("name")),
-							),
-					),
-				),
-			),
-		);
-	};
+			face,
+		});
 
 	return Div(
 		{ class: "flex flex-wrap items-center gap-1" },
@@ -101,33 +75,31 @@ export function IssueLabelPicker({ selected, available, onToggle, open }: IssueL
 			(label) => label.id,
 			(label) =>
 				menu(
-					DropdownMenuTrigger(
-						{
-							variant: "ghost",
-							size: "sm",
-							class: pillClass,
-							title: `${label.get().name} — click to change labels`,
-						},
-						Span({
-							class: "size-2 shrink-0 rounded-full",
-							style: { backgroundColor: label.get().color },
-						}),
-						Span({ class: "max-w-32 truncate" }, label.bind("name")),
-					),
+					{
+						class: pillClass,
+						title: `${label.get().name} — click to change labels`,
+					},
+					() =>
+						Fragment(
+							Span({
+								class: "size-2 shrink-0 rounded-full",
+								style: { backgroundColor: label.get().color },
+							}),
+							Span({ class: "max-w-32 truncate" }, label.bind("name")),
+						),
 				),
 		),
 
 		// One trigger, two readings: the bare `+` once there is something to add
 		// to, and a labelled button while the row would otherwise be empty.
 		menu(
-			DropdownMenuTrigger(
-				{ variant: "ghost", size: "sm", class: addClass, title: "Labels (L)" },
+			{ class: addClass, title: "Labels (L)" },
+			() =>
 				Dynamic([selected], (labels) =>
 					labels.length === 0
 						? Fragment(Tag({ class: "size-3" }), Span({}, "Add label"))
 						: Plus({ class: "size-3" }),
 				),
-			),
 			open,
 		),
 	);

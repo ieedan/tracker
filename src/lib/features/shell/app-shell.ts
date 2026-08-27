@@ -69,6 +69,7 @@ import {
 } from "@/lib/features/issues/template-dialog";
 import { seedUnreadCount, unreadCount } from "@/lib/features/inbox/unread";
 import { TeamIcon } from "@/lib/features/teams/team-icon";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
 
 export interface ShellData {
 	user: App.SessionUser;
@@ -221,9 +222,12 @@ function SidebarBody(
 				class: "w-full justify-start gap-2 text-[13px] text-muted-foreground",
 				onClick: () => openCommandPalette(),
 			},
-			Span({ class: "flex size-3.5 items-center justify-center text-[11px]" }, "⌘"),
+			Span(
+				{ class: cn("flex size-3.5 items-center justify-center text-[11px]", KEY_HINT_CLASS) },
+				"⌘",
+			),
 			"Command palette",
-			Span({ class: "ml-auto text-[11px]" }, "⌘K"),
+			Span({ class: cn("ml-auto text-[11px]", KEY_HINT_CLASS) }, "⌘K"),
 		),
 		UserMenu(data),
 	];

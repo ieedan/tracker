@@ -5,6 +5,16 @@ import { cn } from "@/lib/utils";
 export type KbdProps = ElementProps<"kbd">;
 export type KbdGroupProps = ElementProps<"kbd">;
 
+/**
+ * Keeps a keyboard hint off a layout that has no keyboard.
+ *
+ * Below the phone breakpoint a ⌘⏎ beside a button a thumb is about to press is
+ * a promise the device cannot keep — it reads as an instruction nobody can
+ * follow (ENG-67). The behaviour is left alone: an attached keyboard still
+ * works, the label is simply not drawn.
+ */
+export const KEY_HINT_CLASS = "max-md:hidden";
+
 /** One key on a keyboard, for documenting a shortcut. */
 export const Kbd = createComponent(function Kbd(
 	{ class: className, ...props }: KbdProps,

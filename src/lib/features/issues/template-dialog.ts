@@ -34,6 +34,8 @@ import type { IssueTemplate, Label, Member, Repository, Team, TeamRef } from "@/
 import { BodyComposer } from "./body-composer";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatusPicker, TeamPicker } from "./pickers";
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
+import { cn } from "@/lib/utils";
 
 const open = signal(false);
 const slug = signal("");
@@ -62,8 +64,10 @@ export function openEditTemplate(workspaceSlug: string, template: IssueTemplate)
 	open.set(true);
 }
 
+// 16px on a phone: anything smaller and tapping into the field zooms the page
+// out from under the dialog (ENG-67).
 const inputClass =
-	"h-8 w-full rounded-md border border-input bg-background px-2.5 text-[13px] outline-none focus:border-ring";
+	"h-8 w-full rounded-md border border-input bg-background px-2.5 text-[16px] outline-none focus:border-ring md:text-[13px]";
 
 export function TemplateDialog() {
 	const name = signal("");
@@ -319,7 +323,7 @@ export function TemplateDialog() {
 						value: title,
 						placeholder: "Issue title — left blank, the composer starts empty",
 						class:
-							"h-8 border-0 bg-transparent p-0 text-[15px] font-medium outline-none placeholder:text-muted-foreground",
+							"h-8 border-0 bg-transparent p-0 text-[16px] font-medium outline-none placeholder:text-muted-foreground md:text-[15px]",
 					}),
 					BodyComposer({
 						value: description,
@@ -455,7 +459,7 @@ export function TemplateDialog() {
 						onClick: () => void submit(),
 					},
 					editing.bind((value) => (value === null ? "Create template" : "Save")),
-					Span({ class: "text-[11px] font-normal opacity-70" }, "⌘⏎"),
+					Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
 				),
 			),
 		),

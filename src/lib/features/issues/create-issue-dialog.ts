@@ -71,6 +71,7 @@ import {
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
 import { BodyComposer } from "./body-composer";
 import { cn } from "@/lib/utils";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
 
 const open = signal(false);
 /** So the issue page can yield the drop overlay while this dialog is up. */
@@ -816,8 +817,10 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 						this: titleInput,
 						value: title,
 						placeholder: "Issue title",
+						// 16px on a phone: below that, tapping into the field zooms the
+						// page out from under the dialog (ENG-67).
 						class:
-							"h-8 border-0 bg-transparent p-0 text-[15px] font-medium outline-none placeholder:text-muted-foreground",
+							"h-8 border-0 bg-transparent p-0 text-[16px] font-medium outline-none placeholder:text-muted-foreground md:text-[15px]",
 						autofocus: true,
 						onKeydown: (event) => {
 							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit();
@@ -944,7 +947,7 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 							onClick: () => void submit(),
 						},
 						"Create",
-						Span({ class: "text-[11px] font-normal opacity-70" }, "⌘⏎"),
+						Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
 					),
 				),
 			),

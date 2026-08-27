@@ -7,29 +7,26 @@
  */
 import {
 	Dynamic,
-	ForEach,
+	Fragment,
 	If,
 	Span,
+	derived,
 	type Child,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Check, FolderGit2 } from "@implementjs/lucide";
+import { FolderGit2 } from "@implementjs/lucide";
 import { CHIP_GLYPH, GithubMark } from "@/lib/components/glyphs";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuGroupHeading,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/lib/components/ui/dropdown-menu";
+import { ResponsiveMenu, type MenuOption } from "@/lib/components/ui/responsive-menu";
 import type { GitProviderId } from "@/lib/domain/providers";
 import type { Repository } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
 
 const triggerClass =
 	"inline-flex h-6 items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 text-[12px] text-muted-foreground hover:bg-accent";
+
+/** The row that clears the property. Rows need a string value; no real id is the empty string. */
+const NONE = "";
 
 export interface RepositoryRef {
 	id: string;
@@ -51,46 +48,33 @@ export function RepositoryPicker(
 ) {
 	return If(
 		repositories.bind((list) => list.length > 0),
-		DropdownMenu(
-			{ open: options.open },
-			DropdownMenuTrigger(
-				{
-					variant: "ghost",
-					size: "sm",
-					class: cn(triggerClass, options.class),
-					title: "Repository (R)",
-				},
-				RepositoryGlyph(current, repositories, CHIP_GLYPH.icon),
-				Span(
-					{},
-					current.bind((repo) =>
-						repo === null ? "Repository" : (repo.fullName.split("/")[1] ?? repo.fullName),
+		ResponsiveMenu({
+			heading: "Repository",
+			search: "Search repositories…",
+			open: options.open,
+			contentClass: "w-64",
+			options: derived([repositories], (list) => [
+				{ value: NONE, label: "None", muted: true },
+				...list.map((repo): MenuOption => ({
+					value: repo.id,
+					label: repo.fullName,
+					icon: () => ProviderMark(repo.provider, "size-3.5 shrink-0 text-muted-foreground"),
+				})),
+			]),
+			selected: derived([current], (repo) => [repo?.id ?? NONE]),
+			onSelect: (id) => onPick(id === NONE ? null : id),
+			trigger: { class: cn(triggerClass, options.class), title: "Repository (R)" },
+			face: () =>
+				Fragment(
+					RepositoryGlyph(current, repositories, CHIP_GLYPH.icon),
+					Span(
+						{},
+						current.bind((repo) =>
+							repo === null ? "Repository" : (repo.fullName.split("/")[1] ?? repo.fullName),
+						),
 					),
 				),
-			),
-			DropdownMenuContent(
-				{ class: "w-64", align: "start", search: "Search repositories…", hotkeys: true },
-				DropdownMenuGroup(
-					DropdownMenuGroupHeading("Repository"),
-					DropdownMenuItem(
-						{ onSelect: () => onPick(null) },
-						Span({ class: "flex-1 text-muted-foreground" }, "None"),
-						Tick(current.bind((repo) => repo === null)),
-					),
-					ForEach(
-						repositories,
-						(repo) => repo.id,
-						(repo) =>
-							DropdownMenuItem(
-								{ onSelect: () => onPick(repo.get().id) },
-								ProviderMark(repo.get().provider, "size-3.5 shrink-0 text-muted-foreground"),
-								Span({ class: "flex-1 truncate" }, repo.bind("fullName")),
-								Tick(current.bind((value) => value?.id === repo.get().id)),
-							),
-					),
-				),
-			),
-		),
+		}),
 	);
 }
 
@@ -129,8 +113,4 @@ function RepositoryGlyph(
 export function ProviderMark(provider: GitProviderId | undefined, className: string): Child {
 	if (provider === "github") return GithubMark({ class: className });
 	return FolderGit2({ class: className });
-}
-
-function Tick(shown: Readable<boolean>): Child {
-	return If(shown, Check({ class: "size-3.5 shrink-0 text-primary" }));
 }
