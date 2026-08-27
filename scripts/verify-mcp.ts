@@ -731,6 +731,9 @@ section("agent scopes");
 
 const ROOT = new URL("../", import.meta.url);
 
+/** The deployment both plugin manifests default their one setting to. */
+const HOSTED = "https://tracker.implementjs.dev";
+
 /** A repository file, by its path from the root. */
 function read(path: string): string {
 	return readFileSync(new URL(path, ROOT), "utf8");
@@ -773,10 +776,20 @@ section("plugin manifests");
 		claude.name === "tracker" && cursor.name === "tracker",
 		{ claude: claude.name, cursor: cursor.name },
 	);
+	const claudeDefault = (claude.userConfig as Record<string, { default: string }>).url;
+	const cursorDefault = (cursor.variables as { properties: Record<string, { default: string }> })
+		.properties.TRACKER_URL;
+
 	check(
 		"the variable each config substitutes is the one its manifest declares",
-		"url" in (claude.userConfig as object) &&
-			"TRACKER_URL" in ((cursor.variables as { properties: object }).properties as object),
+		claudeDefault !== undefined && cursorDefault !== undefined,
+	);
+	check(
+		"both default to the hosted instance",
+		// Not the dev server: the default is what most people install and never
+		// touch, and localhost would point them at nothing.
+		claudeDefault?.default === HOSTED && cursorDefault?.default === HOSTED,
+		{ claude: claudeDefault?.default, cursor: cursorDefault?.default },
 	);
 	check(
 		"the marketplace listing points at the plugin",

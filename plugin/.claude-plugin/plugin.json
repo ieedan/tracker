@@ -16,8 +16,8 @@
 		"url": {
 			"type": "string",
 			"title": "tracker URL",
-			"description": "Origin of your tracker instance, with no trailing slash — the plugin appends /api/mcp. The dev server's default is filled in.",
-			"default": "http://localhost:5173",
+			"description": "Origin of your tracker instance, with no trailing slash — the plugin appends /api/mcp. Defaults to the hosted one; point it at your own deployment, or at http://localhost:5173 for a local checkout.",
+			"default": "https://tracker.implementjs.dev",
 			"required": true
 		}
 	}

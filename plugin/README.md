@@ -32,8 +32,9 @@ The tools cover issues (`list_issues`, `get_issue`, `create_issue`,
 ## The one setting
 
 **tracker URL** — the origin of your instance, no trailing slash. The plugin
-appends `/api/mcp`. It defaults to `http://localhost:5173`, which is what
-`pnpm dev` serves, so a local checkout needs no answer at all.
+appends `/api/mcp`. It defaults to `https://tracker.implementjs.dev`, the hosted
+one, so most people never answer it. Point it at your own deployment, or at
+`http://localhost:5173` for a checkout running `pnpm dev`.
 
 Claude Code prompts for it at install and substitutes it as
 `${user_config.url}`; Cursor declares it as the `TRACKER_URL` variable. Nothing
@@ -73,14 +74,14 @@ development. To skip the plugin and just add the server, the install deeplink
 carries the config inline:
 
 ```
-cursor://anysphere.cursor-deeplink/mcp/install?name=tracker&config=eyJ1cmwiOiJodHRwOi8vbG9jYWxob3N0OjUxNzMvYXBpL21jcCJ9
+cursor://anysphere.cursor-deeplink/mcp/install?name=tracker&config=eyJ1cmwiOiJodHRwczovL3RyYWNrZXIuaW1wbGVtZW50anMuZGV2L2FwaS9tY3AifQ==
 ```
 
-That one is the `http://localhost:5173` default. For your own instance, the
-config is base64 of the same object with your origin in it:
+That one is the `https://tracker.implementjs.dev` default. For your own instance,
+the config is base64 of the same object with your origin in it:
 
 ```sh
-node -e 'const c={url:process.argv[1]+"/api/mcp"};console.log("cursor://anysphere.cursor-deeplink/mcp/install?name=tracker&config="+Buffer.from(JSON.stringify(c)).toString("base64"))' https://tracker.example.com
+node -e 'const c={url:process.argv[1]+"/api/mcp"};console.log("cursor://anysphere.cursor-deeplink/mcp/install?name=tracker&config="+Buffer.from(JSON.stringify(c)).toString("base64"))' https://tracker.acme.dev
 ```
 
 Or write it by hand into `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a
@@ -90,7 +91,7 @@ project):
 {
 	"mcpServers": {
 		"tracker": {
-			"url": "https://tracker.example.com/api/mcp"
+			"url": "https://tracker.implementjs.dev/api/mcp"
 		}
 	}
 }
