@@ -15,7 +15,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { IssueStatus } from "@/lib/domain/issues";
-import { STATUS_LABELS } from "@/lib/domain/issues";
+import { STATUS_LABELS, STATUS_ORDER } from "@/lib/domain/issues";
 import type { IssueMention } from "@/lib/domain/mentions";
 import { pullRequestMentions } from "@/lib/domain/mentions";
 import type { GitProviderId } from "@/lib/domain/providers";
@@ -328,14 +328,17 @@ function nextStatus(
 	target: Target,
 ): IssueStatus | null {
 	const current = target.row.status;
-	if (current === "done" || current === "canceled") return null;
+	if (current === "done" || current === "canceled" || current === "duplicate") return null;
 
 	if (state === "merged") return target.closes ? "done" : null;
 	// Closed without merging says the attempt was abandoned, not that the issue
 	// was — whoever owns it decides that.
 	if (state === "closed") return null;
 
-	return current === "in_progress" ? null : "in_progress";
+	// An open pull request means work has started, so anything not yet at "in
+	// progress" catches up to it — but never backward out of a status like In
+	// Review that a person has already moved the issue past.
+	return STATUS_ORDER[current] < STATUS_ORDER.in_progress ? "in_progress" : null;
 }
 
 async function moveIssue(
