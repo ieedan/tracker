@@ -36,7 +36,7 @@
 		"@implementjs/formish": "~0.0.11",
 		"@implementjs/lucide": "~0.0.11",
 		"@implementjs/mode-watcher": "~0.0.11",
-		"@implementjs/primitives": "~0.0.13",
+		"@implementjs/primitives": "~0.0.14",
 		"@libsql/client": "^0.17.4",
 		"better-auth": "^1.7.1",
 		"drizzle-orm": "^0.45.2",

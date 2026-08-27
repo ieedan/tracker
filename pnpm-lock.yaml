@@ -41,8 +41,8 @@ importers:
         specifier: ~0.0.11
         version: 0.0.11
       '@implementjs/primitives':
-        specifier: ~0.0.13
-        version: 0.0.13
+        specifier: ~0.0.14
+        version: 0.0.14
       '@libsql/client':
         specifier: ^0.17.4
         version: 0.17.4
@@ -820,8 +820,8 @@ packages:
   '@implementjs/mode-watcher@0.0.11':
     resolution: {integrity: sha512-BpNM2R3MwVztJSsQ7TuxfHiTXIbcAqjNVXFyzm7qFqjnLIAf+xMyVVruNc1Weu8iP5w/fxFmE84KsgSru8yDvg==}
 
-  '@implementjs/primitives@0.0.13':
-    resolution: {integrity: sha512-+4IfuT2anZhlp1g2c+3oaY2iwmMCqUkYrOb79FbXRVRpZwcrYLWTvQj9HSHS37jEFFjmCd9pa5BXaroWS5PgxQ==}
+  '@implementjs/primitives@0.0.14':
+    resolution: {integrity: sha512-QqVPdw70pjXzHA2Gp8ndnN1hREXxNTPD2tq/1gpuLFAOYpLBt8t6LpboLVGtkrtlRDeuzDkzDp/1ljXHEAN79g==}
 
   '@implementjs/router@0.0.13':
     resolution: {integrity: sha512-rioGk9Yyvm/6br1lla0b0Ln681GFwzH3eLOClhL59vwrY0mHIgeHkakERS1NGVImiIZodDnmibTfFK0AS/tI9g==}
@@ -2997,7 +2997,7 @@ snapshots:
     dependencies:
       '@implementjs/core': 0.0.11
 
-  '@implementjs/primitives@0.0.13':
+  '@implementjs/primitives@0.0.14':
     dependencies:
       '@implementjs/core': 0.0.11
 
