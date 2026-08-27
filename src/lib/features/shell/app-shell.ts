@@ -18,6 +18,7 @@ import {
 	type Signal,
 } from "@implementjs/core";
 import {
+	Check,
 	ChevronDown,
 	CircleUser,
 	Inbox as InboxIcon,
@@ -307,11 +308,7 @@ function MobileHeader(
 			},
 			Menu({ class: "size-4" }),
 		),
-		WorkspaceTile(current),
-		Span(
-			{ class: "min-w-0 truncate text-[13px] font-medium" },
-			current.bind((workspace) => workspace?.name ?? "No workspace"),
-		),
+		MobileWorkspaceSwitcher(data, current),
 		Button(
 			{
 				variant: "ghost",
@@ -321,6 +318,108 @@ function MobileHeader(
 				onClick: () => openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path)),
 			},
 			Plus({ class: "size-4" }),
+		),
+	);
+}
+
+/**
+ * The header's workspace switcher, as a drawer up from the bottom edge (ENG-70).
+ *
+ * The docked sidebar's switcher is a dropdown anchored under a full-width
+ * trigger; on a phone that same panel would hang off a 12px-tall header, under
+ * the thumb that opened it and as far from it as the screen allows. A drawer
+ * comes from the edge the thumb is already at, is as wide as the device, and
+ * gets rows big enough to hit — the shape `responsive-menu.ts` reaches for, and
+ * the one the sidebar itself takes on this viewport.
+ *
+ * Its own component rather than a `ResponsiveMenu`, because the list ends in an
+ * action ("Create workspace") rather than another option, and a picker whose
+ * rows are all `menuitemradio` has nowhere to put one.
+ */
+function MobileWorkspaceSwitcher(
+	data: Readable<ShellData>,
+	current: Readable<Workspace | undefined>,
+) {
+	const open = signal(false);
+	const isDesktop = mediaQuery(DESKTOP_QUERY);
+
+	return Div(
+		{ class: "contents" },
+		// The panel is portaled to the body, so the header going `md:hidden` does
+		// not take it with it — one left open has to be closed by hand.
+		ImplementEffect([isDesktop], (desktop) => {
+			if (desktop) open.set(false);
+		}),
+
+		Button(
+			{
+				variant: "ghost",
+				size: "sm",
+				class: "-ml-1 min-w-0 flex-1 justify-start gap-2 px-1.5",
+				"aria-haspopup": "dialog",
+				"aria-label": "Switch workspace",
+				onClick: () => open.set(true),
+			},
+			WorkspaceTile(current),
+			Span(
+				{ class: "min-w-0 truncate text-[13px] font-medium" },
+				current.bind((workspace) => workspace?.name ?? "No workspace"),
+			),
+			ChevronDown({ class: "size-3.5 shrink-0 text-muted-foreground" }),
+		),
+
+		Drawer(
+			{ open },
+			DrawerContent(
+				DrawerTitle(
+					{ class: "px-4 pt-1 pb-2 text-[13px] font-medium text-muted-foreground" },
+					"Workspaces",
+				),
+				DrawerDescription({ class: "sr-only" }, "Switch to another workspace."),
+				Div(
+					{ role: "menu", class: "flex max-h-[60dvh] flex-col gap-0.5 overflow-y-auto px-2" },
+					ForEach(
+						data.bind((shell) => shell.workspaces),
+						(workspace) => workspace.id,
+						(workspace) => {
+							const active = current.bind((value) => value?.slug === workspace.get().slug);
+							return Button(
+								{
+									variant: "ghost",
+									role: "menuitemradio",
+									"aria-checked": active,
+									class: "h-11 w-full justify-start gap-2.5 px-3 text-[14px] font-normal",
+									onClick: () => {
+										open.set(false);
+										// Already here: closing is the whole of it, and navigating
+										// anyway would throw away where in the workspace you are.
+										if (active.get()) return;
+										router.navigate("/app/:slug", { slug: workspace.get().slug });
+									},
+								},
+								WorkspaceTile(workspace),
+								Span({ class: "flex-1 truncate text-left" }, workspace.bind("name")),
+								If(active, Check({ class: "size-4 shrink-0 text-primary" })),
+							);
+						},
+					),
+				),
+				Div(
+					{ class: "mt-1 border-t border-border px-2 pt-1" },
+					Button(
+						{
+							variant: "ghost",
+							class: "h-11 w-full justify-start gap-2.5 px-3 text-[14px] font-normal",
+							onClick: () => {
+								open.set(false);
+								window.location.assign("/workspaces/new");
+							},
+						},
+						Plus({ class: "size-4 shrink-0" }),
+						"Create workspace",
+					),
+				),
+			),
 		),
 	);
 }
