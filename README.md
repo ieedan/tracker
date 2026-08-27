@@ -552,7 +552,10 @@ to a client that registers without naming any, on the reasoning that the tools
 are useless in isolation; a webhook posts workspace events to a URL the agent
 chose, so a client that wants it has to ask, and the person approving it sees it
 spelled out. Managing members, invites, teams and repositories stays out of an
-agent's hands whatever it was granted.
+agent's hands whatever it was granted. Runtime permissions come from the grant
+itself, not the JWT's `scope` claim — MCP clients often mint tokens with only
+the registration defaults, which would otherwise strip opt-in scopes the consent
+screen just approved (ENG-30).
 
 The `text` format is usually the one to reach for here: it wraps the event as
 `{"text": …}`, which is the shape a Claude Code routine's API trigger takes, so
