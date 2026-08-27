@@ -1,6 +1,7 @@
 import { error } from "@implementjs/kit/server";
 import { and, count, desc, eq, inArray, isNull, like, max, or, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
+import { nanoid } from "nanoid";
 import { parseIdentifier, type IssuePriority, type IssueStatus } from "@/lib/domain/issues";
 import type { Issue } from "@/lib/domain/schemas";
 import { attachmentsFor } from "./attachments.server";
@@ -12,6 +13,7 @@ import {
 	comment,
 	feedback,
 	issue,
+	issueSubscriber,
 	pullRequest,
 	repository,
 	issueLabel,
@@ -172,6 +174,84 @@ export async function listIssues(
 		.orderBy(desc(issue.updatedAt));
 
 	return await hydrate(rows);
+}
+
+/**
+ * The three slices behind "My Issues": what is on you, what you filed, and what
+ * you are following.
+ *
+ * All three are one workspace's worth of one person's work — bounded by how
+ * much any one member can plausibly touch — so they come back whole and the
+ * page tabs between them client side. Same reasoning as the issue list: the
+ * server has already narrowed to the only rows that can appear, and a tab
+ * switch that re-hits the database to show a list you were already holding is a
+ * spinner where there should be none.
+ */
+export async function listAssignedIssues(workspaceId: string, userId: string): Promise<Issue[]> {
+	const rows = await withJoins()
+		.where(and(eq(team.workspaceId, workspaceId), eq(issue.assigneeId, userId)))
+		.orderBy(desc(issue.updatedAt));
+	return await hydrate(rows);
+}
+
+export async function listCreatedIssues(workspaceId: string, userId: string): Promise<Issue[]> {
+	const rows = await withJoins()
+		.where(and(eq(team.workspaceId, workspaceId), eq(issue.creatorId, userId)))
+		.orderBy(desc(issue.updatedAt));
+	return await hydrate(rows);
+}
+
+/**
+ * Issues this user is following.
+ *
+ * Subscription is explicit rather than inferred: a row in `issue_subscriber`,
+ * written when you comment, when work lands on you, or when you press Subscribe
+ * on the issue itself. Inferring it from participation would mean the list
+ * changes shape every time the definition is tweaked, and there would be no way
+ * to leave a noisy issue.
+ */
+export async function listSubscribedIssues(workspaceId: string, userId: string): Promise<Issue[]> {
+	const rows = await withJoins()
+		.innerJoin(issueSubscriber, eq(issueSubscriber.issueId, issue.id))
+		.where(and(eq(team.workspaceId, workspaceId), eq(issueSubscriber.userId, userId)))
+		.orderBy(desc(issue.updatedAt));
+	return await hydrate(rows);
+}
+
+/**
+ * Starts following an issue. Idempotent, and a no-op without a user — every
+ * caller can pass an optional assignee straight through, the way `notify` takes
+ * one.
+ */
+export async function subscribeToIssue(
+	issueId: string,
+	userId: string | null | undefined,
+): Promise<void> {
+	if (userId === null || userId === undefined || userId === "") return;
+
+	await db
+		.insert(issueSubscriber)
+		.values({ id: nanoid(), issueId, userId, createdAt: new Date() })
+		// The unique index on (issueId, userId) is what makes a second subscribe
+		// cost nothing instead of failing.
+		.onConflictDoNothing();
+}
+
+/** Stops following. Unsubscribing from something you never followed is fine. */
+export async function unsubscribeFromIssue(issueId: string, userId: string): Promise<void> {
+	await db
+		.delete(issueSubscriber)
+		.where(and(eq(issueSubscriber.issueId, issueId), eq(issueSubscriber.userId, userId)));
+}
+
+/** Whether the Subscribe control on an issue should read as already on. */
+export async function isSubscribedToIssue(issueId: string, userId: string): Promise<boolean> {
+	const rows = await db
+		.select({ id: issueSubscriber.id })
+		.from(issueSubscriber)
+		.where(and(eq(issueSubscriber.issueId, issueId), eq(issueSubscriber.userId, userId)))
+		.limit(1);
+	return rows.length > 0;
 }
 
 /** One issue, addressed the way the UI addresses it: `ENG-42`. */

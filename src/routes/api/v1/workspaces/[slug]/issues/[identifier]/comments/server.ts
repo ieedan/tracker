@@ -8,7 +8,7 @@ import { adoptDraftAttachments, attachmentsFor } from "@/lib/server/attachments.
 import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { emitCommentEvent } from "@/lib/server/events.server";
-import { getIssueById } from "@/lib/server/issues.server";
+import { getIssueById, subscribeToIssue } from "@/lib/server/issues.server";
 import { notify } from "@/lib/server/notifications.server";
 import { comment, issue, team, user } from "@/lib/server/schema.server";
 import { identifierFor, toComment } from "@/lib/server/serialize.server";
@@ -96,6 +96,14 @@ export const POST = handler({
 			workspaceId: workspace.id,
 			userId: author.id,
 		});
+
+		// Having said something on an issue is what "following" means by default,
+		// so commenting subscribes you without asking. Idempotent, so the tenth
+		// comment costs the same as the first, and the Subscribe control on the
+		// issue is how you back out again.
+		await subscribeToIssue(target.issue.id, author.id);
+		// An agent commenting on someone's behalf follows for them too.
+		await subscribeToIssue(target.issue.id, locals.agent?.installedByUserId);
 
 		const identifier = identifierFor(target.team.key, target.issue.number);
 		const audience = new Set(

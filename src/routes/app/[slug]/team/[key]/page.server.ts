@@ -10,7 +10,7 @@ export default async function load({ locals, params }: LoadEvent) {
 
 	return {
 		issues: await listIssues(workspace.id, { teamKey: team.key }),
-		team: { id: team.id, name: team.name, key: team.key },
+		team: { id: team.id, name: team.name, key: team.key, icon: team.icon, color: team.color },
 		// The bulk actions can scope a selection to a repository.
 		repositories: await listRepositories(workspace.id),
 	};

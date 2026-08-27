@@ -2,6 +2,7 @@ import { error } from "@implementjs/kit/server";
 import { and, asc, count, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { DEFAULT_TEAMS, TEAM_KEY_PATTERN } from "@/lib/domain/issues";
+import { defaultTeamLook } from "@/lib/domain/team-icons";
 import type { Team } from "@/lib/domain/schemas";
 import { db } from "./db.server";
 import { issue, team } from "./schema.server";
@@ -81,9 +82,22 @@ export async function uniqueTeamKey(workspaceId: string, base: string): Promise<
 	return `${base.slice(0, 3)}${nanoid(3).toUpperCase()}`;
 }
 
+/** How many issues a team holds — what `Team.issueCount` reports. */
+export async function countTeamIssues(teamId: string): Promise<number> {
+	const rows = await db
+		.select({ issues: count(issue.id) })
+		.from(issue)
+		.where(eq(issue.teamId, teamId));
+	return rows[0]?.issues ?? 0;
+}
+
 /**
  * The teams a brand-new workspace starts with. A workspace with no teams has
  * nowhere to file an issue, so this is not optional.
+ *
+ * They come with a tile already chosen — a workspace whose first screen shows
+ * two identical gray squares looks unfinished, and picking an icon should read
+ * as changing one rather than filling in a blank.
  */
 export async function createDefaultTeams(workspaceId: string): Promise<void> {
 	await db.insert(team).values(
@@ -92,6 +106,7 @@ export async function createDefaultTeams(workspaceId: string): Promise<void> {
 			workspaceId,
 			name: entry.name,
 			key: entry.key,
+			...defaultTeamLook(entry.key),
 			createdAt: new Date(),
 		})),
 	);

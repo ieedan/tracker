@@ -18,6 +18,7 @@ import {
 	insertWithNumber,
 	listIssues,
 	setIssueLabels,
+	subscribeToIssue,
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { requireRepository } from "@/lib/server/repositories.server";
@@ -105,6 +106,14 @@ export const POST = handler({
 		});
 
 		await setIssueLabels(id, labelIds);
+
+		// Filing an issue is following it — and so is being put on it at birth.
+		// When an agent files, `user` is the bot, so the person who set it up is
+		// subscribed as well: the work was done on their behalf, and this is how
+		// it reaches their My Issues without claiming they authored it.
+		await subscribeToIssue(id, user.id);
+		await subscribeToIssue(id, body.assigneeId);
+		await subscribeToIssue(id, locals.agent?.installedByUserId);
 
 		// Files uploaded in the composer have no parent yet; claim them now.
 		await adoptDraftAttachments({

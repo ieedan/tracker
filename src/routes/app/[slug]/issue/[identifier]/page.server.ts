@@ -5,14 +5,14 @@ import { listActivity } from "@/lib/server/activity.server";
 import { attachmentsFor } from "@/lib/server/attachments.server";
 import { db } from "@/lib/server/db.server";
 import { requireMembership } from "@/lib/server/guards.server";
-import { getIssueByIdentifier } from "@/lib/server/issues.server";
+import { getIssueByIdentifier, isSubscribedToIssue } from "@/lib/server/issues.server";
 import { listRepositories, pullRequestForIssue } from "@/lib/server/repositories.server";
 import { comment, user } from "@/lib/server/schema.server";
 import { toComment } from "@/lib/server/serialize.server";
 import type { LoadEvent } from "./$types";
 
 export default async function load({ locals, params }: LoadEvent) {
-	const { workspace } = await requireMembership(locals, params.slug);
+	const { workspace, user: viewer } = await requireMembership(locals, params.slug);
 
 	const parsed = parseIdentifier(params.identifier);
 	if (parsed === null) error(404, `"${params.identifier}" is not an issue identifier`);
@@ -62,5 +62,9 @@ export default async function load({ locals, params }: LoadEvent) {
 		// comments by timestamp rather than the server flattening them, because
 		// only one of the two can be posted from the page.
 		activity: await listActivity(found.id),
+		// Whether the Subscribe control in the rail starts on. Loaded here rather
+		// than fetched by the control, so the server render already has it right
+		// and the button does not flip state a moment after the page appears.
+		subscribed: await isSubscribedToIssue(found.id, viewer.id),
 	};
 }

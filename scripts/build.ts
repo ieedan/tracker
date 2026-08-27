@@ -30,5 +30,15 @@ function run(command: string, args: string[], env: Record<string, string>): void
 
 const overrides = await provisionPreviewDatabase();
 
+// A production deployment migrates its database the same way a preview does,
+// just without the provisioning: pending migrations apply before the build
+// bakes the connection in. Drizzle records what it has applied in the database
+// itself, so a redeploy with nothing new is a no-op — but a failed migration
+// fails the build, which means schema changes have to stay backward-compatible
+// (the previous deployment keeps serving until this one goes live).
+if (process.env.VERCEL_ENV === "production") {
+	run(bin("drizzle-kit"), ["migrate"], {});
+}
+
 run(bin("vite"), ["build"], overrides);
 run(bin("tsx"), ["scripts/vercel-cron.ts"], overrides);

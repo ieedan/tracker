@@ -33,6 +33,7 @@ import {
 	derived,
 	signal,
 	type Child,
+	type Readable,
 	type Signal,
 } from "@implementjs/core";
 import {
@@ -84,6 +85,15 @@ export interface BodyComposerOptions {
 	/** Grow with the text instead of scrolling inside a fixed box. */
 	autoGrow?: boolean;
 	/**
+	 * Take the height the parent has left instead of the one `rows` asks for,
+	 * scrolling inside it. For a caller that owns the height — the expanded
+	 * create dialog — where `rows` is only the collapsed minimum.
+	 *
+	 * Reactive so a toggle can flip it in place: remounting the box would throw
+	 * away the browser's undo history along with the caret.
+	 */
+	fill?: boolean | Readable<boolean>;
+	/**
 	 * Draw `@file` references as links while the box is not focused. The text
 	 * underneath is still the textarea's, so the click is never intercepted.
 	 */
@@ -106,6 +116,9 @@ export function BodyComposer(options: BodyComposerOptions) {
 	const root = signal<HTMLDivElement | null>(null);
 	const focused = signal(false);
 	const previewing = signal(false);
+	// Every box in the chain has to opt in for a percentage height to resolve:
+	// the root, the one that is actually filled, and the textarea itself.
+	const fill = options.fill ?? false;
 
 	const mentions = fileMentions({
 		value: options.value,
@@ -172,7 +185,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 	};
 
 	return Div(
-		{ this: root, class: "flex flex-col" },
+		{ this: root, class: cn("flex flex-col", { "min-h-0 flex-1": fill }) },
 
 		// Static, not `If`: whether a composer has a toolbar never changes
 		// while it is mounted.
@@ -181,7 +194,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 		// Preview replaces the box but never unmounts it: the browser's undo
 		// history lives in the element, and this keeps it.
 		Div(
-			{ class: cn("relative", { hidden: previewing }) },
+			{ class: cn("relative", { hidden: previewing, "min-h-0 flex-1": fill }) },
 			ImplementLifecycle({ onMount: () => grow() }),
 			// Text arriving from anywhere but the keyboard — a draft restored, an
 			// edit made elsewhere — has to resize the box too.
@@ -211,7 +224,11 @@ export function BodyComposer(options: BodyComposerOptions) {
 				// Hidden rather than unmounted while the links are drawn over it: the
 				// textarea has to keep the click, and the caret has to land in the
 				// text it is measuring against.
-				class: cn(bodyComposerClass, { "text-transparent": overlaid }, options.class),
+				class: cn(
+					bodyComposerClass,
+					{ "text-transparent": overlaid, "h-full": fill },
+					options.class,
+				),
 				onInput: (event) => {
 					mentions.onInput(event);
 					grow();
@@ -257,7 +274,9 @@ export function BodyComposer(options: BodyComposerOptions) {
 		If(
 			previewing,
 			Div(
-				{},
+				// Preview stands in for the box, so under `fill` it has to hold the
+				// same height rather than let the panel collapse around it.
+				{ class: cn({ "min-h-0 flex-1 overflow-y-auto": fill }) },
 				// A click anywhere else is the same "I am done here" that blur is
 				// for the box — without this, a preview left open would swallow the
 				// commit a caller expects on the way out.

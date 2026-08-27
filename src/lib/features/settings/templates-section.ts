@@ -368,7 +368,13 @@ function TemplateDialog(
 							(key) => {
 								const picked = catalog.teams.get().find((entry) => entry.key === key);
 								if (picked !== undefined) {
-									team.set({ id: picked.id, name: picked.name, key: picked.key });
+									team.set({
+										id: picked.id,
+										name: picked.name,
+										key: picked.key,
+										icon: picked.icon,
+										color: picked.color,
+									});
 								}
 							},
 							{ showLabel: true, class: "border border-border" },

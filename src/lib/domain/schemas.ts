@@ -76,6 +76,10 @@ export const TeamSchema = v.object({
 	name: v.string(),
 	/** The `ENG` in `ENG-42`. */
 	key: v.string(),
+	/** Lucide icon name shown beside the team, or null for the default. */
+	icon: v.nullable(v.string()),
+	/** Hex color behind the icon, or null for the default. */
+	color: v.nullable(v.string()),
 	issueCount: v.number(),
 	createdAt: v.string(),
 });
@@ -86,6 +90,8 @@ export const TeamRefSchema = v.object({
 	id: v.string(),
 	name: v.string(),
 	key: v.string(),
+	icon: v.nullable(v.string()),
+	color: v.nullable(v.string()),
 });
 export type TeamRef = v.InferOutput<typeof TeamRefSchema>;
 
@@ -517,6 +523,21 @@ export const CreateCommentBody = v.object({
 export const UpdateCommentBody = v.object({
 	body: trimmed(1, 10_000),
 });
+
+/**
+ * Follow or stop following an issue. One body with a boolean rather than a POST
+ * and a DELETE, because the caller is a toggle: it knows the state it wants, and
+ * saying so is idempotent in both directions.
+ */
+export const SubscribeIssueBody = v.object({
+	subscribed: v.optional(v.boolean(), true),
+});
+
+/** Whether you are following an issue — what the toggle reads and writes. */
+export const IssueSubscriptionSchema = v.object({
+	subscribed: v.boolean(),
+});
+export type IssueSubscription = v.InferOutput<typeof IssueSubscriptionSchema>;
 
 export const AddMemberBody = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email()),

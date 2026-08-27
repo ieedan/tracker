@@ -145,7 +145,15 @@ export function TransferIssueDialog({
 		teams.set(data);
 		const picked = preferDefaultTeam(data);
 		chosenTeam.set(
-			picked === undefined ? null : { id: picked.id, name: picked.name, key: picked.key },
+			picked === undefined
+				? null
+				: {
+						id: picked.id,
+						name: picked.name,
+						key: picked.key,
+						icon: picked.icon,
+						color: picked.color,
+					},
 		);
 	};
 
@@ -282,7 +290,13 @@ export function TransferIssueDialog({
 						(key) => {
 							const picked = teams.get().find((team) => team.key === key);
 							if (picked !== undefined) {
-								chosenTeam.set({ id: picked.id, name: picked.name, key: picked.key });
+								chosenTeam.set({
+									id: picked.id,
+									name: picked.name,
+									key: picked.key,
+									icon: picked.icon,
+									color: picked.color,
+								});
 							}
 						},
 						{ showLabel: true, select: true },

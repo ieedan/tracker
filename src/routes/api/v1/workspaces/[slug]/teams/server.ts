@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as v from "valibot";
 import { CreateTeamBody, TeamSchema } from "@/lib/domain/schemas";
+import { TeamColorSchema, TeamIconNameSchema } from "@/lib/domain/team-icons";
 import { db } from "@/lib/server/db.server";
 import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { team } from "@/lib/server/schema.server";
@@ -23,8 +24,20 @@ export const GET = handler({
 	},
 });
 
+/**
+ * The tile is optional on create — a team with neither gets the hashed fallback
+ * — so it rides along with the shared create body rather than forking it. The
+ * names are validated against `TEAM_ICON_NAMES`, which is also what the picker
+ * renders from, so nothing the UI can offer is refused here.
+ */
+const CreateTeamWithTile = v.object({
+	...CreateTeamBody.entries,
+	icon: v.optional(v.nullable(TeamIconNameSchema)),
+	color: v.optional(v.nullable(TeamColorSchema)),
+});
+
 export const POST = handler({
-	body: CreateTeamBody,
+	body: CreateTeamWithTile,
 	response: TeamSchema,
 	async handle({ locals, params, body }) {
 		const membership = requireAdmin(await requireMembership(locals, params.slug));
@@ -54,6 +67,8 @@ export const POST = handler({
 			workspaceId: membership.workspace.id,
 			name: body.name,
 			key: finalKey,
+			icon: body.icon ?? null,
+			color: body.color ?? null,
 			createdAt: new Date(),
 		};
 		await db.insert(team).values(row);

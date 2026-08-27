@@ -68,6 +68,7 @@ import { NOTIFICATION_TYPES, type NotificationType } from "@/lib/domain/issues";
 import type { Notification, NotificationOrder, Workspace } from "@/lib/domain/schemas";
 import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { adjustUnreadCount, seedUnreadCount, unreadCount } from "./unread";
 
 interface PageData {
 	notifications: Notification[];
@@ -155,6 +156,10 @@ export function InboxPage({
 	/**
 	 * Flips read state for some ids, or for the whole inbox when `ids` is
 	 * omitted. Applied locally first and rolled back if the server disagrees.
+	 *
+	 * The sidebar badge moves with the list rather than with the response: the
+	 * count and the rows are the same fact shown twice, and waiting out a poll
+	 * before the badge agrees with what is plainly on screen reads as a bug.
 	 */
 	const setRead = async (ids: string[] | undefined, read: boolean) => {
 		const before = notifications.get();
@@ -164,13 +169,25 @@ export function InboxPage({
 		);
 		if (alreadyThere) return;
 
-		notifications.set(
-			before.map((entry) => (target === null || target.has(entry.id) ? { ...entry, read } : entry)),
+		const after = before.map((entry) =>
+			target === null || target.has(entry.id) ? { ...entry, read } : entry,
 		);
+		// Only the rows that actually changed state count against the badge —
+		// re-marking something already read moves nothing.
+		const flipped = after.filter((entry, index) => entry.read !== before[index]!.read).length;
+		const badgeBefore = unreadCount.get();
+
+		notifications.set(after);
+		// "Mark all read" clears every notification the account has, not only the
+		// page this screen is holding — so it zeroes the badge rather than
+		// subtracting what happens to be loaded.
+		if (ids === undefined && read) seedUnreadCount(0);
+		else adjustUnreadCount(read ? -flipped : flipped);
 
 		const { error } = await api.POST("/api/v1/notifications", { body: { ids, read } });
 		if (error !== undefined) {
 			notifications.set(before);
+			seedUnreadCount(badgeBefore);
 			toastError(
 				messageOf(error, read ? "Could not mark that read" : "Could not mark that unread"),
 			);

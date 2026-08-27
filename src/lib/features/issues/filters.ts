@@ -178,10 +178,15 @@ export function removeField(filters: Filter[], target: FilterField): Filter[] {
 export const ISSUE_VIEWS = ["active", "backlog", "all"] as const;
 export type IssueView = (typeof ISSUE_VIEWS)[number];
 
+/**
+ * "All" beside "Active" and "Backlog" would read as a third band of statuses;
+ * "All issues" reads as the escape hatch it is — and it is the tab a bare link
+ * lands on, so it is the one that has to say what it shows.
+ */
 export const ISSUE_VIEW_LABELS: Record<IssueView, string> = {
 	active: "Active",
 	backlog: "Backlog",
-	all: "All",
+	all: "All issues",
 };
 
 /**
@@ -196,12 +201,13 @@ export const VIEW_STATUSES: Record<IssueView, readonly IssueStatus[] | null> = {
 };
 
 /**
- * Where a bare URL lands. Active, Linear's default: the work in flight is what
- * you almost always came to look at, and Done and Canceled pile up forever.
- * Nothing is hidden for good — the All tab is one click away, and an explicit
- * `?view=` in the URL always wins, so a shared link still lands where it said.
+ * Where a bare URL lands. The list shows everything until you narrow it: a
+ * link to a team or to the workspace is a link to its issues, not to a slice
+ * of them, and a tab that quietly hid the finished work made shared links lie
+ * about what was there. An explicit `?view=` in the URL always wins, so a link
+ * that named a tab still lands on it.
  */
-export const DEFAULT_VIEW: IssueView = "active";
+export const DEFAULT_VIEW: IssueView = "all";
 
 /** The tab that admits everything — where an empty view offers to send you. */
 export const ALL_VIEW: IssueView = "all";

@@ -30,14 +30,7 @@
 												"type": "string"
 											},
 											"harness": {
-												"enum": [
-													"claude-code",
-													"cursor",
-													"codex",
-													"opencode",
-													"copilot",
-													"other"
-												],
+												"enum": ["claude-code", "cursor", "codex", "opencode", "copilot", "other"],
 												"type": "string"
 											},
 											"scopes": {
@@ -102,9 +95,7 @@
 											"const": true
 										}
 									},
-									"required": [
-										"ok"
-									]
+									"required": ["ok"]
 								}
 							}
 						}
@@ -193,70 +184,49 @@
 															"issues": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"workspace": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"labels": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"members": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"webhooks": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"feedback": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															},
 															"notifications": {
 																"type": "array",
 																"items": {
-																	"enum": [
-																		"read",
-																		"write"
-																	],
+																	"enum": ["read", "write"],
 																	"type": "string"
 																}
 															}
@@ -308,70 +278,49 @@
 											"issues": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"workspace": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"labels": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"members": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"webhooks": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"feedback": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											},
 											"notifications": {
 												"type": "array",
 												"items": {
-													"enum": [
-														"read",
-														"write"
-													],
+													"enum": ["read", "write"],
 													"type": "string"
 												}
 											}
@@ -384,10 +333,7 @@
 										"maximum": 31536000
 									}
 								},
-								"required": [
-									"name",
-									"permissions"
-								]
+								"required": ["name", "permissions"]
 							}
 						}
 					}
@@ -470,70 +416,49 @@
 																"issues": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"workspace": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"labels": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"members": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"webhooks": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"feedback": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																},
 																"notifications": {
 																	"type": "array",
 																	"items": {
-																		"enum": [
-																			"read",
-																			"write"
-																		],
+																		"enum": ["read", "write"],
 																		"type": "string"
 																	}
 																}
@@ -562,10 +487,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"key",
-										"plaintext"
-									]
+									"required": ["key", "plaintext"]
 								}
 							}
 						}
@@ -632,10 +554,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"image": {
@@ -649,18 +568,11 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": [
-												"disabled",
-												"api_key",
-												"public"
-											],
+											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"createdAt": {
@@ -719,10 +631,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -755,10 +664,7 @@
 																	"type": "string"
 																}
 															},
-															"required": [
-																"id",
-																"name"
-															]
+															"required": ["id", "name"]
 														},
 														{
 															"type": "null"
@@ -766,21 +672,10 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"authVia": {
-											"enum": [
-												"session",
-												"api-key",
-												"oauth"
-											],
+											"enum": ["session", "api-key", "oauth"],
 											"type": "string"
 										},
 										"agent": {
@@ -806,18 +701,11 @@
 																		"type": "string"
 																	}
 																},
-																"required": [
-																	"slug",
-																	"name"
-																]
+																"required": ["slug", "name"]
 															}
 														}
 													},
-													"required": [
-														"clientId",
-														"installedBy",
-														"workspaces"
-													]
+													"required": ["clientId", "installedBy", "workspaces"]
 												},
 												{
 													"type": "null"
@@ -825,11 +713,7 @@
 											]
 										}
 									},
-									"required": [
-										"user",
-										"authVia",
-										"agent"
-									]
+									"required": ["user", "authVia", "agent"]
 								}
 							}
 						}
@@ -857,9 +741,7 @@
 										]
 									}
 								},
-								"required": [
-									"imageKey"
-								]
+								"required": ["imageKey"]
 							}
 						}
 					}
@@ -892,10 +774,7 @@
 											]
 										},
 										"type": {
-											"enum": [
-												"human",
-												"agent"
-											],
+											"enum": ["human", "agent"],
 											"type": "string"
 										},
 										"harness": {
@@ -917,14 +796,7 @@
 											]
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"email",
-										"image",
-										"type",
-										"harness"
-									]
+									"required": ["id", "name", "email", "image", "type", "harness"]
 								}
 							}
 						}
@@ -952,10 +824,7 @@
 						"in": "query",
 						"required": false,
 						"schema": {
-							"enum": [
-								"newest",
-								"oldest"
-							],
+							"enum": ["newest", "oldest"],
 							"type": "string"
 						}
 					}
@@ -1012,10 +881,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -1037,14 +903,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"workspaceSlug": {
 												"type": "string"
@@ -1064,11 +923,7 @@
 																"type": "number"
 															}
 														},
-														"required": [
-															"identifier",
-															"title",
-															"number"
-														]
+														"required": ["identifier", "title", "number"]
 													},
 													{
 														"type": "null"
@@ -1136,9 +991,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"ok"
-									]
+									"required": ["ok"]
 								}
 							}
 						}
@@ -1165,9 +1018,7 @@
 											"type": "number"
 										}
 									},
-									"required": [
-										"count"
-									]
+									"required": ["count"]
 								}
 							}
 						}
@@ -1201,11 +1052,7 @@
 										"minimum": 1
 									}
 								},
-								"required": [
-									"filename",
-									"contentType",
-									"size"
-								]
+								"required": ["filename", "contentType", "size"]
 							}
 						}
 					}
@@ -1228,11 +1075,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"key",
-										"uploadUrl",
-										"contentType"
-									]
+									"required": ["key", "uploadUrl", "contentType"]
 								}
 							}
 						}
@@ -1267,10 +1110,7 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"image": {
@@ -1284,18 +1124,11 @@
 												]
 											},
 											"feedbackIntake": {
-												"enum": [
-													"disabled",
-													"api_key",
-													"public"
-												],
+												"enum": ["disabled", "api_key", "public"],
 												"type": "string"
 											},
 											"feedbackBoard": {
-												"enum": [
-													"private",
-													"public"
-												],
+												"enum": ["private", "public"],
 												"type": "string"
 											},
 											"createdAt": {
@@ -1338,9 +1171,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"name"
-								]
+								"required": ["name"]
 							}
 						}
 					}
@@ -1363,10 +1194,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"image": {
@@ -1380,18 +1208,11 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": [
-												"disabled",
-												"api_key",
-												"public"
-											],
+											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1449,10 +1270,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"image": {
@@ -1466,18 +1284,11 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": [
-												"disabled",
-												"api_key",
-												"public"
-											],
+											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1535,18 +1346,11 @@
 										]
 									},
 									"feedbackIntake": {
-										"enum": [
-											"disabled",
-											"api_key",
-											"public"
-										],
+										"enum": ["disabled", "api_key", "public"],
 										"type": "string"
 									},
 									"feedbackBoard": {
-										"enum": [
-											"private",
-											"public"
-										],
+										"enum": ["private", "public"],
 										"type": "string"
 									}
 								},
@@ -1573,10 +1377,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"image": {
@@ -1590,18 +1391,11 @@
 											]
 										},
 										"feedbackIntake": {
-											"enum": [
-												"disabled",
-												"api_key",
-												"public"
-											],
+											"enum": ["disabled", "api_key", "public"],
 											"type": "string"
 										},
 										"feedbackBoard": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"createdAt": {
@@ -1652,14 +1446,7 @@
 										"type": "object",
 										"properties": {
 											"harness": {
-												"enum": [
-													"claude-code",
-													"cursor",
-													"codex",
-													"opencode",
-													"copilot",
-													"other"
-												],
+												"enum": ["claude-code", "cursor", "codex", "opencode", "copilot", "other"],
 												"type": "string"
 											},
 											"name": {
@@ -1677,18 +1464,11 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name"
-													]
+													"required": ["id", "name"]
 												}
 											}
 										},
-										"required": [
-											"harness",
-											"name",
-											"connectedBy"
-										]
+										"required": ["harness", "name", "connectedBy"]
 									}
 								}
 							}
@@ -1738,11 +1518,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"filename",
-									"contentType",
-									"size"
-								]
+								"required": ["filename", "contentType", "size"]
 							}
 						}
 					}
@@ -1796,10 +1572,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -1821,14 +1594,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												"createdAt": {
 													"type": "string"
@@ -1851,11 +1617,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"attachment",
-										"uploadUrl",
-										"contentType"
-									]
+									"required": ["attachment", "uploadUrl", "contentType"]
 								}
 							}
 						}
@@ -1933,10 +1695,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -1958,14 +1717,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"createdAt": {
 											"type": "string"
@@ -2048,12 +1800,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"repositoryId",
-											"fullName",
-											"path",
-											"url"
-										]
+										"required": ["repositoryId", "fullName", "path", "url"]
 									}
 								}
 							}
@@ -2095,10 +1842,7 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"url": {
@@ -2121,15 +1865,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"token",
-											"role",
-											"url",
-											"expiresAt",
-											"revoked",
-											"createdAt"
-										]
+										"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"]
 									}
 								}
 							}
@@ -2157,10 +1893,7 @@
 								"type": "object",
 								"properties": {
 									"role": {
-										"enum": [
-											"admin",
-											"member"
-										],
+										"enum": ["admin", "member"],
 										"type": "string",
 										"default": "member"
 									},
@@ -2190,10 +1923,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"url": {
@@ -2216,15 +1946,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"token",
-										"role",
-										"url",
-										"expiresAt",
-										"revoked",
-										"createdAt"
-									]
+									"required": ["id", "token", "role", "url", "expiresAt", "revoked", "createdAt"]
 								}
 							}
 						}
@@ -2302,24 +2024,12 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string"
 									}
 								},
 								{
-									"enum": [
-										"none",
-										"urgent",
-										"high",
-										"medium",
-										"low"
-									],
+									"enum": ["none", "urgent", "high", "medium", "low"],
 									"type": "string"
 								}
 							]
@@ -2382,11 +2092,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"key"
-												]
+												"required": ["id", "name", "key"]
 											},
 											"title": {
 												"type": "string"
@@ -2408,13 +2114,7 @@
 												"type": "string"
 											},
 											"priority": {
-												"enum": [
-													"none",
-													"urgent",
-													"high",
-													"medium",
-													"low"
-												],
+												"enum": ["none", "urgent", "high", "medium", "low"],
 												"type": "string"
 											},
 											"assignee": {
@@ -2442,10 +2142,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -2467,14 +2164,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													{
 														"type": "null"
@@ -2504,10 +2194,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -2529,14 +2216,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"labels": {
 												"type": "array",
@@ -2553,11 +2233,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"color"
-													]
+													"required": ["id", "name", "color"]
 												}
 											},
 											"commentCount": {
@@ -2575,17 +2251,11 @@
 																"type": "string"
 															},
 															"provider": {
-																"enum": [
-																	"github"
-																],
+																"enum": ["github"],
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"fullName",
-															"provider"
-														]
+														"required": ["id", "fullName", "provider"]
 													},
 													{
 														"type": "null"
@@ -2607,25 +2277,14 @@
 																"type": "string"
 															},
 															"state": {
-																"enum": [
-																	"open",
-																	"merged",
-																	"closed",
-																	"draft"
-																],
+																"enum": ["open", "merged", "closed", "draft"],
 																"type": "string"
 															},
 															"url": {
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"number",
-															"title",
-															"state",
-															"url"
-														]
+														"required": ["id", "number", "title", "state", "url"]
 													},
 													{
 														"type": "null"
@@ -2650,12 +2309,7 @@
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"number",
-															"identifier",
-															"title"
-														]
+														"required": ["id", "number", "identifier", "title"]
 													},
 													{
 														"type": "null"
@@ -2705,10 +2359,7 @@
 																	]
 																},
 																"type": {
-																	"enum": [
-																		"human",
-																		"agent"
-																	],
+																	"enum": ["human", "agent"],
 																	"type": "string"
 																},
 																"harness": {
@@ -2730,14 +2381,7 @@
 																	]
 																}
 															},
-															"required": [
-																"id",
-																"name",
-																"email",
-																"image",
-																"type",
-																"harness"
-															]
+															"required": ["id", "name", "email", "image", "type", "harness"]
 														},
 														"createdAt": {
 															"type": "string"
@@ -2849,13 +2493,7 @@
 										"default": "backlog"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string",
 										"default": "none"
 									},
@@ -2882,10 +2520,7 @@
 										}
 									}
 								},
-								"required": [
-									"teamKey",
-									"title"
-								]
+								"required": ["teamKey", "title"]
 							}
 						}
 					}
@@ -2920,11 +2555,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"key"
-											]
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -2946,13 +2577,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -2980,10 +2605,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -3005,14 +2627,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -3042,10 +2657,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -3067,14 +2679,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"labels": {
 											"type": "array",
@@ -3091,11 +2696,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -3113,17 +2714,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -3145,25 +2740,14 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": [
-																"open",
-																"merged",
-																"closed",
-																"draft"
-															],
+															"enum": ["open", "merged", "closed", "draft"],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"title",
-														"state",
-														"url"
-													]
+													"required": ["id", "number", "title", "state", "url"]
 												},
 												{
 													"type": "null"
@@ -3188,12 +2772,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "number", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -3243,10 +2822,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -3268,14 +2844,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -3380,11 +2949,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"key"
-											]
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -3406,13 +2971,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -3440,10 +2999,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -3465,14 +3021,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -3502,10 +3051,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -3527,14 +3073,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"labels": {
 											"type": "array",
@@ -3551,11 +3090,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -3573,17 +3108,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -3605,25 +3134,14 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": [
-																"open",
-																"merged",
-																"closed",
-																"draft"
-															],
+															"enum": ["open", "merged", "closed", "draft"],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"title",
-														"state",
-														"url"
-													]
+													"required": ["id", "number", "title", "state", "url"]
 												},
 												{
 													"type": "null"
@@ -3648,12 +3166,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "number", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -3703,10 +3216,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -3728,14 +3238,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -3852,13 +3355,7 @@
 										"type": "string"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string"
 									},
 									"assigneeId": {
@@ -3913,11 +3410,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"key"
-											]
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -3939,13 +3432,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -3973,10 +3460,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -3998,14 +3482,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -4035,10 +3512,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -4060,14 +3534,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"labels": {
 											"type": "array",
@@ -4084,11 +3551,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -4106,17 +3569,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -4138,25 +3595,14 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": [
-																"open",
-																"merged",
-																"closed",
-																"draft"
-															],
+															"enum": ["open", "merged", "closed", "draft"],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"title",
-														"state",
-														"url"
-													]
+													"required": ["id", "number", "title", "state", "url"]
 												},
 												{
 													"type": "null"
@@ -4181,12 +3627,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "number", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -4236,10 +3677,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -4261,14 +3699,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -4429,10 +3860,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -4454,14 +3882,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"from": {
 												"anyOf": [
@@ -4498,26 +3919,14 @@
 															"type": "boolean"
 														}
 													},
-													"required": [
-														"name",
-														"color",
-														"added"
-													]
+													"required": ["name", "color", "added"]
 												}
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"type",
-											"actor",
-											"from",
-											"to",
-											"labels",
-											"createdAt"
-										]
+										"required": ["id", "type", "actor", "from", "to", "labels", "createdAt"]
 									}
 								}
 							}
@@ -4589,10 +3998,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -4614,14 +4020,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"attachments": {
 												"type": "array",
@@ -4666,10 +4065,7 @@
 																	]
 																},
 																"type": {
-																	"enum": [
-																		"human",
-																		"agent"
-																	],
+																	"enum": ["human", "agent"],
 																	"type": "string"
 																},
 																"harness": {
@@ -4691,14 +4087,7 @@
 																	]
 																}
 															},
-															"required": [
-																"id",
-																"name",
-																"email",
-																"image",
-																"type",
-																"harness"
-															]
+															"required": ["id", "name", "email", "image", "type", "harness"]
 														},
 														"createdAt": {
 															"type": "string"
@@ -4722,14 +4111,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"body",
-											"author",
-											"attachments",
-											"createdAt",
-											"updatedAt"
-										]
+										"required": ["id", "body", "author", "attachments", "createdAt", "updatedAt"]
 									}
 								}
 							}
@@ -4779,9 +4161,7 @@
 										}
 									}
 								},
-								"required": [
-									"body"
-								]
+								"required": ["body"]
 							}
 						}
 					}
@@ -4823,10 +4203,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -4848,14 +4225,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"attachments": {
 											"type": "array",
@@ -4900,10 +4270,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -4925,14 +4292,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -4956,14 +4316,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"body",
-										"author",
-										"attachments",
-										"createdAt",
-										"updatedAt"
-									]
+									"required": ["id", "body", "author", "attachments", "createdAt", "updatedAt"]
 								}
 							}
 						}
@@ -5016,9 +4369,7 @@
 										"maxLength": 10000
 									}
 								},
-								"required": [
-									"body"
-								]
+								"required": ["body"]
 							}
 						}
 					}
@@ -5060,10 +4411,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -5085,14 +4433,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"attachments": {
 											"type": "array",
@@ -5137,10 +4478,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -5162,14 +4500,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -5193,14 +4524,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"body",
-										"author",
-										"attachments",
-										"createdAt",
-										"updatedAt"
-									]
+									"required": ["id", "body", "author", "attachments", "createdAt", "updatedAt"]
 								}
 							}
 						}
@@ -5294,12 +4618,7 @@
 													"type": "string"
 												},
 												"state": {
-													"enum": [
-														"open",
-														"merged",
-														"closed",
-														"draft"
-													],
+													"enum": ["open", "merged", "closed", "draft"],
 													"type": "string"
 												},
 												"url": {
@@ -5318,10 +4637,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName"
-													]
+													"required": ["id", "fullName"]
 												},
 												"syncedAt": {
 													"anyOf": [
@@ -5395,9 +4711,7 @@
 										"maxLength": 400
 									}
 								},
-								"required": [
-									"reference"
-								]
+								"required": ["reference"]
 							}
 						}
 					}
@@ -5420,12 +4734,7 @@
 											"type": "string"
 										},
 										"state": {
-											"enum": [
-												"open",
-												"merged",
-												"closed",
-												"draft"
-											],
+											"enum": ["open", "merged", "closed", "draft"],
 											"type": "string"
 										},
 										"url": {
@@ -5444,10 +4753,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"fullName"
-											]
+											"required": ["id", "fullName"]
 										},
 										"syncedAt": {
 											"anyOf": [
@@ -5515,9 +4821,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"unlinked"
-									]
+									"required": ["unlinked"]
 								}
 							}
 						}
@@ -5566,10 +4870,7 @@
 										"maxLength": 6
 									}
 								},
-								"required": [
-									"workspaceSlug",
-									"teamKey"
-								]
+								"required": ["workspaceSlug", "teamKey"]
 							}
 						}
 					}
@@ -5604,11 +4905,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"key"
-											]
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -5630,13 +4927,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -5664,10 +4955,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -5689,14 +4977,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -5726,10 +5007,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -5751,14 +5029,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"labels": {
 											"type": "array",
@@ -5775,11 +5046,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -5797,17 +5064,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -5829,25 +5090,14 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": [
-																"open",
-																"merged",
-																"closed",
-																"draft"
-															],
+															"enum": ["open", "merged", "closed", "draft"],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"title",
-														"state",
-														"url"
-													]
+													"required": ["id", "number", "title", "state", "url"]
 												},
 												{
 													"type": "null"
@@ -5872,12 +5122,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "number", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -5927,10 +5172,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -5952,14 +5194,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -6046,11 +5281,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"name",
-											"color"
-										]
+										"required": ["id", "name", "color"]
 									}
 								}
 							}
@@ -6087,10 +5318,7 @@
 										"pattern": "^#[0-9a-fA-F]{6}$"
 									}
 								},
-								"required": [
-									"name",
-									"color"
-								]
+								"required": ["name", "color"]
 							}
 						}
 					}
@@ -6113,11 +5341,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"color"
-									]
+									"required": ["id", "name", "color"]
 								}
 							}
 						}
@@ -6155,10 +5379,7 @@
 												"type": "string"
 											},
 											"role": {
-												"enum": [
-													"admin",
-													"member"
-												],
+												"enum": ["admin", "member"],
 												"type": "string"
 											},
 											"user": {
@@ -6184,10 +5405,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -6209,25 +5427,13 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"createdAt": {
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"role",
-											"user",
-											"createdAt"
-										]
+										"required": ["id", "role", "user", "createdAt"]
 									}
 								}
 							}
@@ -6259,17 +5465,12 @@
 										"format": "email"
 									},
 									"role": {
-										"enum": [
-											"admin",
-											"member"
-										],
+										"enum": ["admin", "member"],
 										"type": "string",
 										"default": "member"
 									}
 								},
-								"required": [
-									"email"
-								]
+								"required": ["email"]
 							}
 						}
 					}
@@ -6286,10 +5487,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"user": {
@@ -6315,10 +5513,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -6340,25 +5535,13 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"role",
-										"user",
-										"createdAt"
-									]
+									"required": ["id", "role", "user", "createdAt"]
 								}
 							}
 						}
@@ -6398,16 +5581,11 @@
 								"type": "object",
 								"properties": {
 									"role": {
-										"enum": [
-											"admin",
-											"member"
-										],
+										"enum": ["admin", "member"],
 										"type": "string"
 									}
 								},
-								"required": [
-									"role"
-								]
+								"required": ["role"]
 							}
 						}
 					}
@@ -6424,10 +5602,7 @@
 											"type": "string"
 										},
 										"role": {
-											"enum": [
-												"admin",
-												"member"
-											],
+											"enum": ["admin", "member"],
 											"type": "string"
 										},
 										"user": {
@@ -6453,10 +5628,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -6478,25 +5650,13 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"createdAt": {
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"role",
-										"user",
-										"createdAt"
-									]
+									"required": ["id", "role", "user", "createdAt"]
 								}
 							}
 						}
@@ -6565,9 +5725,7 @@
 												"type": "string"
 											},
 											"provider": {
-												"enum": [
-													"github"
-												],
+												"enum": ["github"],
 												"type": "string"
 											},
 											"owner": {
@@ -6595,12 +5753,7 @@
 												"type": "object",
 												"properties": {
 													"state": {
-														"enum": [
-															"never",
-															"indexing",
-															"ready",
-															"failed"
-														],
+														"enum": ["never", "indexing", "ready", "failed"],
 														"type": "string"
 													},
 													"ref": {
@@ -6626,14 +5779,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"state",
-													"ref",
-													"fileCount",
-													"truncated",
-													"indexedAt",
-													"error"
-												]
+												"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
 											},
 											"createdAt": {
 												"type": "string"
@@ -6707,9 +5853,7 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": [
-												"github"
-											],
+											"enum": ["github"],
 											"type": "string"
 										},
 										"owner": {
@@ -6737,12 +5881,7 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": [
-														"never",
-														"indexing",
-														"ready",
-														"failed"
-													],
+													"enum": ["never", "indexing", "ready", "failed"],
 													"type": "string"
 												},
 												"ref": {
@@ -6768,14 +5907,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"state",
-												"ref",
-												"fileCount",
-												"truncated",
-												"indexedAt",
-												"error"
-											]
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
 										},
 										"createdAt": {
 											"type": "string"
@@ -6837,9 +5969,7 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": [
-												"github"
-											],
+											"enum": ["github"],
 											"type": "string"
 										},
 										"owner": {
@@ -6867,12 +5997,7 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": [
-														"never",
-														"indexing",
-														"ready",
-														"failed"
-													],
+													"enum": ["never", "indexing", "ready", "failed"],
 													"type": "string"
 												},
 												"ref": {
@@ -6898,14 +6023,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"state",
-												"ref",
-												"fileCount",
-												"truncated",
-												"indexedAt",
-												"error"
-											]
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
 										},
 										"createdAt": {
 											"type": "string"
@@ -6965,9 +6083,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"unlinked"
-									]
+									"required": ["unlinked"]
 								}
 							}
 						}
@@ -7011,9 +6127,7 @@
 											"type": "string"
 										},
 										"provider": {
-											"enum": [
-												"github"
-											],
+											"enum": ["github"],
 											"type": "string"
 										},
 										"owner": {
@@ -7041,12 +6155,7 @@
 											"type": "object",
 											"properties": {
 												"state": {
-													"enum": [
-														"never",
-														"indexing",
-														"ready",
-														"failed"
-													],
+													"enum": ["never", "indexing", "ready", "failed"],
 													"type": "string"
 												},
 												"ref": {
@@ -7072,14 +6181,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"state",
-												"ref",
-												"fileCount",
-												"truncated",
-												"indexedAt",
-												"error"
-											]
+											"required": ["state", "ref", "fileCount", "truncated", "indexedAt", "error"]
 										},
 										"createdAt": {
 											"type": "string"
@@ -7194,9 +6296,7 @@
 										"provider": {
 											"anyOf": [
 												{
-													"enum": [
-														"github"
-													],
+													"enum": ["github"],
 													"type": "string"
 												},
 												{
@@ -7226,10 +6326,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"account",
-														"externalId"
-													]
+													"required": ["account", "externalId"]
 												},
 												{
 													"type": "null"
@@ -7248,19 +6345,11 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"account",
-													"externalId"
-												]
+												"required": ["account", "externalId"]
 											}
 										}
 									},
-									"required": [
-										"provider",
-										"installUrl",
-										"connected",
-										"reusable"
-									]
+									"required": ["provider", "installUrl", "connected", "reusable"]
 								}
 							}
 						}
@@ -7287,9 +6376,7 @@
 								"type": "object",
 								"properties": {
 									"provider": {
-										"enum": [
-											"github"
-										],
+										"enum": ["github"],
 										"type": "string",
 										"default": "github"
 									},
@@ -7304,9 +6391,7 @@
 										"default": ""
 									}
 								},
-								"required": [
-									"externalId"
-								]
+								"required": ["externalId"]
 							}
 						}
 					}
@@ -7326,10 +6411,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"connected",
-										"account"
-									]
+									"required": ["connected", "account"]
 								}
 							}
 						}
@@ -7379,13 +6461,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"name",
-											"key",
-											"issueCount",
-											"createdAt"
-										]
+										"required": ["id", "name", "key", "issueCount", "createdAt"]
 									}
 								}
 							}
@@ -7422,9 +6498,7 @@
 										"maxLength": 6
 									}
 								},
-								"required": [
-									"name"
-								]
+								"required": ["name"]
 							}
 						}
 					}
@@ -7453,13 +6527,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"name",
-										"key",
-										"issueCount",
-										"createdAt"
-									]
+									"required": ["id", "name", "key", "issueCount", "createdAt"]
 								}
 							}
 						}
@@ -7523,11 +6591,7 @@
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"key"
-														]
+														"required": ["id", "name", "key"]
 													},
 													{
 														"type": "null"
@@ -7548,13 +6612,7 @@
 												"type": "string"
 											},
 											"priority": {
-												"enum": [
-													"none",
-													"urgent",
-													"high",
-													"medium",
-													"low"
-												],
+												"enum": ["none", "urgent", "high", "medium", "low"],
 												"type": "string"
 											},
 											"assignee": {
@@ -7582,10 +6640,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -7607,14 +6662,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													{
 														"type": "null"
@@ -7633,17 +6681,11 @@
 																"type": "string"
 															},
 															"provider": {
-																"enum": [
-																	"github"
-																],
+																"enum": ["github"],
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"fullName",
-															"provider"
-														]
+														"required": ["id", "fullName", "provider"]
 													},
 													{
 														"type": "null"
@@ -7665,11 +6707,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"color"
-													]
+													"required": ["id", "name", "color"]
 												}
 											},
 											"createdAt": {
@@ -7767,13 +6805,7 @@
 										"default": "backlog"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string",
 										"default": "none"
 									},
@@ -7807,9 +6839,7 @@
 										"default": []
 									}
 								},
-								"required": [
-									"name"
-								]
+								"required": ["name"]
 							}
 						}
 					}
@@ -7852,11 +6882,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"key"
-													]
+													"required": ["id", "name", "key"]
 												},
 												{
 													"type": "null"
@@ -7877,13 +6903,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -7911,10 +6931,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -7936,14 +6953,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -7962,17 +6972,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -7994,11 +6998,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"createdAt": {
@@ -8103,13 +7103,7 @@
 										"type": "string"
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string"
 									},
 									"assigneeId": {
@@ -8182,11 +7176,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"key"
-													]
+													"required": ["id", "name", "key"]
 												},
 												{
 													"type": "null"
@@ -8207,13 +7197,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -8241,10 +7225,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -8266,14 +7247,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -8292,17 +7266,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -8324,11 +7292,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"createdAt": {
@@ -8415,24 +7379,12 @@
 								{
 									"type": "array",
 									"items": {
-										"enum": [
-											"new",
-											"reviewing",
-											"planned",
-											"accepted",
-											"declined"
-										],
+										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 										"type": "string"
 									}
 								},
 								{
-									"enum": [
-										"new",
-										"reviewing",
-										"planned",
-										"accepted",
-										"declined"
-									],
+									"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 									"type": "string"
 								}
 							]
@@ -8443,10 +7395,7 @@
 						"in": "query",
 						"required": false,
 						"schema": {
-							"enum": [
-								"private",
-								"public"
-							],
+							"enum": ["private", "public"],
 							"type": "string"
 						}
 					},
@@ -8455,10 +7404,7 @@
 						"in": "query",
 						"required": false,
 						"schema": {
-							"enum": [
-								"true",
-								"false"
-							],
+							"enum": ["true", "false"],
 							"type": "string"
 						}
 					},
@@ -8497,20 +7443,11 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": [
-													"new",
-													"reviewing",
-													"planned",
-													"accepted",
-													"declined"
-												],
+												"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 												"type": "string"
 											},
 											"visibility": {
-												"enum": [
-													"private",
-													"public"
-												],
+												"enum": ["private", "public"],
 												"type": "string"
 											},
 											"labels": {
@@ -8528,11 +7465,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"color"
-													]
+													"required": ["id", "name", "color"]
 												}
 											},
 											"submitter": {
@@ -8583,10 +7516,7 @@
 																		]
 																	},
 																	"type": {
-																		"enum": [
-																			"human",
-																			"agent"
-																		],
+																		"enum": ["human", "agent"],
 																		"type": "string"
 																	},
 																	"harness": {
@@ -8608,14 +7538,7 @@
 																		]
 																	}
 																},
-																"required": [
-																	"id",
-																	"name",
-																	"email",
-																	"image",
-																	"type",
-																	"harness"
-																]
+																"required": ["id", "name", "email", "image", "type", "harness"]
 															},
 															{
 																"type": "null"
@@ -8623,11 +7546,7 @@
 														]
 													}
 												},
-												"required": [
-													"name",
-													"email",
-													"user"
-												]
+												"required": ["name", "email", "user"]
 											},
 											"source": {
 												"anyOf": [
@@ -8660,11 +7579,7 @@
 																"type": "string"
 															}
 														},
-														"required": [
-															"id",
-															"identifier",
-															"title"
-														]
+														"required": ["id", "identifier", "title"]
 													},
 													{
 														"type": "null"
@@ -8755,9 +7670,7 @@
 										"default": false
 									}
 								},
-								"required": [
-									"title"
-								]
+								"required": ["title"]
 							}
 						}
 					}
@@ -8786,20 +7699,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"new",
-												"reviewing",
-												"planned",
-												"accepted",
-												"declined"
-											],
+											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"labels": {
@@ -8817,11 +7721,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"submitter": {
@@ -8872,10 +7772,7 @@
 																	]
 																},
 																"type": {
-																	"enum": [
-																		"human",
-																		"agent"
-																	],
+																	"enum": ["human", "agent"],
 																	"type": "string"
 																},
 																"harness": {
@@ -8897,14 +7794,7 @@
 																	]
 																}
 															},
-															"required": [
-																"id",
-																"name",
-																"email",
-																"image",
-																"type",
-																"harness"
-															]
+															"required": ["id", "name", "email", "image", "type", "harness"]
 														},
 														{
 															"type": "null"
@@ -8912,11 +7802,7 @@
 													]
 												}
 											},
-											"required": [
-												"name",
-												"email",
-												"user"
-											]
+											"required": ["name", "email", "user"]
 										},
 										"source": {
 											"anyOf": [
@@ -8949,11 +7835,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -9039,20 +7921,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"new",
-												"reviewing",
-												"planned",
-												"accepted",
-												"declined"
-											],
+											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"labels": {
@@ -9070,11 +7943,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"submitter": {
@@ -9125,10 +7994,7 @@
 																	]
 																},
 																"type": {
-																	"enum": [
-																		"human",
-																		"agent"
-																	],
+																	"enum": ["human", "agent"],
 																	"type": "string"
 																},
 																"harness": {
@@ -9150,14 +8016,7 @@
 																	]
 																}
 															},
-															"required": [
-																"id",
-																"name",
-																"email",
-																"image",
-																"type",
-																"harness"
-															]
+															"required": ["id", "name", "email", "image", "type", "harness"]
 														},
 														{
 															"type": "null"
@@ -9165,11 +8024,7 @@
 													]
 												}
 											},
-											"required": [
-												"name",
-												"email",
-												"user"
-											]
+											"required": ["name", "email", "user"]
 										},
 										"source": {
 											"anyOf": [
@@ -9202,11 +8057,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -9283,20 +8134,11 @@
 										"maxLength": 20000
 									},
 									"status": {
-										"enum": [
-											"new",
-											"reviewing",
-											"planned",
-											"accepted",
-											"declined"
-										],
+										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 										"type": "string"
 									},
 									"visibility": {
-										"enum": [
-											"private",
-											"public"
-										],
+										"enum": ["private", "public"],
 										"type": "string"
 									},
 									"labelIds": {
@@ -9335,20 +8177,11 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"new",
-												"reviewing",
-												"planned",
-												"accepted",
-												"declined"
-											],
+											"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 											"type": "string"
 										},
 										"visibility": {
-											"enum": [
-												"private",
-												"public"
-											],
+											"enum": ["private", "public"],
 											"type": "string"
 										},
 										"labels": {
@@ -9366,11 +8199,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"submitter": {
@@ -9421,10 +8250,7 @@
 																	]
 																},
 																"type": {
-																	"enum": [
-																		"human",
-																		"agent"
-																	],
+																	"enum": ["human", "agent"],
 																	"type": "string"
 																},
 																"harness": {
@@ -9446,14 +8272,7 @@
 																	]
 																}
 															},
-															"required": [
-																"id",
-																"name",
-																"email",
-																"image",
-																"type",
-																"harness"
-															]
+															"required": ["id", "name", "email", "image", "type", "harness"]
 														},
 														{
 															"type": "null"
@@ -9461,11 +8280,7 @@
 													]
 												}
 											},
-											"required": [
-												"name",
-												"email",
-												"user"
-											]
+											"required": ["name", "email", "user"]
 										},
 										"source": {
 											"anyOf": [
@@ -9498,11 +8313,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -9574,9 +8385,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"deleted"
-									]
+									"required": ["deleted"]
 								}
 							}
 						}
@@ -9647,10 +8456,7 @@
 														]
 													},
 													"type": {
-														"enum": [
-															"human",
-															"agent"
-														],
+														"enum": ["human", "agent"],
 														"type": "string"
 													},
 													"harness": {
@@ -9672,14 +8478,7 @@
 														]
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"email",
-													"image",
-													"type",
-													"harness"
-												]
+												"required": ["id", "name", "email", "image", "type", "harness"]
 											},
 											"internal": {
 												"type": "boolean"
@@ -9691,14 +8490,7 @@
 												"type": "string"
 											}
 										},
-										"required": [
-											"id",
-											"body",
-											"author",
-											"internal",
-											"createdAt",
-											"updatedAt"
-										]
+										"required": ["id", "body", "author", "internal", "createdAt", "updatedAt"]
 									}
 								}
 							}
@@ -9746,9 +8538,7 @@
 										"default": false
 									}
 								},
-								"required": [
-									"body"
-								]
+								"required": ["body"]
 							}
 						}
 					}
@@ -9790,10 +8580,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -9815,14 +8602,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"internal": {
 											"type": "boolean"
@@ -9834,14 +8614,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"id",
-										"body",
-										"author",
-										"internal",
-										"createdAt",
-										"updatedAt"
-									]
+									"required": ["id", "body", "author", "internal", "createdAt", "updatedAt"]
 								}
 							}
 						}
@@ -9890,13 +8663,7 @@
 										"maxLength": 200
 									},
 									"priority": {
-										"enum": [
-											"none",
-											"urgent",
-											"high",
-											"medium",
-											"low"
-										],
+										"enum": ["none", "urgent", "high", "medium", "low"],
 										"type": "string",
 										"default": "none"
 									},
@@ -9911,13 +8678,7 @@
 										]
 									},
 									"status": {
-										"enum": [
-											"new",
-											"reviewing",
-											"planned",
-											"accepted",
-											"declined"
-										],
+										"enum": ["new", "reviewing", "planned", "accepted", "declined"],
 										"type": "string",
 										"default": "accepted"
 									}
@@ -9957,11 +8718,7 @@
 													"type": "string"
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"key"
-											]
+											"required": ["id", "name", "key"]
 										},
 										"title": {
 											"type": "string"
@@ -9983,13 +8740,7 @@
 											"type": "string"
 										},
 										"priority": {
-											"enum": [
-												"none",
-												"urgent",
-												"high",
-												"medium",
-												"low"
-											],
+											"enum": ["none", "urgent", "high", "medium", "low"],
 											"type": "string"
 										},
 										"assignee": {
@@ -10017,10 +8768,7 @@
 															]
 														},
 														"type": {
-															"enum": [
-																"human",
-																"agent"
-															],
+															"enum": ["human", "agent"],
 															"type": "string"
 														},
 														"harness": {
@@ -10042,14 +8790,7 @@
 															]
 														}
 													},
-													"required": [
-														"id",
-														"name",
-														"email",
-														"image",
-														"type",
-														"harness"
-													]
+													"required": ["id", "name", "email", "image", "type", "harness"]
 												},
 												{
 													"type": "null"
@@ -10079,10 +8820,7 @@
 													]
 												},
 												"type": {
-													"enum": [
-														"human",
-														"agent"
-													],
+													"enum": ["human", "agent"],
 													"type": "string"
 												},
 												"harness": {
@@ -10104,14 +8842,7 @@
 													]
 												}
 											},
-											"required": [
-												"id",
-												"name",
-												"email",
-												"image",
-												"type",
-												"harness"
-											]
+											"required": ["id", "name", "email", "image", "type", "harness"]
 										},
 										"labels": {
 											"type": "array",
@@ -10128,11 +8859,7 @@
 														"type": "string"
 													}
 												},
-												"required": [
-													"id",
-													"name",
-													"color"
-												]
+												"required": ["id", "name", "color"]
 											}
 										},
 										"commentCount": {
@@ -10150,17 +8877,11 @@
 															"type": "string"
 														},
 														"provider": {
-															"enum": [
-																"github"
-															],
+															"enum": ["github"],
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"fullName",
-														"provider"
-													]
+													"required": ["id", "fullName", "provider"]
 												},
 												{
 													"type": "null"
@@ -10182,25 +8903,14 @@
 															"type": "string"
 														},
 														"state": {
-															"enum": [
-																"open",
-																"merged",
-																"closed",
-																"draft"
-															],
+															"enum": ["open", "merged", "closed", "draft"],
 															"type": "string"
 														},
 														"url": {
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"title",
-														"state",
-														"url"
-													]
+													"required": ["id", "number", "title", "state", "url"]
 												},
 												{
 													"type": "null"
@@ -10225,12 +8935,7 @@
 															"type": "string"
 														}
 													},
-													"required": [
-														"id",
-														"number",
-														"identifier",
-														"title"
-													]
+													"required": ["id", "number", "identifier", "title"]
 												},
 												{
 													"type": "null"
@@ -10280,10 +8985,7 @@
 																]
 															},
 															"type": {
-																"enum": [
-																	"human",
-																	"agent"
-																],
+																"enum": ["human", "agent"],
 																"type": "string"
 															},
 															"harness": {
@@ -10305,14 +9007,7 @@
 																]
 															}
 														},
-														"required": [
-															"id",
-															"name",
-															"email",
-															"image",
-															"type",
-															"harness"
-														]
+														"required": ["id", "name", "email", "image", "type", "harness"]
 													},
 													"createdAt": {
 														"type": "string"
@@ -10399,9 +9094,7 @@
 										"format": "email"
 									}
 								},
-								"required": [
-									"email"
-								]
+								"required": ["email"]
 							}
 						}
 					}
@@ -10418,9 +9111,7 @@
 											"type": "boolean"
 										}
 									},
-									"required": [
-										"subscribed"
-									]
+									"required": ["subscribed"]
 								}
 							}
 						}
@@ -10501,10 +9192,7 @@
 																"const": "group"
 															},
 															"match": {
-																"enum": [
-																	"all",
-																	"any"
-																],
+																"enum": ["all", "any"],
 																"type": "string"
 															},
 															"rules": {
@@ -10514,11 +9202,7 @@
 																}
 															}
 														},
-														"required": [
-															"type",
-															"match",
-															"rules"
-														]
+														"required": ["type", "match", "rules"]
 													},
 													{
 														"type": "null"
@@ -10526,11 +9210,7 @@
 												]
 											},
 											"format": {
-												"enum": [
-													"json",
-													"text",
-													"custom"
-												],
+												"enum": ["json", "text", "custom"],
 												"type": "string"
 											},
 											"template": {
@@ -10562,11 +9242,7 @@
 											"lastDeliveryStatus": {
 												"anyOf": [
 													{
-														"enum": [
-															"pending",
-															"succeeded",
-															"failed"
-														],
+														"enum": ["pending", "succeeded", "failed"],
 														"type": "string"
 													},
 													{
@@ -10649,11 +9325,7 @@
 															]
 														}
 													},
-													"required": [
-														"type",
-														"field",
-														"operator"
-													]
+													"required": ["type", "field", "operator"]
 												},
 												{
 													"type": "object",
@@ -10662,10 +9334,7 @@
 															"const": "group"
 														},
 														"match": {
-															"enum": [
-																"all",
-																"any"
-															],
+															"enum": ["all", "any"],
 															"type": "string"
 														},
 														"rules": {
@@ -10675,11 +9344,7 @@
 															}
 														}
 													},
-													"required": [
-														"type",
-														"match",
-														"rules"
-													]
+													"required": ["type", "match", "rules"]
 												}
 											]
 										}
@@ -10758,10 +9423,7 @@
 														"const": "group"
 													},
 													"match": {
-														"enum": [
-															"all",
-															"any"
-														],
+														"enum": ["all", "any"],
 														"type": "string"
 													},
 													"rules": {
@@ -10771,11 +9433,7 @@
 														}
 													}
 												},
-												"required": [
-													"type",
-													"match",
-													"rules"
-												]
+												"required": ["type", "match", "rules"]
 											},
 											{
 												"type": "null"
@@ -10784,11 +9442,7 @@
 										"default": null
 									},
 									"format": {
-										"enum": [
-											"json",
-											"text",
-											"custom"
-										],
+										"enum": ["json", "text", "custom"],
 										"type": "string",
 										"default": "json"
 									},
@@ -10805,10 +9459,7 @@
 										"default": null
 									}
 								},
-								"required": [
-									"url",
-									"events"
-								],
+								"required": ["url", "events"],
 								"$defs": {
 									"1": {
 										"anyOf": [
@@ -10857,11 +9508,7 @@
 														]
 													}
 												},
-												"required": [
-													"type",
-													"field",
-													"operator"
-												]
+												"required": ["type", "field", "operator"]
 											},
 											{
 												"type": "object",
@@ -10870,10 +9517,7 @@
 														"const": "group"
 													},
 													"match": {
-														"enum": [
-															"all",
-															"any"
-														],
+														"enum": ["all", "any"],
 														"type": "string"
 													},
 													"rules": {
@@ -10883,11 +9527,7 @@
 														}
 													}
 												},
-												"required": [
-													"type",
-													"match",
-													"rules"
-												]
+												"required": ["type", "match", "rules"]
 											}
 										]
 									}
@@ -10954,10 +9594,7 @@
 																	"const": "group"
 																},
 																"match": {
-																	"enum": [
-																		"all",
-																		"any"
-																	],
+																	"enum": ["all", "any"],
 																	"type": "string"
 																},
 																"rules": {
@@ -10967,11 +9604,7 @@
 																	}
 																}
 															},
-															"required": [
-																"type",
-																"match",
-																"rules"
-															]
+															"required": ["type", "match", "rules"]
 														},
 														{
 															"type": "null"
@@ -10979,11 +9612,7 @@
 													]
 												},
 												"format": {
-													"enum": [
-														"json",
-														"text",
-														"custom"
-													],
+													"enum": ["json", "text", "custom"],
 													"type": "string"
 												},
 												"template": {
@@ -11015,11 +9644,7 @@
 												"lastDeliveryStatus": {
 													"anyOf": [
 														{
-															"enum": [
-																"pending",
-																"succeeded",
-																"failed"
-															],
+															"enum": ["pending", "succeeded", "failed"],
 															"type": "string"
 														},
 														{
@@ -11058,10 +9683,7 @@
 											"type": "string"
 										}
 									},
-									"required": [
-										"webhook",
-										"secret"
-									],
+									"required": ["webhook", "secret"],
 									"$defs": {
 										"2": {
 											"anyOf": [
@@ -11110,11 +9732,7 @@
 															]
 														}
 													},
-													"required": [
-														"type",
-														"field",
-														"operator"
-													]
+													"required": ["type", "field", "operator"]
 												},
 												{
 													"type": "object",
@@ -11123,10 +9741,7 @@
 															"const": "group"
 														},
 														"match": {
-															"enum": [
-																"all",
-																"any"
-															],
+															"enum": ["all", "any"],
 															"type": "string"
 														},
 														"rules": {
@@ -11136,11 +9751,7 @@
 															}
 														}
 													},
-													"required": [
-														"type",
-														"match",
-														"rules"
-													]
+													"required": ["type", "match", "rules"]
 												}
 											]
 										}
@@ -11226,10 +9837,7 @@
 														"const": "group"
 													},
 													"match": {
-														"enum": [
-															"all",
-															"any"
-														],
+														"enum": ["all", "any"],
 														"type": "string"
 													},
 													"rules": {
@@ -11239,11 +9847,7 @@
 														}
 													}
 												},
-												"required": [
-													"type",
-													"match",
-													"rules"
-												]
+												"required": ["type", "match", "rules"]
 											},
 											{
 												"type": "null"
@@ -11251,11 +9855,7 @@
 										]
 									},
 									"format": {
-										"enum": [
-											"json",
-											"text",
-											"custom"
-										],
+										"enum": ["json", "text", "custom"],
 										"type": "string"
 									},
 									"template": {
@@ -11322,11 +9922,7 @@
 														]
 													}
 												},
-												"required": [
-													"type",
-													"field",
-													"operator"
-												]
+												"required": ["type", "field", "operator"]
 											},
 											{
 												"type": "object",
@@ -11335,10 +9931,7 @@
 														"const": "group"
 													},
 													"match": {
-														"enum": [
-															"all",
-															"any"
-														],
+														"enum": ["all", "any"],
 														"type": "string"
 													},
 													"rules": {
@@ -11348,11 +9941,7 @@
 														}
 													}
 												},
-												"required": [
-													"type",
-													"match",
-													"rules"
-												]
+												"required": ["type", "match", "rules"]
 											}
 										]
 									}
@@ -11416,10 +10005,7 @@
 															"const": "group"
 														},
 														"match": {
-															"enum": [
-																"all",
-																"any"
-															],
+															"enum": ["all", "any"],
 															"type": "string"
 														},
 														"rules": {
@@ -11429,11 +10015,7 @@
 															}
 														}
 													},
-													"required": [
-														"type",
-														"match",
-														"rules"
-													]
+													"required": ["type", "match", "rules"]
 												},
 												{
 													"type": "null"
@@ -11441,11 +10023,7 @@
 											]
 										},
 										"format": {
-											"enum": [
-												"json",
-												"text",
-												"custom"
-											],
+											"enum": ["json", "text", "custom"],
 											"type": "string"
 										},
 										"template": {
@@ -11477,11 +10055,7 @@
 										"lastDeliveryStatus": {
 											"anyOf": [
 												{
-													"enum": [
-														"pending",
-														"succeeded",
-														"failed"
-													],
+													"enum": ["pending", "succeeded", "failed"],
 													"type": "string"
 												},
 												{
@@ -11563,11 +10137,7 @@
 															]
 														}
 													},
-													"required": [
-														"type",
-														"field",
-														"operator"
-													]
+													"required": ["type", "field", "operator"]
 												},
 												{
 													"type": "object",
@@ -11576,10 +10146,7 @@
 															"const": "group"
 														},
 														"match": {
-															"enum": [
-																"all",
-																"any"
-															],
+															"enum": ["all", "any"],
 															"type": "string"
 														},
 														"rules": {
@@ -11589,11 +10156,7 @@
 															}
 														}
 													},
-													"required": [
-														"type",
-														"match",
-														"rules"
-													]
+													"required": ["type", "match", "rules"]
 												}
 											]
 										}
@@ -11702,11 +10265,7 @@
 												"type": "string"
 											},
 											"status": {
-												"enum": [
-													"pending",
-													"succeeded",
-													"failed"
-												],
+												"enum": ["pending", "succeeded", "failed"],
 												"type": "string"
 											},
 											"attempts": {
@@ -11847,11 +10406,7 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"pending",
-												"succeeded",
-												"failed"
-											],
+											"enum": ["pending", "succeeded", "failed"],
 											"type": "string"
 										},
 										"attempts": {
@@ -12013,11 +10568,7 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"pending",
-												"succeeded",
-												"failed"
-											],
+											"enum": ["pending", "succeeded", "failed"],
 											"type": "string"
 										},
 										"attempts": {
@@ -12146,11 +10697,7 @@
 											"type": "string"
 										},
 										"status": {
-											"enum": [
-												"pending",
-												"succeeded",
-												"failed"
-											],
+											"enum": ["pending", "succeeded", "failed"],
 											"type": "string"
 										},
 										"attempts": {

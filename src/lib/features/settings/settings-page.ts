@@ -23,6 +23,7 @@ import { WorkspaceAgentsSection } from "./workspace-agents-section";
 import { ApiKeysSection } from "./api-keys-section";
 import { FeedbackSection } from "./feedback-section";
 import { RepositoriesSection } from "./repositories-section";
+import { TeamsSection } from "./teams-section";
 import { TemplatesSection } from "./templates-section";
 import { WebhooksSection } from "./webhooks-section";
 
@@ -58,6 +59,10 @@ export function SettingsPage({
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				WorkspaceSection(data, params),
 				MembersSection(data, params.slug, copy),
+				TeamsSection(
+					params.slug,
+					data.bind((value) => value.workspace.role === "admin"),
+				),
 				LabelsSection(data, params),
 				TemplatesSection(params.slug),
 				RepositoriesSection(params),

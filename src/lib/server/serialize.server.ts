@@ -88,13 +88,15 @@ export function toTeam(row: TeamRow, issueCount: number): Team {
 		id: row.id,
 		name: row.name,
 		key: row.key,
+		icon: row.icon,
+		color: row.color,
 		issueCount,
 		createdAt: row.createdAt.toISOString(),
 	};
 }
 
-export function toTeamRef(row: Pick<TeamRow, "id" | "name" | "key">): TeamRef {
-	return { id: row.id, name: row.name, key: row.key };
+export function toTeamRef(row: Pick<TeamRow, "id" | "name" | "key" | "icon" | "color">): TeamRef {
+	return { id: row.id, name: row.name, key: row.key, icon: row.icon, color: row.color };
 }
 
 export function identifierFor(key: string, number: number): string {
@@ -104,7 +106,7 @@ export function identifierFor(key: string, number: number): string {
 export function toIssue(
 	row: IssueRow,
 	context: {
-		team: Pick<TeamRow, "id" | "name" | "key">;
+		team: Pick<TeamRow, "id" | "name" | "key" | "icon" | "color">;
 		assignee: UserRow | null;
 		creator: UserFields;
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;

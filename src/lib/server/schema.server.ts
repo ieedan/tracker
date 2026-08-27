@@ -108,6 +108,10 @@ export const team = sqliteTable(
 		name: text("name").notNull(),
 		/** Uppercase, unique within the workspace. */
 		key: text("key").notNull(),
+		/** Lucide icon name shown beside the team, or null for the default. */
+		icon: text("icon"),
+		/** Hex color behind the icon, or null for the default. */
+		color: text("color"),
 		createdAt: now(),
 	},
 	(table) => [
@@ -467,6 +471,29 @@ export const comment = sqliteTable(
 			.default(sql`(unixepoch() * 1000)`),
 	},
 	(table) => [index("comment_issue").on(table.issueId)],
+);
+
+/**
+ * A workspace member following an issue — they commented on it, were assigned,
+ * or subscribed by hand — so it shows up under My Issues → Subscribed.
+ * Members only, so it keys on userId where feedback_subscriber keys on email.
+ */
+export const issueSubscriber = sqliteTable(
+	"issue_subscriber",
+	{
+		id: text("id").primaryKey(),
+		issueId: text("issueId")
+			.notNull()
+			.references(() => issue.id, { onDelete: "cascade" }),
+		userId: text("userId")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: now(),
+	},
+	(table) => [
+		uniqueIndex("issue_subscriber_unique").on(table.issueId, table.userId),
+		index("issue_subscriber_user").on(table.userId),
+	],
 );
 
 /**

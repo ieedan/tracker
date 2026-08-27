@@ -1,6 +1,7 @@
 /**
- * The view tabs — Linear's Active / Backlog / All, in a row of their own
- * between the list header and the filter chips.
+ * The view tabs — Linear's Active / Backlog / All issues, in a row of their own
+ * between the list header and the filter chips, with the filter control out at
+ * the right end of the same row.
  *
  * They are links rather than buttons because the tab is URL state (see
  * `filters.ts`): the address bar is always something you can paste to someone,
@@ -12,7 +13,7 @@
  * lifted with the shell's `accent` chip — the same treatment the inbox gives
  * its All / Unread pair, so the two rows look like one idea.
  */
-import { A, Div, navigateTo, type Readable } from "@implementjs/core";
+import { A, Div, navigateTo, type Child, type Readable } from "@implementjs/core";
 import { buttonVariants } from "@/lib/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ISSUE_VIEW_LABELS, ISSUE_VIEWS, parseView, viewHref, type IssueView } from "./filters";
@@ -20,7 +21,12 @@ import { ISSUE_VIEW_LABELS, ISSUE_VIEWS, parseView, viewHref, type IssueView } f
 /** Where the list is: what the tabs read themselves out of and link back into. */
 export type ViewLocation = { path: string; search: string };
 
-export function ViewTabs({ url }: { url: Readable<ViewLocation> }) {
+/**
+ * The tab row. `actions` sits at the far right of it — Linear puts the filter
+ * control on this line rather than in the header above, where it would compete
+ * with the view's name.
+ */
+export function ViewTabs({ url, actions }: { url: Readable<ViewLocation>; actions?: Child }) {
 	// Derived from the URL rather than mirrored into a signal, exactly like the
 	// filters — so a reload, a shared link and the back button all agree.
 	const current = url.bind((location) => parseView(location.search));
@@ -32,6 +38,7 @@ export function ViewTabs({ url }: { url: Readable<ViewLocation> }) {
 			"aria-label": "Issue views",
 		},
 		...ISSUE_VIEWS.map((view) => ViewTab(view, url, current)),
+		actions === undefined ? null : Div({ class: "ml-auto flex items-center gap-1" }, actions),
 	);
 }
 
