@@ -49,6 +49,15 @@ export interface AgentPrincipal {
  * is exactly the pair a grant is keyed on. `null` means "not a usable token",
  * and the caller treats that as unauthenticated.
  *
+ * Permissions come from the grant, not the JWT's `scope` claim. A dynamically
+ * registered MCP client usually gets the registration default set stamped on
+ * the token — which deliberately omits opt-in scopes like webhooks — even when
+ * the authorize URL and the consent screen listed them and `grantAgentAccess`
+ * recorded them. Intersecting token ∩ grant then strips everything the person
+ * just approved (ENG-30). The grant is the human's decision and is what
+ * Settings revokes against, so it is the ACL; the JWT only proves the call is
+ * this install.
+ *
  * No workspace is resolved here, because a grant does not name one — which
  * workspace an agent may act in is decided per request, by `requireMembership`
  * checking that the approver is still a member of the one being asked for.
@@ -69,7 +78,6 @@ export async function resolveAgentToken(presented: string): Promise<AgentPrincip
 
 	const installedByUserId = typeof payload.sub === "string" ? payload.sub : null;
 	const clientId = typeof payload.client_id === "string" ? payload.client_id : null;
-	const scope = typeof payload.scope === "string" ? payload.scope : null;
 	if (installedByUserId === null || clientId === null) return null;
 
 	// The bot is joined on `user.harness`, which is what makes every install of
@@ -111,24 +119,6 @@ export async function resolveAgentToken(presented: string): Promise<AgentPrincip
 		grantId: row.grant.id,
 		installedByUserId: row.grant.installedByUserId,
 		clientId: row.grant.clientId,
-		// The token's own scopes intersected with the grant's, so narrowing a
-		// grant in Settings takes effect without waiting for tokens to expire.
-		permissions: intersect(
-			scopesToPermissions(scope),
-			scopesToPermissions(row.grant.scopes.join(" ")),
-		),
+		permissions: scopesToPermissions(row.grant.scopes.join(" ")),
 	};
-}
-
-function intersect(a: ApiKeyPermissions, b: ApiKeyPermissions): ApiKeyPermissions {
-	const result: ApiKeyPermissions = {};
-	for (const [resource, actions] of Object.entries(a) as [
-		keyof ApiKeyPermissions,
-		ApiKeyPermissions[keyof ApiKeyPermissions],
-	][]) {
-		const other = b[resource] ?? [];
-		const shared = (actions ?? []).filter((action) => other.includes(action));
-		if (shared.length > 0) result[resource] = shared;
-	}
-	return result;
 }
