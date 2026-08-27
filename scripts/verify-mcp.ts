@@ -766,31 +766,32 @@ section("plugin manifests");
 	const cursor = parse("plugin/.cursor-plugin/plugin.json");
 	const listing = (parse(".claude-plugin/marketplace.json").plugins as Record<string, never>[])[0];
 
-	// The endpoint each config resolves to, with its one variable filled in.
+	// Claude substitutes `${user_config.url}` at install; Cursor inlines the
+	// hosted URL so a fresh install does not depend on Plugins → Configure
+	// applying a schema default (which it does not — the placeholder was
+	// fetched literally and failed as `http://${tracker_url}`).
 	const claudeUrl = serverUrl("plugin/.mcp.json").replace("${user_config.url}", ORIGIN);
-	const cursorUrl = serverUrl("plugin/mcp.json").replace("${TRACKER_URL}", ORIGIN);
+	const cursorUrl = serverUrl("plugin/mcp.json");
 
 	check("Claude's config reaches the route", claudeUrl === `${ORIGIN}/api/mcp`, claudeUrl);
-	check("Cursor's config reaches the route", cursorUrl === `${ORIGIN}/api/mcp`, cursorUrl);
+	check("Cursor's config reaches the hosted route", cursorUrl === `${HOSTED}/api/mcp`, cursorUrl);
 	check(
 		"and the server keeps the name the manifests give it",
 		claude.name === "tracker" && cursor.name === "tracker",
 		{ claude: claude.name, cursor: cursor.name },
 	);
 	const claudeDefault = (claude.userConfig as Record<string, { default: string }>).url;
-	const cursorDefault = (cursor.variables as { properties: Record<string, { default: string }> })
-		.properties.TRACKER_URL;
 
 	check(
-		"the variable each config substitutes is the one its manifest declares",
-		claudeDefault !== undefined && cursorDefault !== undefined,
+		"Claude's variable is the one its config substitutes",
+		claudeDefault !== undefined && serverUrl("plugin/.mcp.json").includes("${user_config.url}"),
 	);
 	check(
-		"both default to the hosted instance",
+		"Claude defaults to the hosted instance",
 		// Not the dev server: the default is what most people install and never
 		// touch, and localhost would point them at nothing.
-		claudeDefault?.default === HOSTED && cursorDefault?.default === HOSTED,
-		{ claude: claudeDefault?.default, cursor: cursorDefault?.default },
+		claudeDefault?.default === HOSTED,
+		{ claude: claudeDefault?.default },
 	);
 	check(
 		"the marketplace listing points at the plugin",
@@ -806,10 +807,11 @@ section("plugin manifests");
 		"the bundled logo is still the app's mark",
 		markup("plugin/assets/logo.svg") === markup("static/favicon.svg"),
 	);
+	const pluginRoot = new URL("plugin/", ROOT);
 	check(
 		"and each manifest points at a logo that exists",
-		existsSync(new URL(String(claude.icon), new URL("plugin/", ROOT))) &&
-			existsSync(new URL(String(cursor.logo), ROOT)),
+		existsSync(new URL(String(claude.icon), pluginRoot)) &&
+			existsSync(new URL(String(cursor.logo), pluginRoot)),
 		{ claude: claude.icon, cursor: cursor.logo },
 	);
 }

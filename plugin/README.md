@@ -37,9 +37,12 @@ one, so most people never answer it. Point it at your own deployment, or at
 `http://localhost:5173` for a checkout running `pnpm dev`.
 
 Claude Code prompts for it at install and substitutes it as
-`${user_config.url}`; Cursor declares it as the `TRACKER_URL` variable. Nothing
-else is configurable, and no secret is stored — the OAuth flow holds the
-credential, not this manifest.
+`${user_config.url}`. Cursor ships the hosted URL inlined in `mcp.json` (plugin
+`${VAR}` defaults are not applied until someone opens **Plugins → Configure**,
+which left a fresh install fetching the literal `${TRACKER_URL}` and failing).
+For a self-hosted Cursor install, use the deeplink below or edit the URL by
+hand. Nothing else is configurable, and no secret is stored — the OAuth flow
+holds the credential, not this manifest.
 
 ## Install in Claude Code
 

@@ -8,18 +8,6 @@
 	"homepage": "https://github.com/ieedan/tracker/blob/main/plugin/README.md",
 	"repository": "https://github.com/ieedan/tracker",
 	"keywords": ["issue-tracker", "issues", "project-management", "feedback", "webhooks", "mcp"],
-	"logo": "plugin/assets/logo.svg",
-	"mcpServers": "./mcp.json",
-	"variables": {
-		"type": "object",
-		"properties": {
-			"TRACKER_URL": {
-				"type": "string",
-				"title": "tracker URL",
-				"description": "Origin of your tracker instance, with no trailing slash — the plugin appends /api/mcp. Defaults to the hosted one; point it at your own deployment, or at http://localhost:5173 for a local checkout.",
-				"default": "https://tracker.implementjs.dev"
-			}
-		},
-		"required": ["TRACKER_URL"]
-	}
+	"logo": "assets/logo.svg",
+	"mcpServers": "./mcp.json"
 }
