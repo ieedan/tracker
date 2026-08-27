@@ -451,8 +451,7 @@ Verify before trusting the body — over the raw bytes, not a re-serialised obje
 ```js
 const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
 const ok =
-	expected.length === signature.length &&
-	crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+	expected.length === signature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 ```
 
 The payload is `{ id, event, createdAt, workspace, actor, data }`. `data.issue`
