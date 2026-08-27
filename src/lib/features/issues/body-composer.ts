@@ -14,21 +14,25 @@
  * the click lands on the field itself: focus is the browser's, and the caret
  * goes where you pressed.
  *
- * The optional toolbar is the WYSIWYG the composer offers: buttons and
- * shortcuts that write the markdown into the source for you, and a Preview
- * tab that renders it through the same renderer every posted body goes
- * through. Deliberately not a rich-text editor — the body stays the text it
- * stores, and the mention overlay keeps lining up because the on-screen text
- * is still the raw characters.
+ * The markdown is styled where it is written rather than behind a Preview tab.
+ * A tab is two views of one field — write in one, check your work in the other
+ * — and everything that makes the box a box (the caret, the selection, the
+ * scroll position, the `@` menu) had to be carried across the switch and put
+ * back. lib/features/issues/markdown-decorations.ts draws the styling onto the
+ * text instead, as an overlay on the live textarea, so there is one view and
+ * nothing to hand over.
+ *
+ * The optional toolbar is the rest of the WYSIWYG: buttons and shortcuts that
+ * write the markdown into the source for you. Deliberately not a rich-text
+ * editor — the body stays the text it stores, and both overlays keep lining up
+ * because the on-screen text is still the raw characters.
  */
 import {
 	Div,
 	If,
-	ImplementDocument,
 	ImplementEffect,
 	ImplementLifecycle,
-	P,
-	Span,
+	ImplementWindow,
 	Textarea,
 	derived,
 	signal,
@@ -47,10 +51,10 @@ import {
 	Strikethrough,
 	TextQuote,
 } from "@implementjs/lucide";
-import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MentionMenu, MentionText, fileMentions, hasMention } from "./file-mentions";
+import { DecoratedText } from "./markdown-decorations";
 import {
 	cycleHeading,
 	insertLink,
@@ -63,14 +67,29 @@ import {
 } from "./markdown-commands";
 
 /**
+ * What the box and the layers drawn over it have to agree on: the size, the
+ * line height, and where a line breaks. A hair's difference in any of them and
+ * the two wrap in different places, which is the one way an overlay gives
+ * itself away.
+ */
+const TEXT_LAYOUT = "text-[13px] leading-normal break-words whitespace-pre-wrap";
+
+/**
  * How a body box looks, in one place.
  *
  * No border and no ring: the box is the text. Anything that paints an edge
  * around it while you type is the thing that made the issue page feel like a
  * different control from the composer.
  */
-export const bodyComposerClass =
-	"w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-normal outline-none placeholder:text-muted-foreground";
+export const bodyComposerClass = cn(
+	"w-full resize-none border-0 bg-transparent p-0 outline-none placeholder:text-muted-foreground",
+	// Transparent, not hidden: the box still holds the text, the selection and
+	// the caret — the overlay only paints it. `caret-foreground` is the half of
+	// that the colour would otherwise take with it, since a caret with no colour
+	// of its own is the colour of the text.
+	"text-transparent caret-foreground",
+	TEXT_LAYOUT,
+);
 
 export interface BodyComposerOptions {
 	/** The body being written. Two-way: typing writes straight back into it. */
@@ -88,7 +107,7 @@ export interface BodyComposerOptions {
 	 * underneath is still the textarea's, so the click is never intercepted.
 	 */
 	renderMentions?: boolean;
-	/** The formatting toolbar and the Write / Preview tabs. */
+	/** The formatting toolbar and its shortcuts. */
 	toolbar?: boolean;
 	autofocus?: boolean;
 	class?: string;
@@ -103,9 +122,8 @@ export interface BodyComposerOptions {
 
 export function BodyComposer(options: BodyComposerOptions) {
 	const element = options.element ?? signal<HTMLTextAreaElement | null>(null);
-	const root = signal<HTMLDivElement | null>(null);
+	const overlay = signal<HTMLDivElement | null>(null);
 	const focused = signal(false);
-	const previewing = signal(false);
 
 	const mentions = fileMentions({
 		value: options.value,
@@ -123,6 +141,27 @@ export function BodyComposer(options: BodyComposerOptions) {
 		node.style.height = `${node.scrollHeight}px`;
 	};
 
+	/**
+	 * Puts the decoration layer back over the text it decorates.
+	 *
+	 * Two things move it: a scrollbar, which takes width from the box's text but
+	 * not from an `inset-0` layer's, so the two would wrap a character apart
+	 * from each other; and scrolling, which the layer does not do on its own.
+	 */
+	const align = () => {
+		const node = element.get();
+		const layer = overlay.get();
+		if (node === null || layer === null) return;
+		layer.style.width = `${node.clientWidth}px`;
+		layer.scrollTop = node.scrollTop;
+	};
+
+	/** Everything the text having changed asks of the box. */
+	const sync = () => {
+		grow();
+		align();
+	};
+
 	const overlaid = derived(
 		[options.value, focused],
 		(text, active) => options.renderMentions === true && !active && hasMention(text),
@@ -135,7 +174,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 	 */
 	const apply = (command: (state: SelectionState) => SelectionState) => {
 		const node = element.get();
-		if (node === null || previewing.get()) return;
+		if (node === null) return;
 		const next = command({
 			value: options.value.get(),
 			start: node.selectionStart ?? 0,
@@ -148,44 +187,34 @@ export function BodyComposer(options: BodyComposerOptions) {
 		});
 	};
 
-	// Where the caret was when Preview was opened, so Write puts it back.
-	let held: [number, number] = [0, 0];
-
-	const write = () => {
-		if (!previewing.get()) return;
-		previewing.set(false);
-		queueMicrotask(() => {
-			const node = element.get();
-			if (node === null) return;
-			node.focus();
-			node.setSelectionRange(held[0], held[1]);
-		});
-	};
-
-	const preview = () => {
-		if (previewing.get()) return;
-		const node = element.get();
-		held = [node?.selectionStart ?? 0, node?.selectionEnd ?? 0];
-		// Set before the textarea hides, so the blur that hiding fires is
-		// recognisably ours and does not commit the caller's editor.
-		previewing.set(true);
-	};
-
 	return Div(
-		{ this: root, class: "flex flex-col" },
+		{ class: "flex flex-col" },
 
 		// Static, not `If`: whether a composer has a toolbar never changes
 		// while it is mounted.
-		options.toolbar === true ? ComposerToolbar({ previewing, apply, write, preview }) : null,
+		options.toolbar === true ? ComposerToolbar({ apply }) : null,
 
-		// Preview replaces the box but never unmounts it: the browser's undo
-		// history lives in the element, and this keeps it.
 		Div(
-			{ class: cn("relative", { hidden: previewing }) },
-			ImplementLifecycle({ onMount: () => grow() }),
+			{ class: "relative" },
+			ImplementLifecycle({ onMount: () => sync() }),
 			// Text arriving from anywhere but the keyboard — a draft restored, an
 			// edit made elsewhere — has to resize the box too.
-			ImplementEffect([options.value], () => grow(), { immediate: false }),
+			ImplementEffect([options.value], () => sync(), { immediate: false }),
+			// A narrower window rewraps the box; the layer has to rewrap with it.
+			ImplementWindow({ onResize: () => align() }),
+
+			// The markdown, drawn onto the text as it is typed. It steps aside for
+			// the mention overlay below, which draws the same text its own way.
+			Div(
+				{
+					this: overlay,
+					class: cn("pointer-events-none absolute inset-0 overflow-hidden", TEXT_LAYOUT, {
+						hidden: overlaid,
+					}),
+					"aria-hidden": true,
+				},
+				DecoratedText(options.value),
+			),
 
 			If(
 				overlaid,
@@ -194,8 +223,10 @@ export function BodyComposer(options: BodyComposerOptions) {
 						// Clicks fall through to the textarea, so the box is still one
 						// target — except on a link itself, which is the one thing here
 						// you would rather follow than put a caret in.
-						class:
-							"pointer-events-none absolute inset-0 text-[13px] leading-normal break-words whitespace-pre-wrap [&_a]:pointer-events-auto",
+						class: cn(
+							"pointer-events-none absolute inset-0 [&_a]:pointer-events-auto",
+							TEXT_LAYOUT,
+						),
 						"aria-hidden": true,
 					},
 					MentionText(options.value),
@@ -208,21 +239,19 @@ export function BodyComposer(options: BodyComposerOptions) {
 				placeholder: options.placeholder,
 				rows: options.rows,
 				autofocus: options.autofocus,
-				// Hidden rather than unmounted while the links are drawn over it: the
-				// textarea has to keep the click, and the caret has to land in the
-				// text it is measuring against.
-				class: cn(bodyComposerClass, { "text-transparent": overlaid }, options.class),
+				class: cn(bodyComposerClass, options.class),
 				onInput: (event) => {
 					mentions.onInput(event);
-					grow();
+					sync();
 				},
+				// The layer does not scroll itself: it is drawn over a box that does.
+				onScroll: () => align(),
 				onFocus: () => focused.set(true),
 				onBlur: () => {
 					focused.set(false);
 					// Picking from the menu blurs the box, and a caller that commits on
-					// blur would close the editor out from under the insertion. Opening
-					// the preview hides the box, which blurs it the same way.
-					if (mentions.open.get() || previewing.get()) return;
+					// blur would close the editor out from under the insertion.
+					if (mentions.open.get()) return;
 					options.onBlur?.();
 				},
 				onKeydown: (event) => {
@@ -253,27 +282,6 @@ export function BodyComposer(options: BodyComposerOptions) {
 
 			MentionMenu(mentions),
 		),
-
-		If(
-			previewing,
-			Div(
-				{},
-				// A click anywhere else is the same "I am done here" that blur is
-				// for the box — without this, a preview left open would swallow the
-				// commit a caller expects on the way out.
-				ImplementDocument({
-					onMousedown: (event) => {
-						const container = root.get();
-						if (container === null || container.contains(event.target as Node)) return;
-						previewing.set(false);
-						options.onBlur?.();
-					},
-				}),
-				If(options.value.bind((text) => text.trim() !== ""))
-					.Then(Markdown(options.value))
-					.Else(P({ class: "text-[13px] text-muted-foreground" }, "Nothing to preview")),
-			),
-		),
 	);
 }
 
@@ -286,41 +294,17 @@ const SHORTCUTS: Record<string, (state: SelectionState) => SelectionState> = {
 };
 
 /**
- * Write / Preview on the left, formatting on the right — the shape every
- * markdown box since GitHub's has taught.
+ * The formatting row above the box.
  *
  * Every control acts on `mousedown` and prevents the default, so the textarea
- * never loses focus (or, for the tabs, loses it only to the preview): the
- * selection a button formats is the one that was visible when it was pressed.
+ * never loses focus: the selection a button formats is the one that was
+ * visible when it was pressed.
  */
 function ComposerToolbar({
-	previewing,
 	apply,
-	write,
-	preview,
 }: {
-	previewing: Signal<boolean>;
 	apply: (command: (state: SelectionState) => SelectionState) => void;
-	write: () => void;
-	preview: () => void;
 }) {
-	const tab = (label: string, active: (value: boolean) => boolean, activate: () => void) =>
-		Button(
-			{
-				variant: "ghost",
-				size: "xs",
-				type: "button",
-				class: cn("h-6 px-2 text-[12px] font-normal text-muted-foreground", {
-					"bg-secondary text-foreground": previewing.bind(active),
-				}),
-				onMousedown: (event) => {
-					event.preventDefault();
-					activate();
-				},
-			},
-			label,
-		);
-
 	const tool = (
 		icon: (props: { class?: string }) => Child,
 		label: string,
@@ -336,7 +320,6 @@ function ComposerToolbar({
 				// Reachable through the shortcuts and the box itself; tabbing
 				// through ten buttons on the way out of a comment is not a path.
 				tabIndex: -1,
-				disabled: previewing,
 				class: "text-muted-foreground hover:text-foreground",
 				onMousedown: (event) => {
 					event.preventDefault();
@@ -348,9 +331,6 @@ function ComposerToolbar({
 
 	return Div(
 		{ class: "mb-2 flex flex-wrap items-center gap-0.5 border-b border-border pb-1.5" },
-		tab("Write", (value) => !value, write),
-		tab("Preview", (value) => value, preview),
-		Span({ class: "flex-1" }),
 		tool(Bold, "Bold (⌘B)", (state) => toggleWrap(state, "**")),
 		tool(Italic, "Italic (⌘I)", (state) => toggleWrap(state, "*")),
 		tool(Strikethrough, "Strikethrough", (state) => toggleWrap(state, "~~")),
