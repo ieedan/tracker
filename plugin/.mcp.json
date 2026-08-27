@@ -2,7 +2,7 @@
 	"mcpServers": {
 		"tracker": {
 			"type": "http",
-			"url": "${user_config.url}/api/mcp"
+			"url": "https://tracker.implementjs.dev/api/mcp"
 		}
 	}
 }

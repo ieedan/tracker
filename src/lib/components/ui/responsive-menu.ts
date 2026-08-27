@@ -12,8 +12,8 @@
  * The rows are described as data rather than built as nodes because the two
  * shapes draw them differently — a menu row carries `menuitemradio` semantics,
  * a hotkey hint and the type-to-filter the dropdown gets for free, while a
- * drawer row is a 44px button with a tick. Describing an option once is what
- * keeps the two shapes one list.
+ * drawer row is a 44px button with a tick — or, where several can be picked, a
+ * checkbox. Describing an option once is what keeps the two shapes one list.
  *
  * @see responsive-dialog.ts, which does the same for a modal and lends this its
  * breakpoint.
@@ -244,8 +244,29 @@ function MenuDropdown(options: ResponsiveMenuOptions, open: Signal<boolean>): Mo
  * bar's — keeps the keyboard down by hand.
  */
 function MenuDrawer(options: ResponsiveMenuOptions, open: Signal<boolean>): Mountable {
+	// Multi-select rows carry the same checkbox the dropdown draws, and a
+	// checkbox writes rather than reports — so the ticked set has to be a signal
+	// of this shape's own. What the boxes write is diffed back out as `onSelect`
+	// calls, exactly as `DropdownMenuCheckboxGroup` does it upstream: the caller
+	// still owns the list, and hands out only what is currently selected.
+	const checked = signal(options.selected.get());
+	const syncing: Child[] =
+		options.multiple === true
+			? [
+					ImplementEffect([options.selected], (values) => checked.set(values)),
+					// Settled writes only: the effect above is what feeds the boxes, and
+					// diffing it back out would only re-announce what the caller just said.
+					ImplementEffect(
+						[checked],
+						(values) => applyIdDiff(options.selected.get(), values, options.onSelect),
+						{ immediate: false },
+					),
+				]
+			: [];
+
 	return Div(
 		{ class: "contents" },
+		...syncing,
 		Button(
 			{
 				type: "button",
@@ -275,7 +296,7 @@ function MenuDrawer(options: ResponsiveMenuOptions, open: Signal<boolean>): Moun
 					ForEach(
 						options.options,
 						(option) => option.value,
-						(option) => DrawerRow(options, option, open),
+						(option) => DrawerRow(options, option, open, checked),
 					),
 				),
 			),
@@ -283,28 +304,41 @@ function MenuDrawer(options: ResponsiveMenuOptions, open: Signal<boolean>): Moun
 	);
 }
 
+/**
+ * @param ticked The multi-select drawer's own copy of the checked set, which
+ * the row's checkbox writes into. Ignored by a single-select row.
+ */
 function DrawerRow(
 	menu: ResponsiveMenuOptions,
 	option: Readable<MenuOption>,
 	open: Signal<boolean>,
+	ticked: Signal<string[]>,
 ): Mountable {
 	const value = option.get().value;
+	const multiple = menu.multiple === true;
 	const checked = menu.selected.bind((values) => values.includes(value));
 
 	return Button(
 		{
 			type: "button",
 			variant: "ghost",
-			role: menu.multiple === true ? "menuitemcheckbox" : "menuitemradio",
+			role: multiple ? "menuitemcheckbox" : "menuitemradio",
 			"aria-checked": checked,
 			class: "h-11 w-full justify-start gap-2.5 px-3 text-[14px] font-normal",
 			onClick: () => {
 				menu.onSelect(value);
-				// Picking one is the whole errand; toggling labels is not, so a
-				// multi-select drawer stays up for the next tap.
-				if (menu.multiple !== true) open.set(false);
+				// ENG-71: the row is one pick and you are done — the same bargain the
+				// dropdown makes, where the box is what ticks several without
+				// dismissing and the rest of the row goes through and closes. A
+				// multi-select drawer that stayed up for every tap left no way at all
+				// to say "that one, thanks" but the scrim.
+				open.set(false);
 			},
 		},
+		// The tick belongs in front on a multi-select, as a box that can be hit on
+		// its own: a trailing check reads as decoration, and a drawer has no
+		// highlighted row to reveal one that is only drawn when checked.
+		multiple ? MenuCheckbox(ticked, value, "size-[18px] opacity-100") : null,
 		option.get().icon?.() ?? null,
 		Span(
 			{
@@ -315,6 +349,6 @@ function DrawerRow(
 			option.bind("label"),
 		),
 		Hint(option),
-		If(checked, Check({ class: "size-4 shrink-0 text-primary" })),
+		multiple ? null : If(checked, Check({ class: "size-4 shrink-0 text-primary" })),
 	);
 }

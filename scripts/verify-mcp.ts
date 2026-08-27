@@ -766,32 +766,29 @@ section("plugin manifests");
 	const cursor = parse("plugin/.cursor-plugin/plugin.json");
 	const listing = (parse(".claude-plugin/marketplace.json").plugins as Record<string, never>[])[0];
 
-	// Claude substitutes `${user_config.url}` at install; Cursor inlines the
-	// hosted URL so a fresh install does not depend on Plugins → Configure
-	// applying a schema default (which it does not — the placeholder was
-	// fetched literally and failed as `http://${tracker_url}`).
-	const claudeUrl = serverUrl("plugin/.mcp.json").replace("${user_config.url}", ORIGIN);
+	// Both manifests inline the hosted URL rather than a placeholder. Neither
+	// client reliably applies a schema default: Cursor fetched `${TRACKER_URL}`
+	// literally and failed the connection, and a Claude install that never
+	// prompted left `${user_config.url}` unsubstituted. Self-hosters edit the URL.
+	const claudeUrl = serverUrl("plugin/.mcp.json");
 	const cursorUrl = serverUrl("plugin/mcp.json");
 
-	check("Claude's config reaches the route", claudeUrl === `${ORIGIN}/api/mcp`, claudeUrl);
+	check("Claude's config reaches the hosted route", claudeUrl === `${HOSTED}/api/mcp`, claudeUrl);
 	check("Cursor's config reaches the hosted route", cursorUrl === `${HOSTED}/api/mcp`, cursorUrl);
 	check(
 		"and the server keeps the name the manifests give it",
 		claude.name === "tracker" && cursor.name === "tracker",
 		{ claude: claude.name, cursor: cursor.name },
 	);
-	const claudeDefault = (claude.userConfig as Record<string, { default: string }>).url;
-
 	check(
-		"Claude's variable is the one its config substitutes",
-		claudeDefault !== undefined && serverUrl("plugin/.mcp.json").includes("${user_config.url}"),
+		"neither is left holding an unsubstituted placeholder",
+		!`${claudeUrl}${cursorUrl}`.includes("${"),
+		{ claude: claudeUrl, cursor: cursorUrl },
 	);
 	check(
-		"Claude defaults to the hosted instance",
-		// Not the dev server: the default is what most people install and never
-		// touch, and localhost would point them at nothing.
-		claudeDefault?.default === HOSTED,
-		{ claude: claudeDefault?.default },
+		"nor declares a setting nothing reads",
+		claude.userConfig === undefined && cursor.variables === undefined,
+		{ claude: claude.userConfig, cursor: cursor.variables },
 	);
 	check(
 		"the marketplace listing points at the plugin",

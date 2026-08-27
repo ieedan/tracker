@@ -68,6 +68,7 @@ import {
 	TeamPicker,
 	WorkspacePicker,
 } from "./pickers";
+import { cacheTeams, cachedTeams, warmTeams } from "./team-cache";
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
 import { BodyComposer } from "./body-composer";
 import { cn } from "@/lib/utils";
@@ -218,6 +219,8 @@ export function CreateIssueDialog(
 	const assigneeOpen = signal(false);
 	const repositoryOpen = signal(false);
 	const labelOpen = signal(false);
+	/** Watched only to warm the teams of the workspaces on the list (ENG-71). */
+	const workspaceOpen = signal(false);
 
 	const openMenu = (which: "status" | "priority" | "assignee" | "repository" | "label") => {
 		statusOpen.set(which === "status");
@@ -417,7 +420,11 @@ export function CreateIssueDialog(
 			// dialog came to sit on a blank "Team" pill. The shell already loaded
 			// this workspace's teams, so open on those and let the response reconcile
 			// them (issue counts move, a team may have been added since).
-			const seededTeams = knownTeamsFor(workspaceSlug);
+			const shellTeams = knownTeamsFor(workspaceSlug);
+			if (shellTeams.length > 0) cacheTeams(workspaceSlug, shellTeams);
+			// Opened from somewhere the shell knows nothing about — a workspace the
+			// crumb visited earlier this session still has its teams (ENG-71).
+			const seededTeams = shellTeams.length > 0 ? shellTeams : cachedTeams(workspaceSlug);
 			let seededKey: string | null = null;
 			if (seededTeams.length > 0) {
 				teams.set(seededTeams);
@@ -492,6 +499,7 @@ export function CreateIssueDialog(
 
 			if (teamResult.error !== undefined) return;
 			teams.set(teamResult.data);
+			cacheTeams(workspaceSlug, teamResult.data);
 
 			// Swap the seeded team for its freshly fetched self — the same answer
 			// whenever the seed was current, and the right one when it was not —
@@ -517,6 +525,27 @@ export function CreateIssueDialog(
 	 */
 	const loadWorkspaceScope = async (workspaceSlug: string) => {
 		const ticket = ++scopeTicket;
+
+		// ENG-71: the team pill is the one field a switch cannot leave empty — no
+		// team, no identifier, and the Create button is disabled until one lands.
+		// The teams for this workspace are usually already known (the crumb has
+		// been here before, or opening its menu warmed them), so the pick shows a
+		// filled-in composer straight away and the fetch below only reconciles it.
+		const seededTeams = cachedTeams(workspaceSlug);
+		const wantedTeam = workspaceSlug === slug.get() ? preferredTeam.get() : "";
+		let seededKey: string | null = null;
+		if (seededTeams.length > 0) {
+			teams.set(seededTeams);
+			const seed = teamRefFor(seededTeams, wantedTeam);
+			seededKey = seed?.key ?? null;
+			chosenTeam.set(seed);
+		} else {
+			// Nothing to file to until this workspace's teams arrive; the create
+			// button stays disabled through the gap.
+			teams.set([]);
+			chosenTeam.set(null);
+		}
+
 		const [memberResult, labelResult, teamResult, repoResult] = await Promise.all([
 			api.GET("/api/v1/workspaces/[slug]/members", { params: { slug: workspaceSlug } }),
 			api.GET("/api/v1/workspaces/[slug]/labels", { params: { slug: workspaceSlug } }),
@@ -536,8 +565,16 @@ export function CreateIssueDialog(
 		}
 		if (teamResult.error === undefined) {
 			teams.set(teamResult.data);
+			cacheTeams(workspaceSlug, teamResult.data);
+			// Swap the seeded team for its freshly fetched self, without undoing a
+			// pick made while these requests were in flight — the seed is what made
+			// the picker usable that early, so a pick off it is reachable now.
+			const held = chosenTeam.get();
 			chosenTeam.set(
-				teamRefFor(teamResult.data, workspaceSlug === slug.get() ? preferredTeam.get() : ""),
+				teamRefFor(
+					teamResult.data,
+					held !== null && seededKey !== null && held.key !== seededKey ? held.key : wantedTeam,
+				),
 			);
 		}
 	};
@@ -566,9 +603,8 @@ export function CreateIssueDialog(
 		chosenRepository.set(null);
 		attachments.set([]);
 		uploads.set([]);
-		// Nothing to file to until the new workspace's teams arrive; the create
-		// button stays disabled through the gap.
-		chosenTeam.set(null);
+		// The team comes from the scope load, which seeds it from what is already
+		// known about the new workspace before it fetches anything (ENG-71).
 		void loadWorkspaceScope(next.slug);
 	};
 
@@ -714,6 +750,15 @@ export function CreateIssueDialog(
 				}
 				flushPersist();
 			}),
+			// ENG-71: opening the crumb is the first sign a switch is coming, and it
+			// is a good half-second ahead of the pick. Every workspace on the list
+			// gets its teams fetched now — one small request each, skipped for the
+			// ones already known — so the pick lands on a composer that is filled
+			// in rather than one waiting on a round trip.
+			ImplementEffect([workspaceOpen], (isOpen) => {
+				if (!isOpen) return;
+				for (const workspace of workspaces.get()) void warmTeams(workspace.slug);
+			}),
 			ImplementEffect(
 				[
 					title,
@@ -793,7 +838,9 @@ export function CreateIssueDialog(
 							BreadcrumbItem(
 								// ENG-58: file into any workspace you belong to, defaulting
 								// to the one the composer opened from.
-								WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace),
+								WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, {
+									open: workspaceOpen,
+								}),
 							),
 							BreadcrumbSeparator(),
 							BreadcrumbItem(

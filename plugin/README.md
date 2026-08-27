@@ -29,20 +29,23 @@ The tools cover issues (`list_issues`, `get_issue`, `create_issue`,
 `test_webhook`, `list_webhook_deliveries`, …). The webhook tools need
 `webhooks:write`, which is grantable but never handed out by default.
 
-## The one setting
+## The endpoint
 
-**tracker URL** — the origin of your instance, no trailing slash. The plugin
-appends `/api/mcp`. It defaults to `https://tracker.implementjs.dev`, the hosted
-one, so most people never answer it. Point it at your own deployment, or at
-`http://localhost:5173` for a checkout running `pnpm dev`.
+**tracker URL** — both manifests ship the hosted instance inlined:
+`https://tracker.implementjs.dev/api/mcp`. There is nothing to answer at
+install.
 
-Claude Code prompts for it at install and substitutes it as
-`${user_config.url}`. Cursor ships the hosted URL inlined in `mcp.json` (plugin
-`${VAR}` defaults are not applied until someone opens **Plugins → Configure**,
-which left a fresh install fetching the literal `${TRACKER_URL}` and failing).
-For a self-hosted Cursor install, use the deeplink below or edit the URL by
-hand. Nothing else is configurable, and no secret is stored — the OAuth flow
-holds the credential, not this manifest.
+It is written out rather than substituted from a setting because neither client
+applies a manifest default reliably. Cursor does not apply `${VAR}` defaults
+until someone opens **Plugins → Configure**, which left a fresh install fetching
+the literal `${TRACKER_URL}` and failing with `fetch failed`; a Claude Code
+install that never prompted left `${user_config.url}` unresolved the same way.
+
+For a self-hosted deployment, or a checkout running `pnpm dev` on
+`http://localhost:5173`, edit the URL in `.mcp.json` (Claude Code) and
+`mcp.json` (Cursor) and reinstall. `pnpm verify:mcp` asserts the two agree and
+that neither is left holding a placeholder. Nothing else is configurable, and no
+secret is stored — the OAuth flow holds the credential, not this manifest.
 
 ## Install in Claude Code
 
