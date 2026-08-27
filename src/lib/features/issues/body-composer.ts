@@ -274,6 +274,18 @@ export function BodyComposer(options: BodyComposerOptions) {
 					}
 					if (event.key === "Escape") {
 						options.onEscape?.();
+						// Escape is the one edit that arrives from outside while the
+						// caret is still in here — a caller putting the stored body back
+						// where an abandoned draft was. The effect below leaves a
+						// focused box alone, which is right for a body that changed
+						// somewhere else and wrong for this: without the redraw the
+						// words that were just taken back are still on screen.
+						const node = host.get();
+						const reverted = options.value.get();
+						if (node !== null && reverted !== drawn) {
+							drawn = reverted;
+							paint(node, reverted);
+						}
 						return;
 					}
 					if (event.key === "Enter") {
