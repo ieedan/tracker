@@ -6,7 +6,7 @@
  * its own click so the row never sees it. Checking from here leaves the menu
  * open; clicking the rest of the row goes through the item and closes.
  */
-import { type Signal } from "@implementjs/core";
+import { type ClassValue, type Signal } from "@implementjs/core";
 import { Checkbox, type CheckboxProps } from "@/lib/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +33,11 @@ export function applyIdDiff(
 	}
 }
 
-export function MenuCheckbox(selected: Signal<string[]>, value: string) {
+/**
+ * @param className Overrides for the shapes that do not have a highlighted row
+ * to reveal the box — a drawer, where every box is drawn from the start.
+ */
+export function MenuCheckbox(selected: Signal<string[]>, value: string, className?: ClassValue) {
 	return Checkbox({
 		decorative: true,
 		"aria-hidden": true,
@@ -43,6 +47,7 @@ export function MenuCheckbox(selected: Signal<string[]>, value: string) {
 			"transition-opacity opacity-0 data-[state=checked]:opacity-100",
 			"group-data-highlighted/menu-item:opacity-100",
 			"group-data-selected/command-item:opacity-100",
+			className,
 		),
 	} as CheckboxProps);
 }
