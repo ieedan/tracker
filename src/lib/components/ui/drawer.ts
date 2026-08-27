@@ -12,10 +12,12 @@ import {
 	DrawerPortal as DrawerPortalPrimitive,
 	DrawerTitle as DrawerTitlePrimitive,
 	DrawerTrigger as DrawerTriggerPrimitive,
+	mergeProps,
 	type DrawerDirection,
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
 import { TabOrder } from "./tab-order";
+import { swallowTapThrough } from "./tap-through";
 import { cn } from "@/lib/utils";
 
 /**
@@ -92,22 +94,27 @@ export const DrawerOverlay = createComponent(function DrawerOverlay(
 	...children: Child[]
 ) {
 	return DrawerOverlayPrimitive(
-		{
-			...props,
-			"data-slot": "drawer-overlay",
-			class: cn(
-				"fixed inset-0 z-[calc(50+var(--ip-nested-level,0))] bg-black/50",
-				"[opacity:var(--ip-drawer-fade,1)]",
-				`transition-[opacity,display] ${EASE} transition-discrete`,
-				"data-[state=open]:block",
-				"data-[state=closed]:pointer-events-none data-[state=closed]:hidden data-[state=closed]:opacity-0",
-				"starting:data-[state=open]:opacity-0",
-				// the panel is following a finger; the scrim has to keep up frame for frame
-				"data-[dragging]:transition-none",
-				"data-[nested]:bg-transparent",
-				className,
-			),
-		},
+		// A tap on the scrim dismisses the drawer, and must not also click the
+		// page the drawer was covering. See `swallowTapThrough` (ENG-69).
+		mergeProps(
+			{ onPointerdown: swallowTapThrough },
+			{
+				...props,
+				"data-slot": "drawer-overlay",
+				class: cn(
+					"fixed inset-0 z-[calc(50+var(--ip-nested-level,0))] bg-black/50",
+					"[opacity:var(--ip-drawer-fade,1)]",
+					`transition-[opacity,display] ${EASE} transition-discrete`,
+					"data-[state=open]:block",
+					"data-[state=closed]:pointer-events-none data-[state=closed]:hidden data-[state=closed]:opacity-0",
+					"starting:data-[state=open]:opacity-0",
+					// the panel is following a finger; the scrim has to keep up frame for frame
+					"data-[dragging]:transition-none",
+					"data-[nested]:bg-transparent",
+					className,
+				),
+			},
+		),
 		...children,
 	);
 });
