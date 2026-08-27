@@ -315,29 +315,46 @@ async function issuesForMentions(workspaceId: string, mentions: IssueMention[]):
 // --- moving the issue -------------------------------------------------------
 
 /**
- * Where a pull request's state should leave an issue, or null to leave it be.
+ * Where a pull request changing should leave an issue, or null to leave it be.
  *
  * Only ever forwards, and never out of a terminal state: somebody moving an
  * issue to Canceled has made a decision, and a reopened pull request is not an
  * argument against it. Merging only finishes an issue the pull request claimed —
  * named in its title or branch, closed by keyword, or linked by hand — which is
  * GitHub's own rule that a bare mention references rather than closes.
+ *
+ * "Forward" is measured against `STATUS_ORDER` rather than a single hardcoded
+ * status, because there are now two stops along the way — In Progress and In
+ * Review — and an issue already past one must not be dragged back to it by an
+ * event that only means "this pull request is still open".
  */
-function nextStatus(
-	state: RemotePullRequestEvent["pull"]["state"],
-	target: Target,
-): IssueStatus | null {
+function nextStatus(event: RemotePullRequestEvent, target: Target): IssueStatus | null {
 	const current = target.row.status;
 	if (current === "done" || current === "canceled" || current === "duplicate") return null;
 
+	const state = event.pull.state;
 	if (state === "merged") return target.closes ? "done" : null;
 	// Closed without merging says the attempt was abandoned, not that the issue
 	// was — whoever owns it decides that.
 	if (state === "closed") return null;
 
-	// An open pull request means work has started, so anything not yet at "in
-	// progress" catches up to it — but never backward out of a status like In
-	// Review that a person has already moved the issue past.
+	// Sent back to draft says review is paused, not that the work before it was
+	// undone — so only the one step back, and only when review was in fact where
+	// it stood.
+	if (event.action === "converted_to_draft") {
+		return current === "in_review" ? "in_progress" : null;
+	}
+
+	// Marked ready for review is the one signal that means "review this", so it
+	// is the only thing that ever advances an issue to In Review.
+	if (event.action === "ready_for_review") {
+		return STATUS_ORDER[current] < STATUS_ORDER.in_review ? "in_review" : null;
+	}
+
+	// Anything else on a live pull request (opened, reopened, edited) means work
+	// has started, so anything not yet at "in progress" catches up to it — but
+	// never backward out of a status like In Review that a person, or the
+	// ready-for-review automation above, already moved the issue past.
 	return STATUS_ORDER[current] < STATUS_ORDER.in_progress ? "in_progress" : null;
 }
 
@@ -348,7 +365,7 @@ async function moveIssue(
 	target: Target,
 	event: RemotePullRequestEvent,
 ): Promise<void> {
-	const status = nextStatus(event.pull.state, target);
+	const status = nextStatus(event, target);
 	if (status === null) return;
 
 	const identifier = identifierFor(target.key, target.row.number);
