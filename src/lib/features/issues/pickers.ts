@@ -357,7 +357,9 @@ export function WorkspacePicker(
 	current: Readable<Workspace | null>,
 	workspaces: Readable<Workspace[]>,
 	onPick: (slug: string) => void,
-	options: { class?: string } = {},
+	/** `open` is a read as much as a control: the composer warms what a switch
+	 * will need the moment the menu comes up (ENG-71). */
+	options: { class?: string; open?: Signal<boolean> } = {},
 ) {
 	// Fresh nodes per call — the crumb face is rendered in both branches.
 	const face = () =>
@@ -376,6 +378,7 @@ export function WorkspacePicker(
 		ResponsiveMenu({
 			heading: "Workspace",
 			search: "File in workspace…",
+			open: options.open,
 			options: derived([workspaces], (list) =>
 				list.map((workspace): MenuOption => ({
 					value: workspace.slug,
