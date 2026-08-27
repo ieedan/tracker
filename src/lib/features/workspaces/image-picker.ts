@@ -162,10 +162,9 @@ export function ImagePicker(options: {
 					// is uploaded, so the picker should show it rather than imply
 					// there is nothing there.
 					options.placeholder ??
-						Dynamic([options.seed ?? options.fallback, options.fallback], (seed, name) =>
+						Dynamic([options.seed ?? options.fallback], (seed) =>
 							GeneratedWorkspaceAvatar({
 								seed,
-								name,
 								class: "size-full rounded-none text-lg",
 							}),
 						),
