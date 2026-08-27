@@ -9,3 +9,4 @@ local.db
 local.db-*
 .vercel
 .implement
+.agents/scheduled_tasks.lock
