@@ -1,29 +1,23 @@
-// The four dropdowns that edit an issue in place — status, priority, assignee
+// The four pickers that edit an issue in place — status, priority, assignee
 // and labels. The list rows and the detail page share them, which is what keeps
 // "click the status glyph and pick a new one" identical in both places.
+//
+// Each one is a `ResponsiveMenu`: a dropdown anchored to the pill on a pointer,
+// and a drawer from the bottom edge on a phone (ENG-67). The rows are the same
+// list either way — see responsive-menu.ts.
 import {
 	Dynamic,
 	ForEach,
 	Fragment,
 	If,
-	ImplementEffect,
 	Span,
+	derived,
 	signal,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
 import { ChevronDownIcon, Tag, Users } from "@implementjs/lucide";
-import { MenuCheckbox, applyIdDiff } from "@/lib/components/ui/menu-checkbox";
-import {
-	DropdownMenu,
-	DropdownMenuCheckboxGroup,
-	DropdownMenuCheckboxItem,
-	DropdownMenuContent,
-	DropdownMenuGroupHeading,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/lib/components/ui/dropdown-menu";
+import { ResponsiveMenu, type MenuOption } from "@/lib/components/ui/responsive-menu";
 import {
 	CHIP_GLYPH,
 	PriorityIcon,
@@ -58,24 +52,38 @@ type PickerOptions = {
 	select?: boolean;
 };
 
-/**
- * Radio/checkbox groups want a writable Signal. Callers often only have a
- * Readable of the issue, so this is a live view that follows it — the same
- * shape Settings uses to keep a local list in sync with loaded data.
- */
-function followRadio<T>(
-	source: Readable<T>,
-	pick: (value: T) => string | null,
-): Signal<string | null> {
-	return signal<string | null>(pick(source.get()));
+/** One value, as the menu wants it: a list of the ids currently ticked. */
+function only(value: Readable<string>): Readable<string[]> {
+	return derived([value], (picked) => [picked]);
 }
 
-function syncRadio<T>(
-	source: Readable<T>,
-	value: Signal<string | null>,
-	pick: (value: T) => string | null,
-) {
-	return ImplementEffect([source], (next) => value.set(pick(next)));
+/**
+ * The two property lists that are the same on every issue. Built once, at the
+ * module level: the rows are constants and the icon factories are pure, so
+ * there is nothing per-picker about them.
+ */
+const STATUS_OPTIONS: Readable<MenuOption[]> = signal(
+	ISSUE_STATUSES.map((status): MenuOption => ({
+		value: status,
+		label: STATUS_LABELS[status],
+		icon: () => StatusIcon(status),
+	})),
+);
+
+const PRIORITY_OPTIONS: Readable<MenuOption[]> = signal(
+	ISSUE_PRIORITIES.map((priority): MenuOption => ({
+		value: priority,
+		label: PRIORITY_LABELS[priority],
+		icon: () => PriorityIcon(priority),
+	})),
+);
+
+/** The label swatch, which is the same dot on a row as it is on a chip. */
+function LabelDot(color: string, size = "size-2.5") {
+	return Span({
+		class: cn(size, "shrink-0 rounded-full"),
+		style: { backgroundColor: color },
+	});
 }
 
 export function StatusPicker(
@@ -83,46 +91,25 @@ export function StatusPicker(
 	onPick: (status: IssueStatus) => void,
 	options: PickerOptions = {},
 ) {
-	const value = followRadio(current, (status) => status);
-
-	return DropdownMenu(
-		{ open: options.open },
-		syncRadio(current, value, (status) => status),
-		DropdownMenuTrigger(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: cn(triggerClass, options.class),
-				title: "Status (S)",
-			},
-			StatusIcon(current),
-			options.showLabel === true
-				? Span(
-						{},
-						current.bind((status) => STATUS_LABELS[status]),
-					)
-				: null,
-		),
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: "Change status…", hotkeys: true },
-			DropdownMenuRadioGroup(
-				{
-					value,
-					onValueChange: (status) => {
-						if (typeof status === "string") onPick(status as IssueStatus);
-					},
-				},
-				DropdownMenuGroupHeading("Status"),
-				...ISSUE_STATUSES.map((status) =>
-					DropdownMenuRadioItem(
-						{ value: status },
-						StatusIcon(status),
-						Span({ class: "flex-1" }, STATUS_LABELS[status]),
-					),
-				),
+	return ResponsiveMenu({
+		heading: "Status",
+		search: "Change status…",
+		open: options.open,
+		options: STATUS_OPTIONS,
+		selected: only(current),
+		onSelect: (status) => onPick(status as IssueStatus),
+		trigger: { class: cn(triggerClass, options.class), title: "Status (S)" },
+		face: () =>
+			Fragment(
+				StatusIcon(current),
+				options.showLabel === true
+					? Span(
+							{},
+							current.bind((status) => STATUS_LABELS[status]),
+						)
+					: null,
 			),
-		),
-	);
+	});
 }
 
 export function PriorityPicker(
@@ -130,46 +117,25 @@ export function PriorityPicker(
 	onPick: (priority: IssuePriority) => void,
 	options: PickerOptions = {},
 ) {
-	const value = followRadio(current, (priority) => priority);
-
-	return DropdownMenu(
-		{ open: options.open },
-		syncRadio(current, value, (priority) => priority),
-		DropdownMenuTrigger(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: cn(triggerClass, options.class),
-				title: "Priority (P)",
-			},
-			PriorityIcon(current),
-			options.showLabel === true
-				? Span(
-						{},
-						current.bind((priority) => PRIORITY_LABELS[priority]),
-					)
-				: null,
-		),
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: "Set priority…", hotkeys: true },
-			DropdownMenuRadioGroup(
-				{
-					value,
-					onValueChange: (priority) => {
-						if (typeof priority === "string") onPick(priority as IssuePriority);
-					},
-				},
-				DropdownMenuGroupHeading("Priority"),
-				...ISSUE_PRIORITIES.map((priority) =>
-					DropdownMenuRadioItem(
-						{ value: priority },
-						PriorityIcon(priority),
-						Span({ class: "flex-1" }, PRIORITY_LABELS[priority]),
-					),
-				),
+	return ResponsiveMenu({
+		heading: "Priority",
+		search: "Set priority…",
+		open: options.open,
+		options: PRIORITY_OPTIONS,
+		selected: only(current),
+		onSelect: (priority) => onPick(priority as IssuePriority),
+		trigger: { class: cn(triggerClass, options.class), title: "Priority (P)" },
+		face: () =>
+			Fragment(
+				PriorityIcon(current),
+				options.showLabel === true
+					? Span(
+							{},
+							current.bind((priority) => PRIORITY_LABELS[priority]),
+						)
+					: null,
 			),
-		),
-	);
+	});
 }
 
 export function AssigneePicker(
@@ -178,60 +144,35 @@ export function AssigneePicker(
 	onPick: (userId: string | null) => void,
 	options: PickerOptions = {},
 ) {
-	const value = followRadio(current, (user) => user?.id ?? UNASSIGNED);
-
-	return DropdownMenu(
-		{ open: options.open },
-		syncRadio(current, value, (user) => user?.id ?? UNASSIGNED),
-		DropdownMenuTrigger(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: cn(triggerClass, options.class),
-				title: "Assignee (A)",
-			},
-			AssigneeAvatar(current, CHIP_GLYPH.avatar),
-			options.showLabel === true
-				? Span(
-						{},
-						current.bind((user) => user?.name ?? "Unassigned"),
-					)
-				: null,
-		),
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: "Assign to…", hotkeys: true },
-			DropdownMenuRadioGroup(
-				{
-					value,
-					onValueChange: (id) => {
-						if (id === null || id === UNASSIGNED) onPick(null);
-						else if (typeof id === "string") onPick(id);
-					},
-				},
-				DropdownMenuGroupHeading("Assign to"),
-				DropdownMenuRadioItem(
-					{ value: UNASSIGNED },
-					UnassignedAvatar(),
-					Span({ class: "flex-1" }, "Unassigned"),
-				),
-				ForEach(
-					members,
-					(member) => member.id,
-					(member) =>
-						DropdownMenuRadioItem(
-							// The avatar falls back to initials, which would otherwise be
-							// part of what the filter matches on.
-							{ value: member.get().user.id, label: member.get().user.name },
-							UserAvatar(member.get().user),
-							Span(
-								{ class: "flex-1 truncate" },
-								member.bind((value) => value.user.name),
-							),
-						),
-				),
+	return ResponsiveMenu({
+		heading: "Assign to",
+		search: "Assign to…",
+		open: options.open,
+		options: derived([members], (list) => [
+			{ value: UNASSIGNED, label: "Unassigned", icon: () => UnassignedAvatar() },
+			...list.map((member): MenuOption => ({
+				value: member.user.id,
+				label: member.user.name,
+				// The avatar falls back to initials, which would otherwise be part
+				// of what the filter matches on.
+				search: member.user.name,
+				icon: () => UserAvatar(member.user),
+			})),
+		]),
+		selected: derived([current], (user) => [user?.id ?? UNASSIGNED]),
+		onSelect: (id) => onPick(id === UNASSIGNED ? null : id),
+		trigger: { class: cn(triggerClass, options.class), title: "Assignee (A)" },
+		face: () =>
+			Fragment(
+				AssigneeAvatar(current, CHIP_GLYPH.avatar),
+				options.showLabel === true
+					? Span(
+							{},
+							current.bind((user) => user?.name ?? "Unassigned"),
+						)
+					: null,
 			),
-		),
-	);
+	});
 }
 
 export function LabelPicker(
@@ -240,53 +181,23 @@ export function LabelPicker(
 	onToggle: (labelId: string) => void,
 	options: { class?: string; open?: Signal<boolean> } = {},
 ) {
-	const selectedIds = signal(selected.get().map((label) => label.id));
-
-	return DropdownMenu(
-		{ open: options.open },
-		ImplementEffect([selected], (labels) => selectedIds.set(labels.map((label) => label.id))),
-		DropdownMenuTrigger(
-			{
-				variant: "ghost",
-				size: "sm",
-				class: cn(triggerClass, options.class),
-				title: "Labels (L)",
-			},
-			LabelTrigger(selected),
+	return ResponsiveMenu({
+		heading: "Labels",
+		search: "Add label…",
+		multiple: true,
+		open: options.open,
+		options: derived([available], (labels) =>
+			labels.map((label): MenuOption => ({
+				value: label.id,
+				label: label.name,
+				icon: () => LabelDot(label.color),
+			})),
 		),
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: "Add label…", hotkeys: true },
-			DropdownMenuCheckboxGroup(
-				{
-					value: selectedIds,
-					onValueChange: (ids) => {
-						applyIdDiff(
-							selected.get().map((label) => label.id),
-							ids,
-							onToggle,
-						);
-					},
-				},
-				DropdownMenuGroupHeading("Labels"),
-				ForEach(
-					available,
-					(label) => label.id,
-					(label) =>
-						DropdownMenuCheckboxItem(
-							{
-								value: label.get().id,
-								indicator: MenuCheckbox(selectedIds, label.get().id),
-							},
-							Span({
-								class: "size-2.5 shrink-0 rounded-full",
-								style: { backgroundColor: label.get().color },
-							}),
-							Span({ class: "flex-1 truncate" }, label.bind("name")),
-						),
-				),
-			),
-		),
-	);
+		selected: derived([selected], (labels) => labels.map((label) => label.id)),
+		onSelect: onToggle,
+		trigger: { class: cn(triggerClass, options.class), title: "Labels (L)" },
+		face: () => LabelTrigger(selected),
+	});
 }
 
 /** The assignee's avatar, or the dashed placeholder when there is none. */
@@ -374,38 +285,16 @@ export function TeamPicker(
 	onPick: (key: string) => void,
 	options: PickerOptions & { crumb?: boolean } = {},
 ) {
-	const value = followRadio(current, (team) => team?.key ?? null);
-
-	const trigger =
+	const face = () =>
 		options.crumb === true
-			? DropdownMenuTrigger(
-					{
-						variant: "ghost",
-						size: "sm",
-						class: cn(
-							"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
-							options.class,
-						),
-						title: "Team",
-					},
+			? Fragment(
 					TeamFace(current, "size-4"),
 					Span(
 						{ class: "font-mono leading-none" },
 						current.bind((team) => team?.key ?? "Team"),
 					),
 				)
-			: DropdownMenuTrigger(
-					{
-						variant: options.select === true ? "outline" : "ghost",
-						size: "sm",
-						class: cn(
-							options.select === true
-								? "h-9 w-full justify-start px-3 text-[13px] font-normal"
-								: triggerClass,
-							options.class,
-						),
-						title: "Team",
-					},
+			: Fragment(
 					TeamFace(current, "size-4"),
 					Span(
 						{ class: options.showLabel === true ? "" : "font-mono" },
@@ -425,43 +314,38 @@ export function TeamPicker(
 						: null,
 				);
 
-	return DropdownMenu(
-		{ open: options.open },
-		syncRadio(current, value, (team) => team?.key ?? null),
-		trigger,
-		DropdownMenuContent(
-			{ class: "w-56", align: "start", search: "Change team…", hotkeys: true },
-			DropdownMenuRadioGroup(
-				{
-					value,
-					onValueChange: (key) => {
-						if (typeof key === "string") onPick(key);
-					},
-				},
-				DropdownMenuGroupHeading("Team"),
-				ForEach(
-					teams,
-					(team) => team.id,
-					(team) =>
-						DropdownMenuRadioItem(
-							// The tile falls back to the team's initial, which would otherwise
-							// be part of what the filter matches on; the key is worth keeping
-							// searchable, so it joins the name rather than replacing it.
-							{
-								value: team.get().key,
-								label: `${team.get().name} ${team.get().key}`,
-							},
-							Dynamic([team], (value) => TeamIcon(value, "size-4")),
-							Span({ class: "flex-1 truncate" }, team.bind("name")),
-							Span(
-								{ class: "shrink-0 font-mono text-[11px] text-muted-foreground" },
-								team.bind("key"),
-							),
-						),
-				),
-			),
+	const triggerClassName =
+		options.crumb === true
+			? "h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+			: options.select === true
+				? "h-9 w-full justify-start px-3 text-[13px] font-normal"
+				: triggerClass;
+
+	return ResponsiveMenu({
+		heading: "Team",
+		search: "Change team…",
+		open: options.open,
+		options: derived([teams], (list) =>
+			list.map((team): MenuOption => ({
+				value: team.key,
+				label: team.name,
+				// The tile falls back to the team's initial, which would otherwise
+				// be part of what the filter matches on; the key is worth keeping
+				// searchable, so it joins the name rather than replacing it.
+				search: `${team.name} ${team.key}`,
+				hint: team.key,
+				icon: () => TeamIcon(team, "size-4"),
+			})),
 		),
-	);
+		selected: derived([current], (team) => (team === null ? [] : [team.key])),
+		onSelect: onPick,
+		trigger: {
+			variant: options.crumb !== true && options.select === true ? "outline" : "ghost",
+			class: cn(triggerClassName, options.class),
+			title: "Team",
+		},
+		face,
+	});
 }
 
 /**
@@ -475,8 +359,6 @@ export function WorkspacePicker(
 	onPick: (slug: string) => void,
 	options: { class?: string } = {},
 ) {
-	const value = followRadio(current, (workspace) => workspace?.slug ?? null);
-
 	// Fresh nodes per call — the crumb face is rendered in both branches.
 	const face = () =>
 		Fragment(
@@ -491,46 +373,30 @@ export function WorkspacePicker(
 
 	return If(
 		workspaces.bind((list) => list.length > 1),
-		DropdownMenu(
-			{},
-			syncRadio(current, value, (workspace) => workspace?.slug ?? null),
-			DropdownMenuTrigger(
-				{
-					variant: "ghost",
-					size: "sm",
-					class: cn(
-						"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
-						options.class,
-					),
-					title: "Workspace",
-				},
-				face(),
+		ResponsiveMenu({
+			heading: "Workspace",
+			search: "File in workspace…",
+			options: derived([workspaces], (list) =>
+				list.map((workspace): MenuOption => ({
+					value: workspace.slug,
+					label: workspace.name,
+					// The avatar falls back to an initial, which would otherwise be
+					// part of what the filter matches on.
+					search: workspace.name,
+					icon: () => WorkspaceAvatar(workspace, "size-4 rounded-[4px] text-[8px]"),
+				})),
 			),
-			DropdownMenuContent(
-				{ class: "w-56", align: "start", search: "File in workspace…", hotkeys: true },
-				DropdownMenuRadioGroup(
-					{
-						value,
-						onValueChange: (slug) => {
-							if (typeof slug === "string") onPick(slug);
-						},
-					},
-					DropdownMenuGroupHeading("Workspace"),
-					ForEach(
-						workspaces,
-						(workspace) => workspace.id,
-						(workspace) =>
-							DropdownMenuRadioItem(
-								// The avatar falls back to an initial, which would otherwise
-								// be part of what the filter matches on.
-								{ value: workspace.get().slug, label: workspace.get().name },
-								WorkspaceAvatar(workspace.get(), "size-4 rounded-[4px] text-[8px]"),
-								Span({ class: "flex-1 truncate" }, workspace.bind("name")),
-							),
-					),
+			selected: derived([current], (workspace) => (workspace === null ? [] : [workspace.slug])),
+			onSelect: onPick,
+			trigger: {
+				class: cn(
+					"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
+					options.class,
 				),
-			),
-		),
+				title: "Workspace",
+			},
+			face,
+		}),
 	).Else(
 		Span(
 			{

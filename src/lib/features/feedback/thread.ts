@@ -12,6 +12,7 @@ import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
 import {
 	Empty,
 	EmptyDescription,
@@ -129,7 +130,8 @@ export function FeedbackThread(options: {
 						rows: 3,
 						placeholder: "Write a reply…",
 						class:
-							"resize-none border-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground",
+							// 16px on a phone, or the caret landing here zooms the page (ENG-67).
+							"resize-none border-0 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground md:text-[13px]",
 						onKeydown: (event) => {
 							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void post();
 						},
@@ -158,7 +160,9 @@ export function FeedbackThread(options: {
 								),
 						Span(
 							{ class: "ml-auto text-[11px] text-muted-foreground" },
-							"Markdown supported · ⌘↵ to send",
+							"Markdown supported",
+							// The chord half goes away where there is no keyboard to press it on.
+							Span({ class: KEY_HINT_CLASS }, " · ⌘↵ to send"),
 						),
 						Button(
 							{

@@ -70,6 +70,20 @@ import { highlightCode } from "@/lib/components/highlight";
 import { cn } from "@/lib/utils";
 
 /**
+ * How big a body reads: 13px from `md` up, 16px below it.
+ *
+ * The small end is not a taste decision. Safari on iOS zooms the whole page
+ * when the caret lands in an editable drawn below 16px, and the composer is
+ * drawn with these same classes — so a body typed on a phone used to shove the
+ * layout sideways on the first tap (ENG-67). It is the same `text-base
+ * md:text-sm` bargain `Input` and `Textarea` already make.
+ *
+ * Everything inside a body — headings, code blocks — is sized in `em` against
+ * this, so these are the only two numbers a body has.
+ */
+export const BODY_TEXT_CLASS = "text-[16px] md:text-[13px]";
+
+/**
  * Renders a markdown body.
  *
  * The whole body is re-parsed when the text changes. Comments are posted, not
@@ -82,7 +96,8 @@ export function Markdown(body: Readable<string>, options: { class?: ClassValue }
 			// flush in whatever laid it out, rather than a comment being taller
 			// than the text it contains.
 			class: cn(
-				"text-[13px] leading-relaxed break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0",
+				BODY_TEXT_CLASS,
+				"leading-relaxed break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0",
 				options.class,
 			),
 		},
@@ -452,17 +467,20 @@ function parseList(
 const HEADINGS = [H1, H2, H3, H4, H5, H6];
 
 /**
- * Headings are sized against the 13px body rather than against the document.
- * A comment is not a page, and an `#` in one means "this is a section of my
+ * Headings are sized against the body rather than against the document. A
+ * comment is not a page, and an `#` in one means "this is a section of my
  * comment", not "this outranks the issue title".
+ *
+ * In `em`, so the ladder holds at either body size: 16/15/14/13 against the
+ * 13px body it was drawn for, and the same steps scaled up on a phone.
  */
 const HEADING_CLASS = [
-	"mt-4 mb-2 text-[16px] font-semibold",
-	"mt-4 mb-2 text-[15px] font-semibold",
-	"mt-3 mb-1 text-[14px] font-semibold",
-	"mt-3 mb-1 text-[13px] font-semibold",
-	"mt-3 mb-1 text-[13px] font-semibold",
-	"mt-3 mb-1 text-[13px] font-semibold text-muted-foreground",
+	"mt-4 mb-2 text-[1.23em] font-semibold",
+	"mt-4 mb-2 text-[1.15em] font-semibold",
+	"mt-3 mb-1 text-[1.08em] font-semibold",
+	"mt-3 mb-1 text-[1em] font-semibold",
+	"mt-3 mb-1 text-[1em] font-semibold",
+	"mt-3 mb-1 text-[1em] font-semibold text-muted-foreground",
 ];
 
 function renderBlocks(blocks: Block[]): Child[] {
@@ -486,7 +504,7 @@ function renderBlock(block: Block): Child {
 					// Long lines scroll inside the block instead of stretching the
 					// comment column — a pasted command should not widen the page.
 					class:
-						"my-2 overflow-x-auto rounded-md border border-border bg-secondary/40 p-3 text-[12px] leading-relaxed",
+						"my-2 overflow-x-auto rounded-md border border-border bg-secondary/40 p-3 text-[0.92em] leading-relaxed",
 					"data-language": block.language === "" ? undefined : block.language,
 				},
 				// The info string picks the tokenizer; a language it does not

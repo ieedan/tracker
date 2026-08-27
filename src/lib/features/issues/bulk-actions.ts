@@ -54,6 +54,7 @@ import { patchIssues } from "./issue-store";
 import { DeleteIssuesDialog } from "./delete-issue";
 import { ProviderMark } from "./repository-picker";
 import { TransferIssueDialog } from "./transfer-issue";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
 
 export type BulkView =
 	| "root"
@@ -190,7 +191,7 @@ export function BulkSelectionBar({
 							open.set(true);
 						},
 					},
-					Span({ class: "text-[11px] text-muted-foreground" }, "⌘"),
+					Span({ class: cn("text-[11px] text-muted-foreground", KEY_HINT_CLASS) }, "⌘"),
 					"Actions",
 				),
 				Button(
@@ -909,7 +910,7 @@ function RepositoryCommands(
 }
 
 function Shortcut(keys: string) {
-	return Span({ class: "ml-auto text-[11px] text-muted-foreground" }, keys);
+	return Span({ class: cn("ml-auto text-[11px] text-muted-foreground", KEY_HINT_CLASS) }, keys);
 }
 
 function resolveAssignee(members: Member[], assigneeId: string | null): UserSummary | null {

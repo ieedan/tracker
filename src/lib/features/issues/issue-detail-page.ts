@@ -52,6 +52,8 @@ import { PullRequestLink } from "./pull-request-link";
 import { BodyComposer } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
 import { DeleteIssueButton } from "./delete-issue";
+import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
+import { cn } from "@/lib/utils";
 
 interface PageData {
 	issue: Issue;
@@ -765,7 +767,7 @@ function CommentThread(
 						onClick: () => void post(),
 					},
 					"Comment",
-					Span({ class: "text-[11px] font-normal opacity-70" }, "⌘⏎"),
+					Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
 				),
 			),
 		),

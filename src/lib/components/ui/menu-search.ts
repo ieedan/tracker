@@ -52,9 +52,14 @@ const HIDDEN_ATTR = "data-search-hidden";
 /** The key a row currently answers to. Absent while a query is running. */
 const HOTKEY_ATTR = "data-hotkey-active";
 
-/** `Kbd`'s look, written out: the hint is built with `createElement`, not mounted. */
+/**
+ * `Kbd`'s look, written out: the hint is built with `createElement`, not
+ * mounted — so `KEY_HINT_CLASS` is spelled into the string rather than merged.
+ * The digits still pick a row for anyone with a keyboard; below the phone
+ * breakpoint they are simply not drawn (ENG-67).
+ */
 const HOTKEY_CLASS =
-	"ml-auto inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-sm bg-muted px-1 font-sans text-[10px] font-medium text-muted-foreground select-none";
+	"ml-auto inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-sm bg-muted px-1 font-sans text-[10px] font-medium text-muted-foreground select-none max-md:hidden";
 
 export type MenuSearchOptions = {
 	/** A filter box at the top of the menu. `true` uses a generic placeholder. */
@@ -119,8 +124,10 @@ function SearchRow(
 			"data-slot": "menu-search-input",
 			"aria-label": "Filter",
 			placeholder: search === true ? "Search…" : search,
+			// 16px on a phone: below that, focusing the box zooms the page and takes
+			// the menu it belongs to with it (ENG-67).
 			class:
-				"h-8 w-full min-w-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground",
+				"h-8 w-full min-w-0 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground md:text-[13px]",
 			onInput: () => controller.schedule(),
 			onKeydown: (event) => controller.onInputKeydown(event),
 		}),
