@@ -15,20 +15,17 @@
  * goes where you pressed.
  *
  * The optional toolbar is the WYSIWYG the composer offers: buttons and
- * shortcuts that write the markdown into the source for you, and a Preview
- * tab that renders it through the same renderer every posted body goes
- * through. Deliberately not a rich-text editor — the body stays the text it
- * stores, and the mention overlay keeps lining up because the on-screen text
- * is still the raw characters.
+ * shortcuts that write the markdown into the source for you, applied inline
+ * as you type — there is no separate Preview tab to switch to. Deliberately
+ * not a rich-text editor — the body stays the text it stores, and the
+ * mention overlay keeps lining up because the on-screen text is still the
+ * raw characters.
  */
 import {
 	Div,
 	If,
-	ImplementDocument,
 	ImplementEffect,
 	ImplementLifecycle,
-	P,
-	Span,
 	Textarea,
 	derived,
 	signal,
@@ -47,7 +44,6 @@ import {
 	Strikethrough,
 	TextQuote,
 } from "@implementjs/lucide";
-import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MentionMenu, MentionText, fileMentions, hasMention } from "./file-mentions";
@@ -88,7 +84,7 @@ export interface BodyComposerOptions {
 	 * underneath is still the textarea's, so the click is never intercepted.
 	 */
 	renderMentions?: boolean;
-	/** The formatting toolbar and the Write / Preview tabs. */
+	/** The formatting toolbar. */
 	toolbar?: boolean;
 	autofocus?: boolean;
 	class?: string;
@@ -105,7 +101,6 @@ export function BodyComposer(options: BodyComposerOptions) {
 	const element = options.element ?? signal<HTMLTextAreaElement | null>(null);
 	const root = signal<HTMLDivElement | null>(null);
 	const focused = signal(false);
-	const previewing = signal(false);
 
 	const mentions = fileMentions({
 		value: options.value,
@@ -135,7 +130,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 	 */
 	const apply = (command: (state: SelectionState) => SelectionState) => {
 		const node = element.get();
-		if (node === null || previewing.get()) return;
+		if (node === null) return;
 		const next = command({
 			value: options.value.get(),
 			start: node.selectionStart ?? 0,
@@ -148,40 +143,15 @@ export function BodyComposer(options: BodyComposerOptions) {
 		});
 	};
 
-	// Where the caret was when Preview was opened, so Write puts it back.
-	let held: [number, number] = [0, 0];
-
-	const write = () => {
-		if (!previewing.get()) return;
-		previewing.set(false);
-		queueMicrotask(() => {
-			const node = element.get();
-			if (node === null) return;
-			node.focus();
-			node.setSelectionRange(held[0], held[1]);
-		});
-	};
-
-	const preview = () => {
-		if (previewing.get()) return;
-		const node = element.get();
-		held = [node?.selectionStart ?? 0, node?.selectionEnd ?? 0];
-		// Set before the textarea hides, so the blur that hiding fires is
-		// recognisably ours and does not commit the caller's editor.
-		previewing.set(true);
-	};
-
 	return Div(
 		{ this: root, class: "flex flex-col" },
 
 		// Static, not `If`: whether a composer has a toolbar never changes
 		// while it is mounted.
-		options.toolbar === true ? ComposerToolbar({ previewing, apply, write, preview }) : null,
+		options.toolbar === true ? ComposerToolbar({ apply }) : null,
 
-		// Preview replaces the box but never unmounts it: the browser's undo
-		// history lives in the element, and this keeps it.
 		Div(
-			{ class: cn("relative", { hidden: previewing }) },
+			{ class: "relative" },
 			ImplementLifecycle({ onMount: () => grow() }),
 			// Text arriving from anywhere but the keyboard — a draft restored, an
 			// edit made elsewhere — has to resize the box too.
@@ -220,9 +190,8 @@ export function BodyComposer(options: BodyComposerOptions) {
 				onBlur: () => {
 					focused.set(false);
 					// Picking from the menu blurs the box, and a caller that commits on
-					// blur would close the editor out from under the insertion. Opening
-					// the preview hides the box, which blurs it the same way.
-					if (mentions.open.get() || previewing.get()) return;
+					// blur would close the editor out from under the insertion.
+					if (mentions.open.get()) return;
 					options.onBlur?.();
 				},
 				onKeydown: (event) => {
@@ -253,27 +222,6 @@ export function BodyComposer(options: BodyComposerOptions) {
 
 			MentionMenu(mentions),
 		),
-
-		If(
-			previewing,
-			Div(
-				{},
-				// A click anywhere else is the same "I am done here" that blur is
-				// for the box — without this, a preview left open would swallow the
-				// commit a caller expects on the way out.
-				ImplementDocument({
-					onMousedown: (event) => {
-						const container = root.get();
-						if (container === null || container.contains(event.target as Node)) return;
-						previewing.set(false);
-						options.onBlur?.();
-					},
-				}),
-				If(options.value.bind((text) => text.trim() !== ""))
-					.Then(Markdown(options.value))
-					.Else(P({ class: "text-[13px] text-muted-foreground" }, "Nothing to preview")),
-			),
-		),
 	);
 }
 
@@ -286,41 +234,18 @@ const SHORTCUTS: Record<string, (state: SelectionState) => SelectionState> = {
 };
 
 /**
- * Write / Preview on the left, formatting on the right — the shape every
- * markdown box since GitHub's has taught.
+ * Formatting only — everything happens inline in the box below, so there is
+ * nothing to switch between.
  *
  * Every control acts on `mousedown` and prevents the default, so the textarea
- * never loses focus (or, for the tabs, loses it only to the preview): the
- * selection a button formats is the one that was visible when it was pressed.
+ * never loses focus: the selection a button formats is the one that was
+ * visible when it was pressed.
  */
 function ComposerToolbar({
-	previewing,
 	apply,
-	write,
-	preview,
 }: {
-	previewing: Signal<boolean>;
 	apply: (command: (state: SelectionState) => SelectionState) => void;
-	write: () => void;
-	preview: () => void;
 }) {
-	const tab = (label: string, active: (value: boolean) => boolean, activate: () => void) =>
-		Button(
-			{
-				variant: "ghost",
-				size: "xs",
-				type: "button",
-				class: cn("h-6 px-2 text-[12px] font-normal text-muted-foreground", {
-					"bg-secondary text-foreground": previewing.bind(active),
-				}),
-				onMousedown: (event) => {
-					event.preventDefault();
-					activate();
-				},
-			},
-			label,
-		);
-
 	const tool = (
 		icon: (props: { class?: string }) => Child,
 		label: string,
@@ -336,7 +261,6 @@ function ComposerToolbar({
 				// Reachable through the shortcuts and the box itself; tabbing
 				// through ten buttons on the way out of a comment is not a path.
 				tabIndex: -1,
-				disabled: previewing,
 				class: "text-muted-foreground hover:text-foreground",
 				onMousedown: (event) => {
 					event.preventDefault();
@@ -348,9 +272,6 @@ function ComposerToolbar({
 
 	return Div(
 		{ class: "mb-2 flex flex-wrap items-center gap-0.5 border-b border-border pb-1.5" },
-		tab("Write", (value) => !value, write),
-		tab("Preview", (value) => value, preview),
-		Span({ class: "flex-1" }),
 		tool(Bold, "Bold (⌘B)", (state) => toggleWrap(state, "**")),
 		tool(Italic, "Italic (⌘I)", (state) => toggleWrap(state, "*")),
 		tool(Strikethrough, "Strikethrough", (state) => toggleWrap(state, "~~")),
