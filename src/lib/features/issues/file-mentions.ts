@@ -13,16 +13,19 @@
  */
 import {
 	Div,
+	Dynamic,
 	ForEach,
 	If,
 	Span,
 	derived,
 	signal,
+	type Child,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
 import { FileCode2 } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
+import { rankPath } from "@/lib/domain/fuzzy";
 import { cn } from "@/lib/utils";
 
 export interface FileMatch {
@@ -105,6 +108,8 @@ export function mentionPoint(host: HTMLElement): CaretPoint | null {
 export interface MentionState {
 	open: Readable<boolean>;
 	matches: Readable<FileMatch[]>;
+	/** What has been typed after the `@`, so the menu can show what it matched. */
+	term: Readable<string>;
 	highlighted: Signal<number>;
 	/** Where the `@` is, so the menu can sit under it rather than under the box. */
 	anchor: Readable<CaretPoint | null>;
@@ -115,6 +120,15 @@ export interface MentionState {
 	close: () => void;
 	choose: (match: FileMatch) => void;
 }
+
+/**
+ * How many files the menu asks for. More than fits without scrolling, because
+ * a fuzzy query that matches broadly should still let the tenth-best answer be
+ * reached with the arrow keys rather than by typing more.
+ */
+const MENU_ROWS = 12;
+/** Long enough to coalesce a fast typist's keystrokes, short enough to feel live. */
+const SEARCH_DEBOUNCE_MS = 60;
 
 /**
  * Wires up `@` handling for one composer.
@@ -136,14 +150,16 @@ export function fileMentions(options: {
 	const highlighted = signal(0);
 	const anchor = signal<CaretPoint | null>(null);
 	const open = derived([query, matches], (current, list) => current !== null && list.length > 0);
+	const term = derived([query], (current) => current?.query ?? "");
 
 	let sequence = 0;
+	let pending: ReturnType<typeof setTimeout> | null = null;
 
-	const search = async (term: string) => {
+	const search = async (typed: string) => {
 		const mine = ++sequence;
 		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/files", {
 			params: { slug: options.slug() },
-			query: { q: term, repository: options.repository(), limit: 8 },
+			query: { q: typed, repository: options.repository(), limit: MENU_ROWS },
 		});
 		// A slower earlier request must not overwrite a faster later one.
 		if (mine !== sequence) return;
@@ -151,7 +167,31 @@ export function fileMentions(options: {
 		highlighted.set(0);
 	};
 
+	/**
+	 * A loose query reaches a lot of the index, so a request per keystroke is
+	 * work nobody reads: everything but the last one is replaced before it
+	 * lands. Opening the menu is not debounced — `@` on its own should answer at
+	 * once — and the in-flight guard above still covers responses arriving out
+	 * of order.
+	 */
+	const scheduleSearch = (typed: string) => {
+		if (pending !== null) clearTimeout(pending);
+		if (typed === "") {
+			pending = null;
+			void search(typed);
+			return;
+		}
+		pending = setTimeout(() => {
+			pending = null;
+			void search(typed);
+		}, SEARCH_DEBOUNCE_MS);
+	};
+
 	const close = () => {
+		if (pending !== null) clearTimeout(pending);
+		pending = null;
+		// Nothing in flight may land after this, or the menu would reopen itself.
+		sequence++;
 		query.set(null);
 		matches.set([]);
 		anchor.set(null);
@@ -167,18 +207,18 @@ export function fileMentions(options: {
 	return {
 		open,
 		matches,
+		term,
 		highlighted,
 		anchor,
 		refresh: (value, caret, host) => {
 			const found = caret < 0 ? null : activeMention(value, caret);
 			query.set(found);
 			if (found === null) {
-				matches.set([]);
-				anchor.set(null);
+				close();
 				return;
 			}
 			anchor.set(host === null ? null : mentionPoint(host));
-			void search(found.query);
+			scheduleSearch(found.query);
 		},
 		onKeydown: (event) => {
 			if (!open.get()) return false;
@@ -240,6 +280,30 @@ function menuHeight(count: number): number {
 	return Math.min(count * ROW_HEIGHT + MENU_PADDING, MENU_MAX_HEIGHT);
 }
 
+/**
+ * `text` with the characters the query landed on picked out.
+ *
+ * A subsequence match is not obvious from the result alone — why
+ * `src/lib/server/mcp/tools.ts` answers `libmcp` is a question the row should
+ * not leave open — so the ranking is scored again here and the winning
+ * characters are emphasised. `slice` is the offset of `text` within the path
+ * the positions were measured against, since the basename is drawn on its own.
+ */
+function Emphasised(text: string, positions: number[], slice = 0): Child {
+	const parts: Child[] = [];
+	let cursor = 0;
+	for (const position of positions) {
+		const index = position - slice;
+		if (index < cursor || index >= text.length) continue;
+		if (index > cursor) parts.push(text.slice(cursor, index));
+		parts.push(Span({ class: "font-semibold text-foreground" }, text[index]!));
+		cursor = index + 1;
+	}
+	if (parts.length === 0) return text;
+	if (cursor < text.length) parts.push(text.slice(cursor));
+	return Span({ class: "contents" }, ...parts);
+}
+
 export function MentionMenu(state: MentionState, options: { class?: string } = {}) {
 	/** True when there is no room below the line but there is room above it. */
 	const flipped = derived([state.anchor, state.matches], (point, matches) => {
@@ -279,14 +343,15 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 			ForEach(
 				state.matches,
 				(match) => `${match.repositoryId}:${match.path}`,
-				(match) => {
-					const index = state.matches.get().findIndex((entry) => entry.path === match.get().path);
-					return Div(
+				// `index` comes from the list rather than being looked up, so a row
+				// that keeps its place across a re-query knows which place that is.
+				(match, index) =>
+					Div(
 						{
-							class: derived([state.highlighted], (current) =>
+							class: derived([state.highlighted, index], (current, position) =>
 								cn(
 									"flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px]",
-									current === index ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+									current === position ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
 								),
 							),
 							// `mousedown` rather than `click`: the editor would blur first
@@ -299,14 +364,19 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 						FileCode2({ class: "size-3.5 shrink-0 text-muted-foreground" }),
 						Span(
 							{ class: "min-w-0 flex-1 truncate" },
-							match.bind((value) => value.path.slice(value.path.lastIndexOf("/") + 1)),
+							Dynamic([match, state.term], (value, typed) => {
+								const positions = rankPath(typed, value.path)?.positions ?? [];
+								const start = value.path.lastIndexOf("/") + 1;
+								return Emphasised(value.path.slice(start), positions, start);
+							}),
 						),
 						Span(
 							{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
-							match.bind((value) => value.path),
+							Dynamic([match, state.term], (value, typed) =>
+								Emphasised(value.path, rankPath(typed, value.path)?.positions ?? []),
+							),
 						),
-					);
-				},
+					),
 			),
 		),
 	);
