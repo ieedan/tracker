@@ -15,6 +15,7 @@
  */
 import { tool, type McpTool } from "@implementjs/kit/mcp";
 import type { RequestEvent } from "@implementjs/kit/server";
+import { toJsonSchema } from "@valibot/to-json-schema";
 import * as v from "valibot";
 import { formatBytes, isAudio, isImage, isTextual } from "@/lib/domain/attachments";
 import {
@@ -307,6 +308,30 @@ function scoped<S extends v.GenericSchema<Record<string, unknown>>>(definition: 
 			return await definition.handle({ input, event, slug });
 		},
 	});
+}
+
+/**
+ * A tool's `inputSchema`, converted here rather than by kit.
+ *
+ * Kit builds `tools/list` schemas by `await import`ing the valibot converter
+ * under a variable specifier, deliberately so no bundler follows it. Nothing
+ * then puts the package in the deployed function, the import throws, and the
+ * `catch` turns that into "listing it as unconstrained" — every tool advertised
+ * as a bare `{"type":"object"}`, with not one argument visible to the model.
+ * Locally it always works, because dev installs the converter either way.
+ *
+ * Importing it at the top of this file is what makes it survive the build, and
+ * `inputJsonSchema` takes precedence over `input`, so kit never reaches the
+ * dynamic path. The conversion is the same call kit would have made.
+ */
+function withSchema(entry: McpTool): McpTool {
+	if (entry.input === undefined) return entry;
+	// The converter's own `JsonSchema` is a closed shape; kit's is an open
+	// record, and it is the one this has to satisfy.
+	const schema = toJsonSchema(entry.input as v.GenericSchema, {
+		errorMode: "ignore",
+	}) as Record<string, unknown>;
+	return { ...entry, inputJsonSchema: async () => schema };
 }
 
 export const MCP_TOOLS: McpTool[] = [
@@ -694,4 +719,4 @@ export const MCP_TOOLS: McpTool[] = [
 		handle: async ({ input, event }) =>
 			await callApi(event, "GET", `/api/v1/notifications${queryString({ unread: input.unread })}`),
 	}),
-];
+].map(withSchema);

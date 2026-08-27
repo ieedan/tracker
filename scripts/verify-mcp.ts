@@ -12,6 +12,7 @@
  * this says which part of it broke.
  */
 import { AGENT_DEFAULT_SCOPES, AGENT_GRANTABLE_SCOPES } from "../src/lib/domain/agents.ts";
+import { MCP_TOOLS } from "../src/lib/server/mcp/tools.server.ts";
 import { DELETE, GET, POST } from "../src/routes/api/mcp/server.ts";
 
 const ORIGIN = "https://tracker.test";
@@ -260,6 +261,33 @@ const listed = await (async () => {
 	check(
 		"every tool has an object inputSchema",
 		listed.every((entry) => (entry.inputSchema as { type?: string }).type === "object"),
+	);
+	// Kit would otherwise convert `input` by importing the valibot converter
+	// under a variable specifier, which no bundler follows — so the package is
+	// absent from the deployed function, the import throws, and every tool is
+	// listed as an unconstrained `{"type":"object"}` with no arguments the model
+	// can see. Nothing above catches that: dev has the converter installed, so
+	// the schemas look right here while production serves empty ones. Converting
+	// in `tools.server.ts` instead is what survives the build, and this is the
+	// check that says so.
+	const unconverted = MCP_TOOLS.filter(
+		(entry) => entry.input !== undefined && entry.inputJsonSchema === undefined,
+	).map((entry) => entry.name);
+	check(
+		"every schema is converted at build time, not by kit's runtime import",
+		unconverted.length === 0,
+		unconverted,
+	);
+	const unconstrained = listed
+		.filter((entry) => {
+			const schema = entry.inputSchema as { properties?: Record<string, unknown> };
+			return Object.keys(schema.properties ?? {}).length === 0;
+		})
+		.map((entry) => String(entry.name));
+	check(
+		"only the two argument-less tools advertise no properties",
+		unconstrained.join(",") === "whoami,list_workspaces",
+		unconstrained,
 	);
 	check(
 		"every tool has a title and a description",
