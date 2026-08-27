@@ -58,8 +58,10 @@ import {
 	type IssuePriority,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Activity, Comment, Issue } from "@/lib/domain/schemas";
+import type { Activity, Attachment, Comment, Issue } from "@/lib/domain/schemas";
 import { AttachmentGrid } from "@/lib/features/attachments/attachment-list";
+import { beginUploads, preventFilePaste } from "@/lib/features/attachments/file-drop";
+import type { Upload } from "@/lib/features/attachments/uploader";
 import { relativeTime } from "@/lib/format";
 import { BodyComposer } from "./body-composer";
 
@@ -173,6 +175,27 @@ function CommentRow(
 	const draft = signal(comment.get().body);
 	const draftRef = signal<HTMLElement | null>(null);
 	const confirmingDelete = signal(false);
+	/** Images pasted while rewording, and the ones still on their way up. */
+	const attached = signal<Attachment[]>([]);
+	const uploads = signal<Upload[]>([]);
+
+	/**
+	 * A screenshot pasted into a comment belongs to that comment.
+	 *
+	 * The box being editable is what makes this necessary: a paste the page
+	 * does not catch is one the browser drops into the document as an `<img>`,
+	 * which the serializer has no markdown for — so the picture went nowhere
+	 * and took a blank line's worth of nothing with it.
+	 */
+	const attach = (files: File[]) => {
+		beginUploads({
+			files,
+			slug: slug.get(),
+			commentId: comment.get().id,
+			uploads,
+			onUploaded: (attachment) => attached.push(attachment),
+		});
+	};
 
 	const isAuthor = derived([actions.viewerId, comment], (id, value) => value.author.id === id);
 	const canDelete = derived([isAuthor, actions.isAdmin], (author, admin) => author || admin);
@@ -208,7 +231,10 @@ function CommentRow(
 	};
 
 	return Div(
-		{ class: "group/comment flex gap-3" },
+		{
+			class: "group/comment flex gap-3",
+			onPaste: (event) => preventFilePaste(event, attach),
+		},
 		UserAvatar(comment.get().author, "mt-0.5"),
 		Div(
 			{ class: "min-w-0 flex-1" },
@@ -277,7 +303,16 @@ function CommentRow(
 					// branch renders through it, so a status line stays one plain sentence.
 					Markdown(comment.bind("body"), { class: "mt-0.5" }),
 				),
-			AttachmentGrid({ attachments: comment.bind("attachments"), slug }),
+			AttachmentGrid({
+				// What the server has, plus anything pasted since it last said so —
+				// by id, because the next load hands back the same rows.
+				attachments: derived([comment, attached], (value, extra) => {
+					const known = new Set(value.attachments.map((entry) => entry.id));
+					return [...value.attachments, ...extra.filter((entry) => !known.has(entry.id))];
+				}),
+				uploads,
+				slug,
+			}),
 			DeleteCommentDialog({
 				open: confirmingDelete,
 				onConfirm: () => actions.onDelete(comment.get().id),
