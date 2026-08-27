@@ -194,17 +194,31 @@ export function BodyComposer(options: BodyComposerOptions) {
 			},
 		}),
 
-		// A body that changed anywhere else — a draft restored, an issue edited
-		// in another tab — has to be redrawn. Never while the caret is in the
-		// box, which would move the text out from under whoever is typing.
+		/**
+		 * A body set from outside the box — a posted comment clearing it, Escape
+		 * putting the stored words back, a draft restored — drawn as given.
+		 *
+		 * Not guarded on focus. Whether an edit made elsewhere should land on
+		 * what someone is in the middle of typing is a question about the body,
+		 * not about the box, and the callers that can answer it already do:
+		 * both the description and a comment leave their draft alone while the
+		 * caret is in it. Guarding here as well only broke the resets that are
+		 * deliberate — clearing after a ⌘⏎ post left the words on screen with
+		 * the placeholder drawn underneath them, because the value emptied and
+		 * the box never heard about it.
+		 */
 		ImplementEffect(
 			[options.value],
 			(text) => {
 				const node = host.get();
 				if (node === null || text === drawn) return;
-				if (typeof document !== "undefined" && document.activeElement === node) return;
 				drawn = text;
 				paint(node, text);
+				// Keeping the caret is part of the reset: a cleared box you are
+				// still standing in is where the next comment gets typed.
+				if (typeof document !== "undefined" && document.activeElement === node) {
+					focusBody(node);
+				}
 			},
 			{ immediate: false },
 		),
@@ -274,18 +288,6 @@ export function BodyComposer(options: BodyComposerOptions) {
 					}
 					if (event.key === "Escape") {
 						options.onEscape?.();
-						// Escape is the one edit that arrives from outside while the
-						// caret is still in here — a caller putting the stored body back
-						// where an abandoned draft was. The effect below leaves a
-						// focused box alone, which is right for a body that changed
-						// somewhere else and wrong for this: without the redraw the
-						// words that were just taken back are still on screen.
-						const node = host.get();
-						const reverted = options.value.get();
-						if (node !== null && reverted !== drawn) {
-							drawn = reverted;
-							paint(node, reverted);
-						}
 						return;
 					}
 					if (event.key === "Enter") {
