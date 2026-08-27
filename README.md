@@ -84,8 +84,20 @@ top, and points the deployment at it. `defineEnv` bakes the environment into the
 bundle, which is why this happens before `vite build` rather than at runtime.
 
 The name comes from the branch, not the deployment, so pushing again reuses the
-same database instead of discarding the state a reviewer built up. Sign in to any
-preview as **demo@tracker.dev** / **password123**.
+same database instead of discarding the state a reviewer built up.
+
+A preview's login page carries a **Sign in as demo@tracker.dev** button that
+signs you straight in, so reviewing a pull request takes one click rather than a
+typed-out email and password. `scripts/build.ts` turns it on by pointing
+`DEMO_LOGIN_EMAIL` and `DEMO_LOGIN_PASSWORD` at the seeded demo account, and
+only on the path where it has just branched the seeded template — a preview
+falling back to the project-wide `DATABASE_URL` gets the ordinary login page.
+The password never reaches the browser: the button posts to `/api/demo-login`,
+which signs in server-side and hands back the session cookie, and which 404s
+wherever those two variables are unset. That is the whole gate, so **do not set
+them on a deployment holding real data** — anyone who can open the login page
+can press the button. Nothing sets them for production. Typing the credentials
+still works too: **demo@tracker.dev** / **password123**.
 
 GitHub on previews is its own choice: a separate App (which keeps production's
 private key and its list of installations out of preview deployments), the
@@ -615,6 +627,7 @@ src/
 │  └ client/             browser-side api, auth and toasts
 └ routes/
    ├ api/auth/[...all]/  better-auth's own surface
+   ├ api/demo-login/     the preview one-click sign-in; 404 unless configured
    ├ api/v1/             the documented REST API
    │  ├ webhooks/drain/  cron-authorized delivery retries
    │  └ github/webhook/  inbound pull request events, signature-authorized

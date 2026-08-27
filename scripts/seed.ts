@@ -24,14 +24,17 @@ import {
 	workspace,
 	workspaceMember,
 } from "../src/lib/server/schema.server";
+import { DEMO_ACCOUNT } from "./lib/demo.ts";
 import { DEFAULT_TEAMS } from "../src/lib/domain/issues";
 import { defaultTeamLook } from "../src/lib/domain/team-icons";
 import type { IssuePriority, IssueStatus } from "../src/lib/domain/issues";
 
-const PASSWORD = "password123";
+const PASSWORD = DEMO_ACCOUNT.password;
 
+// The first is the one a preview's "Sign in as…" button uses, so its address
+// lives in `lib/demo.ts` where `preview-db.ts` reads it too.
 const PEOPLE = [
-	{ name: "Ada Lovelace", email: "demo@tracker.dev" },
+	{ name: DEMO_ACCOUNT.name, email: DEMO_ACCOUNT.email },
 	{ name: "Grace Hopper", email: "grace@tracker.dev" },
 	{ name: "Alan Turing", email: "alan@tracker.dev" },
 ];

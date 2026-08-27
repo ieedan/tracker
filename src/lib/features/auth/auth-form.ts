@@ -1,5 +1,6 @@
 import { A, Div, H1, If, Input, Label, P, Span, signal, type Readable } from "@implementjs/core";
 import { createForm, Field, Form } from "@implementjs/formish";
+import { ZapIcon } from "@implementjs/lucide";
 import * as v from "valibot";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/lib/components/ui/button";
@@ -37,15 +38,110 @@ const styles = {
 
 export interface AuthPageData {
 	providers: { github: boolean };
+	/**
+	 * The demo account's address, where this deployment has one, or `null`.
+	 *
+	 * Its password stays on the server — `/api/demo-login` is what signs in —
+	 * so this is only ever a label for the button.
+	 */
+	demo: string | null;
 }
 
 /**
- * The social buttons and the rule that separates them from the form.
+ * Everything that is not the password form: the social buttons, the one-click
+ * demo account, and the rule that separates them from the fields.
  *
  * Rendered above the fields rather than below: someone who has an account
  * through GitHub is looking for the button, and making them read past a
  * password form to find it is how you get duplicate accounts.
+ *
+ * The whole block goes away when neither is configured, rather than leaving a
+ * rule hanging over the form with nothing above it.
  */
+function AlternativeSignIn(data: Readable<AuthPageData>, verb: string) {
+	return If(
+		data.bind((value) => value.providers.github || value.demo !== null),
+		Div(
+			{ class: "mb-5 flex flex-col gap-3" },
+			DemoSignIn(data),
+			SocialSignIn(data, verb),
+			Div(
+				{ class: "flex items-center gap-3" },
+				Div({ class: "h-px flex-1 bg-border" }),
+				Span({ class: "text-[11px] tracking-wide text-muted-foreground" }, "OR"),
+				Div({ class: "h-px flex-1 bg-border" }),
+			),
+		),
+	);
+}
+
+/**
+ * One click into the seeded demo account.
+ *
+ * It leads because it is the reason the block is on screen at all where it
+ * appears — a preview deployment, where nobody wants to type
+ * `demo@tracker.dev` and a password to look at a pull request.
+ *
+ * The POST carries no body: which account this is belongs to the server's
+ * configuration, and letting the page name one would turn this into a way to
+ * sign in as anybody whose password you can guess, without the rate limiting
+ * better-auth puts on its own sign-in route.
+ */
+function DemoSignIn(data: Readable<AuthPageData>) {
+	const busy = signal(false);
+	const failure = signal("");
+
+	const start = async () => {
+		failure.set("");
+		busy.set(true);
+		try {
+			const response = await fetch("/api/demo-login", { method: "POST" });
+			if (!response.ok) {
+				busy.set(false);
+				failure.set(await demoMessage(response));
+				return;
+			}
+		} catch {
+			busy.set(false);
+			failure.set("Could not reach the server. Check your connection.");
+			return;
+		}
+		// A full load, so the server hook sees the new cookie — the same reason
+		// the password form navigates rather than routing on the client.
+		window.location.assign(destination());
+	};
+
+	return If(
+		data.bind((value) => value.demo !== null),
+		Div(
+			{ class: "flex flex-col gap-3" },
+			Button(
+				{
+					variant: "secondary",
+					class: "w-full gap-2",
+					loading: busy,
+					onClick: () => void start(),
+				},
+				ZapIcon({ class: "size-4" }),
+				data.bind((value) => `Sign in as ${value.demo ?? ""}`),
+			),
+			P({ class: styles.error }, failure),
+		),
+	);
+}
+
+/** The endpoint answers JSON on both of its failures; neither is worth hiding. */
+async function demoMessage(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { message?: unknown };
+		if (typeof body.message === "string" && body.message !== "") return body.message;
+	} catch {
+		// Not JSON — a proxy's error page, most likely.
+	}
+	return "Could not sign in to the demo account.";
+}
+
+/** "Sign in with GitHub", where this deployment has the credentials for it. */
 function SocialSignIn(data: Readable<AuthPageData>, verb: string) {
 	const busy = signal(false);
 	const failure = signal("");
@@ -71,7 +167,7 @@ function SocialSignIn(data: Readable<AuthPageData>, verb: string) {
 	return If(
 		data.bind((value) => value.providers.github),
 		Div(
-			{ class: "mb-5 flex flex-col gap-3" },
+			{ class: "flex flex-col gap-3" },
 			Button(
 				{
 					variant: "secondary",
@@ -83,12 +179,6 @@ function SocialSignIn(data: Readable<AuthPageData>, verb: string) {
 				`${verb} with GitHub`,
 			),
 			P({ class: styles.error }, failure),
-			Div(
-				{ class: "flex items-center gap-3" },
-				Div({ class: "h-px flex-1 bg-border" }),
-				Span({ class: "text-[11px] tracking-wide text-muted-foreground" }, "OR"),
-				Div({ class: "h-px flex-1 bg-border" }),
-			),
 		),
 	);
 }
@@ -143,7 +233,7 @@ export function LoginPage(data: Readable<AuthPageData>) {
 			AppWordmark({ class: styles.mark }),
 			H1({ class: styles.title }, "Sign in to tracker"),
 			P({ class: styles.subtitle }, "Welcome back. Enter your details to continue."),
-			SocialSignIn(data, "Sign in"),
+			AlternativeSignIn(data, "Sign in"),
 			Form(
 				{
 					class: styles.form,
@@ -187,7 +277,7 @@ export function SignUpPage(data: Readable<AuthPageData>) {
 			AppWordmark({ class: styles.mark }),
 			H1({ class: styles.title }, "Create your account"),
 			P({ class: styles.subtitle }, "Track issues with your team in minutes."),
-			SocialSignIn(data, "Continue"),
+			AlternativeSignIn(data, "Continue"),
 			Form(
 				{
 					class: styles.form,
