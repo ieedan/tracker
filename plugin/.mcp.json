@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"tracker": {
+			"type": "http",
+			"url": "${user_config.url}/api/mcp"
+		}
+	}
+}

@@ -160,6 +160,8 @@ deployment made before the push fails validation and has to be redeployed.
   `F` to filter, `⌘↵` to submit a composer or a comment, `Esc` to dismiss.
 - **REST API** — everything the UI does, under `/api/v1`, authenticated with a
   session cookie _or_ an API key.
+- **MCP** — the same surface as tools an agent can call, at `/api/mcp`, behind
+  OAuth and scoped by what the person authorizing it approved.
 
 ## The API
 
@@ -195,6 +197,43 @@ templates), **labels** (write creates one; there is no rename or delete),
 skip those checks; a key without a scope gets 403. Keys minted before scoping
 still have full access. Ingest (`POST …/user-feedback`) needs **feedback**
 write when a key is presented.
+
+## MCP
+
+`/api/mcp` is the same workspace again, as tools an agent calls. The transport
+is kit's — Streamable HTTP, stateless, JSON-only, no session id and no GET stream,
+which the spec allows for a server that never pushes. `src/lib/server/mcp/`
+holds the tools; each one is a thin call into `/api/v1`, so there is no third
+write path either.
+
+There is no token to paste. An unauthorized call gets a 401 carrying
+`WWW-Authenticate: Bearer resource_metadata="…"`, the client follows it to
+`/.well-known/oauth-protected-resource`, registers itself, and a person approves
+the connection on the consent screen — which is where the scopes it may use are
+decided. See [Webhooks from an agent](#webhooks-from-an-agent) for how a grant
+and a scope combine.
+
+`pnpm verify:mcp` exercises the whole route — the JSON-RPC transport, the origin
+and authorization checks, every tool's validation and handler — against a
+stubbed `/api/v1`, so a kit upgrade or a reshuffled tool has to keep the
+contract a client sees.
+
+### The plugin
+
+Pointing an editor at the endpoint by hand works, but it arrives as a URL with
+no name on it. [`plugin/`](plugin/README.md) is the same endpoint packaged as a
+plugin — a logo, a description, and one setting for your instance's origin — with
+a manifest for Claude Code and one for Cursor sitting over the same endpoint.
+
+```sh
+/plugin marketplace add ieedan/tracker
+/plugin install tracker@tracker
+```
+
+The marketplace manifest is `.claude-plugin/marketplace.json` at the root, so
+the repository is both the app and the marketplace that ships its plugin. For
+Cursor, the install deeplink and the plain `mcp.json` are in
+[`plugin/README.md`](plugin/README.md).
 
 ## Attachments
 

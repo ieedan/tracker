@@ -1,0 +1,25 @@
+{
+	"name": "tracker",
+	"description": "The tracker MCP server, as an installable plugin.",
+	"owner": {
+		"name": "Aidan Bleser",
+		"url": "https://github.com/ieedan"
+	},
+	"plugins": [
+		{
+			"name": "tracker",
+			"source": "./plugin",
+			"displayName": "tracker",
+			"description": "Issue tracking from the editor. Reads, files, triages and comments on tracker issues, and manages the webhooks a bot subscribes itself to — over the workspace's MCP endpoint, authorized as its own member.",
+			"version": "0.1.0",
+			"author": {
+				"name": "Aidan Bleser",
+				"url": "https://github.com/ieedan"
+			},
+			"homepage": "https://github.com/ieedan/tracker/blob/main/plugin/README.md",
+			"repository": "https://github.com/ieedan/tracker",
+			"keywords": ["issue-tracker", "issues", "project-management", "feedback", "webhooks", "mcp"],
+			"category": "productivity"
+		}
+	]
+}

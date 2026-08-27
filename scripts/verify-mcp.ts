@@ -11,6 +11,7 @@
  * underneath (a kit upgrade, a reshuffled tool) has to keep that contract or
  * this says which part of it broke.
  */
+import { existsSync, readFileSync } from "node:fs";
 import { AGENT_DEFAULT_SCOPES, AGENT_GRANTABLE_SCOPES } from "../src/lib/domain/agents.ts";
 import { DELETE, GET, POST } from "../src/routes/api/mcp/server.ts";
 
@@ -723,6 +724,92 @@ section("agent scopes");
 		"defaults are otherwise the grantable set",
 		AGENT_DEFAULT_SCOPES.length === AGENT_GRANTABLE_SCOPES.length - 2,
 		{ defaults: AGENT_DEFAULT_SCOPES.length, grantable: AGENT_GRANTABLE_SCOPES.length },
+	);
+}
+
+// ------------------------------------------------------------------ plugin
+
+const ROOT = new URL("../", import.meta.url);
+
+/** The deployment both plugin manifests default their one setting to. */
+const HOSTED = "https://tracker.implementjs.dev";
+
+/** A repository file, by its path from the root. */
+function read(path: string): string {
+	return readFileSync(new URL(path, ROOT), "utf8");
+}
+
+function parse(path: string): Record<string, never> {
+	return JSON.parse(read(path)) as Record<string, never>;
+}
+
+/** The `tracker` entry of an `mcpServers` document, whichever client's it is. */
+function serverUrl(path: string): string {
+	return (parse(path).mcpServers as Record<string, { url: string }>).tracker.url;
+}
+
+/** The `<svg …>` onward, so the licence comment above it may differ. */
+function markup(path: string): string {
+	const source = read(path);
+	return source.slice(source.indexOf("<svg"));
+}
+
+section("plugin manifests");
+{
+	// `plugin/` is the same endpoint with a name and a logo on it, for the
+	// clients that install a plugin rather than paste a URL. Nothing at runtime
+	// reads those files, so nothing at runtime would notice them going stale —
+	// the route moving, the server being renamed, the mark being redrawn in one
+	// of its two copies. That is what this section is for.
+	const claude = parse("plugin/.claude-plugin/plugin.json");
+	const cursor = parse("plugin/.cursor-plugin/plugin.json");
+	const listing = (parse(".claude-plugin/marketplace.json").plugins as Record<string, never>[])[0];
+
+	// The endpoint each config resolves to, with its one variable filled in.
+	const claudeUrl = serverUrl("plugin/.mcp.json").replace("${user_config.url}", ORIGIN);
+	const cursorUrl = serverUrl("plugin/mcp.json").replace("${TRACKER_URL}", ORIGIN);
+
+	check("Claude's config reaches the route", claudeUrl === `${ORIGIN}/api/mcp`, claudeUrl);
+	check("Cursor's config reaches the route", cursorUrl === `${ORIGIN}/api/mcp`, cursorUrl);
+	check(
+		"and the server keeps the name the manifests give it",
+		claude.name === "tracker" && cursor.name === "tracker",
+		{ claude: claude.name, cursor: cursor.name },
+	);
+	const claudeDefault = (claude.userConfig as Record<string, { default: string }>).url;
+	const cursorDefault = (cursor.variables as { properties: Record<string, { default: string }> })
+		.properties.TRACKER_URL;
+
+	check(
+		"the variable each config substitutes is the one its manifest declares",
+		claudeDefault !== undefined && cursorDefault !== undefined,
+	);
+	check(
+		"both default to the hosted instance",
+		// Not the dev server: the default is what most people install and never
+		// touch, and localhost would point them at nothing.
+		claudeDefault?.default === HOSTED && cursorDefault?.default === HOSTED,
+		{ claude: claudeDefault?.default, cursor: cursorDefault?.default },
+	);
+	check(
+		"the marketplace listing points at the plugin",
+		listing?.source === "./plugin" && listing?.name === claude.name,
+		listing?.source,
+	);
+	check(
+		"and every manifest agrees on the version",
+		listing?.version === claude.version && cursor.version === claude.version,
+		{ listing: listing?.version, claude: claude.version, cursor: cursor.version },
+	);
+	check(
+		"the bundled logo is still the app's mark",
+		markup("plugin/assets/logo.svg") === markup("static/favicon.svg"),
+	);
+	check(
+		"and each manifest points at a logo that exists",
+		existsSync(new URL(String(claude.icon), new URL("plugin/", ROOT))) &&
+			existsSync(new URL(String(cursor.logo), ROOT)),
+		{ claude: claude.icon, cursor: cursor.logo },
 	);
 }
 
