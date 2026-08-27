@@ -72,14 +72,14 @@ importers:
         specifier: ^2.21.0
         version: 2.21.0
       '@implementjs/adapter-vercel':
-        specifier: ^0.0.16
-        version: 0.0.16(@implementjs/kit@0.0.16(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
+        specifier: ^0.0.18
+        version: 0.0.18(@implementjs/kit@0.0.18(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))
       '@implementjs/eslint':
         specifier: ~0.0.2
         version: 0.0.2
       '@implementjs/kit':
-        specifier: ~0.0.16
-        version: 0.0.16(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+        specifier: ~0.0.18
+        version: 0.0.18(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
@@ -788,10 +788,10 @@ packages:
   '@fontsource-variable/inter@5.3.0':
     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
-  '@implementjs/adapter-vercel@0.0.16':
-    resolution: {integrity: sha512-ySNGScnB6gv+i4oCZGvrTk1A9JrlI+7KRSQbkV1H31eu2eXA8s65qcn4lRLgsKCa8BcfZFApetCGRa2esPEEYg==}
+  '@implementjs/adapter-vercel@0.0.18':
+    resolution: {integrity: sha512-t7ugU5O4RckLZEBSgN27O8ml/ORr1HcqBErB7irxyr8OOwt9flvKrqAvrZ5G/fU7ODTczIYa0UejmFulZWjfew==}
     peerDependencies:
-      '@implementjs/kit': 0.0.16
+      '@implementjs/kit': 0.0.18
 
   '@implementjs/core@0.0.11':
     resolution: {integrity: sha512-Xz3OO3FkOvggdJhWXp9XfrSsW4kRcbB+4HZU8QeWzGbKivdJriX/lJFLOC7XilmB2SqKTjhJaRfADBXCuR+v+Q==}
@@ -804,8 +804,8 @@ packages:
     peerDependencies:
       valibot: '>=1.4.1 <2'
 
-  '@implementjs/kit@0.0.16':
-    resolution: {integrity: sha512-222NRZTzClwmT/Hef4Y64Fvc0bvKc98gjlzPfdduav9IQ20ebVJWHwjWzN2dhm6vkV7X7Q00203kki98Q9X0FQ==}
+  '@implementjs/kit@0.0.18':
+    resolution: {integrity: sha512-TJdWqPfB2Kw51ekzRxH3XygJh34Hn5lBSty6CReNMtMHtJCde7J5dLGpoDZz9lRwQCJ6nvU9J0SEbuBS1ZJ2UQ==}
     hasBin: true
     peerDependencies:
       neverthrow: ^8.0.0
@@ -2960,9 +2960,9 @@ snapshots:
 
   '@fontsource-variable/inter@5.3.0': {}
 
-  '@implementjs/adapter-vercel@0.0.16(@implementjs/kit@0.0.16(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
+  '@implementjs/adapter-vercel@0.0.18(@implementjs/kit@0.0.18(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)))':
     dependencies:
-      '@implementjs/kit': 0.0.16(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      '@implementjs/kit': 0.0.18(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
 
   '@implementjs/core@0.0.11':
     dependencies:
@@ -2977,7 +2977,7 @@ snapshots:
       '@implementjs/core': 0.0.11
       valibot: 1.4.2(typescript@7.0.2)
 
-  '@implementjs/kit@0.0.16(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
+  '@implementjs/kit@0.0.18(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))':
     dependencies:
       '@implementjs/core': 0.0.11
       '@implementjs/router': 0.0.13

@@ -12,7 +12,6 @@
  * this says which part of it broke.
  */
 import { AGENT_DEFAULT_SCOPES, AGENT_GRANTABLE_SCOPES } from "../src/lib/domain/agents.ts";
-import { MCP_TOOLS } from "../src/lib/server/mcp/tools.server.ts";
 import { DELETE, GET, POST } from "../src/routes/api/mcp/server.ts";
 
 const ORIGIN = "https://tracker.test";
@@ -262,22 +261,12 @@ const listed = await (async () => {
 		"every tool has an object inputSchema",
 		listed.every((entry) => (entry.inputSchema as { type?: string }).type === "object"),
 	);
-	// Kit would otherwise convert `input` by importing the valibot converter
-	// under a variable specifier, which no bundler follows — so the package is
-	// absent from the deployed function, the import throws, and every tool is
-	// listed as an unconstrained `{"type":"object"}` with no arguments the model
-	// can see. Nothing above catches that: dev has the converter installed, so
-	// the schemas look right here while production serves empty ones. Converting
-	// in `tools.server.ts` instead is what survives the build, and this is the
-	// check that says so.
-	const unconverted = MCP_TOOLS.filter(
-		(entry) => entry.input !== undefined && entry.inputJsonSchema === undefined,
-	).map((entry) => entry.name);
-	check(
-		"every schema is converted at build time, not by kit's runtime import",
-		unconverted.length === 0,
-		unconverted,
-	);
+	// A tool listed with no properties is one the model can see the name of and
+	// nothing else. Two of them genuinely take no arguments; a third would mean
+	// the conversion silently produced nothing — which is what shipping without
+	// the JSON-Schema converter looked like (implementjs ENG-29). That the
+	// converter reaches the *deployed bundle* is asserted by the build, since
+	// nothing running here can tell: dev always resolves it from node_modules.
 	const unconstrained = listed
 		.filter((entry) => {
 			const schema = entry.inputSchema as { properties?: Record<string, unknown> };

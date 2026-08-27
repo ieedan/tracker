@@ -48,9 +48,9 @@
 	"devDependencies": {
 		"@clack/prompts": "^1.7.0",
 		"@dotenvx/dotenvx": "^2.21.0",
-		"@implementjs/adapter-vercel": "^0.0.16",
+		"@implementjs/adapter-vercel": "^0.0.18",
 		"@implementjs/eslint": "~0.0.2",
-		"@implementjs/kit": "~0.0.16",
+		"@implementjs/kit": "~0.0.18",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.2.0",
 		"@valibot/to-json-schema": "^1.7.1",
