@@ -6,7 +6,7 @@ import type { OAuth2Tokens, OAuth2UserInfo } from "better-auth/oauth2";
 import { jwt } from "better-auth/plugins";
 import type { GithubProfile } from "better-auth/social-providers";
 import {
-	AGENT_GRANTABLE_SCOPES,
+	AGENT_DEFAULT_SCOPES,
 	AGENT_REGISTRABLE_SCOPES,
 	AGENT_SCOPES,
 	OPENID_SCOPES,
@@ -220,11 +220,13 @@ export const auth = betterAuth({
 			allowDynamicClientRegistration: true,
 			allowUnauthenticatedClientRegistration: true,
 			// A client that asks for nothing in particular gets the whole non-admin
-			// set, because the tools are not independently useful: creating an
-			// issue needs a team key, and finding one needs `workspace:read`. The
-			// human still sees exactly what is being granted on the consent screen,
-			// and admin scopes are excluded here regardless.
-			clientRegistrationDefaultScopes: AGENT_GRANTABLE_SCOPES,
+			// set bar webhooks, because the tools are not independently useful:
+			// creating an issue needs a team key, and finding one needs
+			// `workspace:read`. Webhooks are the exception a client has to name —
+			// see `AGENT_DEFAULT_SCOPES`. The human still sees exactly what is being
+			// granted on the consent screen, and admin scopes are excluded here
+			// regardless.
+			clientRegistrationDefaultScopes: AGENT_DEFAULT_SCOPES,
 			// Admin-only scopes are withheld at registration. Agents are capped
 			// below admin in guards.server.ts regardless — this just turns a
 			// certain 403 into a clear error at the point of registration.

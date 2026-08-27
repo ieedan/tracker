@@ -2,7 +2,11 @@ import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { WebhookDeliverySchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
+import {
+	requireAdminAccess,
+	requireMembership,
+	requirePermission,
+} from "@/lib/server/guards.server";
 import { webhook, webhookDelivery } from "@/lib/server/schema.server";
 import { toDelivery } from "@/lib/server/serialize.server";
 import { dispatchPending } from "@/lib/server/webhooks.server";
@@ -16,7 +20,7 @@ import { handler } from "./$types";
 export const POST = handler({
 	response: WebhookDeliverySchema,
 	async handle({ locals, params }) {
-		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		const membership = requireAdminAccess(await requireMembership(locals, params.slug));
 		requirePermission(locals, "webhooks", "write");
 
 		const owned = await db

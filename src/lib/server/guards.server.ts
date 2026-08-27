@@ -10,6 +10,15 @@ export interface Membership {
 	user: App.SessionUser;
 	workspace: typeof workspace.$inferSelect;
 	role: WorkspaceRole;
+	/**
+	 * The role behind the request, before the agent cap.
+	 *
+	 * For a person these are the same value. For an agent `role` is capped at
+	 * `member` while this stays whatever the human who authorized it holds, which
+	 * is what `requireAdminAccess` reads to admit an admin's delegate to a route
+	 * `requireAdmin` closes outright.
+	 */
+	delegatedRole: WorkspaceRole;
 }
 
 /** 401s a request with no session and no valid credential. */
@@ -47,7 +56,7 @@ export async function requireMembership(locals: App.Locals, slug: string): Promi
 	const row = rows[0];
 	if (row === undefined) error(404, `no workspace "${slug}"`);
 
-	return { user, workspace: row.workspace, role: row.role };
+	return { user, workspace: row.workspace, role: row.role, delegatedRole: row.role };
 }
 
 /**
@@ -61,6 +70,10 @@ export async function requireMembership(locals: App.Locals, slug: string): Promi
  * Two caps hold regardless. An agent can never be more capable than the person
  * who set it up, and it is never an admin: returning `member` enforces the
  * second for every admin-gated route at once, since `requireAdmin` reads this.
+ *
+ * `delegatedRole` carries what the approver actually holds, so a route that
+ * wants to let an admin's delegate in — see `requireAdminAccess` — can, without
+ * the cap being lifted everywhere by one route needing it.
  */
 async function agentMembership(
 	agent: App.AgentContext,
@@ -86,13 +99,33 @@ async function agentMembership(
 	// implement:bug:#2: `valid-role` treats any object property named `role` as
 	// an ARIA role, including a workspace role in a server-only file.
 	// oxlint-disable-next-line implementjs/valid-role
-	return { user: bot, workspace: row.workspace, role: "member" };
+	return { user: bot, workspace: row.workspace, role: "member", delegatedRole: row.role };
 }
 
 /** Admin-only actions: managing members, invites and workspace settings. */
 export function requireAdmin(membership: Membership): Membership {
 	if (membership.role !== "admin") error(403, "admin role required");
 	return membership;
+}
+
+/**
+ * Admin-level actions an admin may also delegate to an agent (ENG-65).
+ *
+ * For a person this is exactly `requireAdmin` — `delegatedRole` is their own
+ * role, so nothing widens for the humans in a workspace. What it adds is the
+ * agent case: the bot is still capped at `member`, but the human it acts for is
+ * an admin, and holding an admin's delegated token is holding an admin's reach.
+ *
+ * It is not a general lifting of the never-admin cap, which is why it is a
+ * second guard rather than a change to `requireAdmin`. Managing members,
+ * invites, teams and repositories stays out of an agent's hands whatever it was
+ * granted; only webhooks opt in, and only because configuring one is the kind of
+ * plumbing an agent is *for*. The scope check beside it is the other half: the
+ * approver has to have ticked webhooks on the consent screen as well.
+ */
+export function requireAdminAccess(membership: Membership): Membership {
+	if (membership.role === "admin" || membership.delegatedRole === "admin") return membership;
+	error(403, "admin role required");
 }
 
 /**

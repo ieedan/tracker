@@ -2,7 +2,11 @@ import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import { WebhookDeliveryDetailSchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
+import {
+	requireAdminAccess,
+	requireMembership,
+	requirePermission,
+} from "@/lib/server/guards.server";
 import { webhook, webhookDelivery } from "@/lib/server/schema.server";
 import { toDeliveryDetail } from "@/lib/server/serialize.server";
 import { requestHeadersFor } from "@/lib/server/webhooks.server";
@@ -16,7 +20,7 @@ import { handler } from "./$types";
 export const GET = handler({
 	response: WebhookDeliveryDetailSchema,
 	async handle({ locals, params }) {
-		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		const membership = requireAdminAccess(await requireMembership(locals, params.slug));
 		requirePermission(locals, "webhooks", "read");
 
 		const rows = await db

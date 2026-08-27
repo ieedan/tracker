@@ -451,7 +451,8 @@ Verify before trusting the body — over the raw bytes, not a re-serialised obje
 ```js
 const expected = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
 const ok =
-	expected.length === signature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+	expected.length === signature.length &&
+	crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 ```
 
 The payload is `{ id, event, createdAt, workspace, actor, data }`. `data.issue`
@@ -534,6 +535,29 @@ URLs resolving to loopback, private, link-local or carrier-NAT addresses are
 refused — a webhook URL is user-supplied, and without that check the endpoint is
 a server-side request forgery primitive. Loopback is allowed outside production
 so you can point one at a local listener while developing.
+
+### Webhooks from an agent
+
+Managing webhooks is admin-only, and an agent is capped below admin — so
+subscribing a bot to an event used to mean a person clicking through Settings on
+its behalf. It no longer does. The MCP server carries `list_webhooks`,
+`create_webhook`, `update_webhook`, `delete_webhook`, `test_webhook` and
+`list_webhook_deliveries`, and an agent reaches them when **both** halves hold:
+the person who authorized it is a workspace admin (`requireAdminAccess` in
+`guards.server.ts`, the one route family where an admin's delegate counts as an
+admin), and the grant they approved includes `webhooks:write`.
+
+That scope is grantable but never default. Every other non-admin scope is handed
+to a client that registers without naming any, on the reasoning that the tools
+are useless in isolation; a webhook posts workspace events to a URL the agent
+chose, so a client that wants it has to ask, and the person approving it sees it
+spelled out. Managing members, invites, teams and repositories stays out of an
+agent's hands whatever it was granted.
+
+The `text` format is usually the one to reach for here: it wraps the event as
+`{"text": …}`, which is the shape a Claude Code routine's API trigger takes, so
+the agent picking the event up gets the issue it is about without writing a
+receiver.
 
 ## Layout
 

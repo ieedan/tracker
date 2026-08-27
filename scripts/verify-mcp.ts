@@ -11,6 +11,7 @@
  * underneath (a kit upgrade, a reshuffled tool) has to keep that contract or
  * this says which part of it broke.
  */
+import { AGENT_DEFAULT_SCOPES, AGENT_GRANTABLE_SCOPES } from "../src/lib/domain/agents.ts";
 import { DELETE, GET, POST } from "../src/routes/api/mcp/server.ts";
 
 const ORIGIN = "https://tracker.test";
@@ -211,7 +212,7 @@ const listed = await (async () => {
 	return (body.result as { tools: Record<string, never>[] }).tools;
 })();
 {
-	check("every tool is listed", listed.length === 23, listed.length);
+	check("every tool is listed", listed.length === 29, listed.length);
 	const names = listed.map((entry) => String(entry.name));
 	check(
 		"names are unchanged",
@@ -235,6 +236,12 @@ const listed = await (async () => {
 				"create_label",
 				"list_members",
 				"get_workspace",
+				"list_webhooks",
+				"create_webhook",
+				"update_webhook",
+				"delete_webhook",
+				"test_webhook",
+				"list_webhook_deliveries",
 				"list_feedback",
 				"get_feedback",
 				"update_feedback",
@@ -275,13 +282,26 @@ const listed = await (async () => {
 		!readOnly.includes("create_issue") && readOnly.includes("get_issue"),
 	);
 	check(
-		"delete_issue is the destructive one",
+		"the deletes are the destructive ones",
 		listed
 			.filter(
 				(entry) => (entry.annotations as { destructiveHint?: boolean }).destructiveHint === true,
 			)
 			.map((entry) => entry.name)
-			.join(",") === "delete_issue",
+			.join(",") === "delete_issue,delete_webhook",
+	);
+	// A webhook's conditions are the one recursive schema here — `v.lazy` over a
+	// group of rules — and the JSON Schema for it is a `$ref`. If the `$defs` it
+	// points at do not survive the conversion, a strict client sees a dangling
+	// reference rather than a filter it can fill in.
+	const webhookSchema = listed.find((entry) => entry.name === "create_webhook")!.inputSchema as {
+		$defs?: Record<string, unknown>;
+	};
+	check(
+		"the recursive filter schema keeps its definitions",
+		JSON.stringify(webhookSchema).includes('"$ref"') &&
+			Object.keys(webhookSchema.$defs ?? {}).length > 0,
+		webhookSchema.$defs,
 	);
 	const issueSchema = listed.find((entry) => entry.name === "list_issues")!.inputSchema as {
 		properties: Record<string, { description?: string; type?: string }>;
@@ -377,6 +397,100 @@ calls.length = 0;
 	check("delete_issue DELETEs", calls.at(-1)?.method === "DELETE", calls.at(-1));
 	check("an empty body is not an error", result.isError === undefined, result);
 }
+
+section("tools/call — webhooks");
+{
+	calls.length = 0;
+	nextApiResponse = () => json({ webhook: { id: "wh_1" }, secret: "whsec_…" }, 201);
+	const result = await call("create_webhook", {
+		url: "https://example.test/hook",
+		events: ["issue.created"],
+		format: "text",
+		workspace: "tracker",
+	});
+	const posted = calls.at(-1)?.body as Record<string, unknown>;
+	check(
+		"create_webhook POSTs to the webhooks collection",
+		calls.at(-1)?.method === "POST" && calls.at(-1)?.path === "/api/v1/workspaces/tracker/webhooks",
+		calls.at(-1),
+	);
+	check(
+		"with the body the endpoint takes, `workspace` stripped",
+		posted.workspace === undefined &&
+			posted.url === "https://example.test/hook" &&
+			JSON.stringify(posted.events) === JSON.stringify(["issue.created"]) &&
+			posted.format === "text",
+		posted,
+	);
+	check(
+		"the schema's defaults come through here too",
+		posted.description === "" && posted.filter === null && posted.template === null,
+		posted,
+	);
+	check(
+		"the once-only secret reaches the model",
+		result.content[0]?.text?.includes("whsec_") === true,
+		result,
+	);
+}
+{
+	const result = await call("create_webhook", {
+		url: "not a url",
+		events: [],
+		workspace: "tracker",
+	});
+	check("a URL the schema rejects never reaches the API", result.isError === true, result);
+}
+{
+	calls.length = 0;
+	nextApiResponse = () => json({ id: "wh_1" });
+	await call("update_webhook", {
+		id: "wh_1",
+		changes: { enabled: false },
+		workspace: "tracker",
+	});
+	check(
+		"update_webhook PATCHes only the fields it was given",
+		calls.at(-1)?.method === "PATCH" &&
+			calls.at(-1)?.path === "/api/v1/workspaces/tracker/webhooks/wh_1" &&
+			JSON.stringify(calls.at(-1)?.body) === JSON.stringify({ enabled: false }),
+		calls.at(-1),
+	);
+}
+{
+	calls.length = 0;
+	nextApiResponse = () => new Response(null, { status: 204 });
+	await call("delete_webhook", { id: "wh_1", workspace: "tracker" });
+	check(
+		"delete_webhook DELETEs the webhook",
+		calls.at(-1)?.method === "DELETE" &&
+			calls.at(-1)?.path === "/api/v1/workspaces/tracker/webhooks/wh_1",
+		calls.at(-1),
+	);
+}
+{
+	calls.length = 0;
+	nextApiResponse = () => json({ id: "del_1", status: "succeeded" });
+	await call("test_webhook", { id: "wh_1", workspace: "tracker" });
+	check(
+		"test_webhook posts to the test route",
+		calls.at(-1)?.method === "POST" &&
+			calls.at(-1)?.path === "/api/v1/workspaces/tracker/webhooks/wh_1/test",
+		calls.at(-1),
+	);
+}
+{
+	calls.length = 0;
+	nextApiResponse = () => json([]);
+	await call("list_webhook_deliveries", { id: "wh_1", limit: 5, workspace: "tracker" });
+	check(
+		"a delivery limit becomes a query param",
+		calls.at(-1)?.path === "/api/v1/workspaces/tracker/webhooks/wh_1/deliveries?limit=5",
+		calls.at(-1),
+	);
+}
+
+section("tools/call — the agent's token");
 {
 	const request = rpc("tools/call", { name: "whoami", arguments: {} });
 	request.headers.set("authorization", "Bearer token-123");
@@ -532,6 +646,35 @@ section("workspace resolution");
 		none.content[0],
 	);
 	globalThis.fetch = before;
+}
+
+section("agent scopes");
+{
+	// The other half of the webhook tools: a scope an agent cannot be granted
+	// makes them a guaranteed 403, and one handed out by default makes them a
+	// capability nobody asked for.
+	check(
+		"webhooks are grantable",
+		AGENT_GRANTABLE_SCOPES.includes("webhooks:read") &&
+			AGENT_GRANTABLE_SCOPES.includes("webhooks:write"),
+		AGENT_GRANTABLE_SCOPES,
+	);
+	check(
+		"but never by default",
+		!AGENT_DEFAULT_SCOPES.includes("webhooks:read") &&
+			!AGENT_DEFAULT_SCOPES.includes("webhooks:write"),
+		AGENT_DEFAULT_SCOPES,
+	);
+	check(
+		"members:write stays admin-only",
+		!AGENT_GRANTABLE_SCOPES.includes("members:write"),
+		AGENT_GRANTABLE_SCOPES,
+	);
+	check(
+		"defaults are otherwise the grantable set",
+		AGENT_DEFAULT_SCOPES.length === AGENT_GRANTABLE_SCOPES.length - 2,
+		{ defaults: AGENT_DEFAULT_SCOPES.length, grantable: AGENT_GRANTABLE_SCOPES.length },
+	);
 }
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${failures} check(s) failed`}`);
