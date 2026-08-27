@@ -20,6 +20,7 @@ import {
 	getIssueById,
 	insertWithNumber,
 	setIssueLabels,
+	subscribeToIssue,
 } from "@/lib/server/issues.server";
 import { feedback, issue, team } from "@/lib/server/schema.server";
 import { requireTeam } from "@/lib/server/teams.server";
@@ -91,6 +92,13 @@ export const POST = handler({
 		const carried = await labelIdsFor(row.id);
 		const marker = await feedbackLabelId(workspace.id);
 		await setIssueLabels(issueId, [...new Set([...carried, marker])]);
+
+		// Converting files the issue on the converter's behalf, so they — and an
+		// assignee named on the form — follow it from the start.
+		await subscribeToIssue(issueId, user.id);
+		await subscribeToIssue(issueId, body.assigneeId);
+		// An agent converting on someone's behalf follows for them too.
+		await subscribeToIssue(issueId, locals.agent?.installedByUserId);
 
 		await db
 			.update(feedback)

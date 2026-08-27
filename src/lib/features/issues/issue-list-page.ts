@@ -6,14 +6,13 @@ import {
 	If,
 	ImplementDocument,
 	ImplementLifecycle,
-	Input,
 	Span,
 	derived,
 	signal,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { LayoutList, ListFilter, Plus, Search } from "@implementjs/lucide";
+import { LayoutList, ListFilter, Plus } from "@implementjs/lucide";
 import { navigateTo } from "@implementjs/core";
 import { isTyping } from "@/lib/client/is-typing";
 import { StatusIcon } from "@/lib/components/glyphs";
@@ -111,8 +110,6 @@ export function IssueListPage({
 	});
 	const refresh = () => void refreshIssues(issues, scope);
 
-	const query = signal("");
-
 	// The URL is the filter state. Deriving from it rather than mirroring it into
 	// a signal means a shared link, a reload and the back button all land on the
 	// same view — and the server render is already filtered, so nothing flashes
@@ -146,21 +143,13 @@ export function IssueListPage({
 
 	const addFilterOpen = signal(false);
 
-	const visible = derived([issues, query, filters, view], (list, term, active, tab) => {
-		const needle = term.trim().toLowerCase();
-		// Tab first, then the filters within it, then the search box.
+	// Tab first, then the filters within it. Searching the list is the command
+	// palette's job — the header carries no box of its own.
+	const visible = derived([issues, filters, view], (list, active, tab) => {
 		const inView = list.filter((issue) => matchesView(issue, tab));
-		const matched =
-			active.length === 0 ? inView : inView.filter((issue) => matchesFilters(issue, active));
-		if (needle === "") return matched;
-		return matched.filter(
-			(issue) =>
-				issue.title.toLowerCase().includes(needle) ||
-				issue.identifier.toLowerCase().includes(needle),
-		);
+		return active.length === 0 ? inView : inView.filter((issue) => matchesFilters(issue, active));
 	});
 
-	const searchRef = signal<HTMLInputElement | null>(null);
 	const hoveredId = signal<string | null>(null);
 	const rowMenu = signal<{ id: string; field: "status" | "priority" | "assignee" } | null>(null);
 	const selected = signal<string[]>([]);
@@ -227,7 +216,7 @@ export function IssueListPage({
 				}),
 		}),
 
-		// `c` opens the composer, `/` focuses search — the two Linear reflexes.
+		// `c` opens the composer, `f` opens the filter menu — the Linear reflexes.
 		ImplementDocument({
 			onKeydown: (event) => {
 				if (isTyping(event)) return;
@@ -243,11 +232,6 @@ export function IssueListPage({
 				if (key === "c") {
 					event.preventDefault();
 					openCreateIssue(params.slug.get(), data.get().team?.key);
-					return;
-				}
-				if (key === "/") {
-					event.preventDefault();
-					searchRef.get()?.focus();
 					return;
 				}
 				if (key === "f") {
@@ -300,19 +284,13 @@ export function IssueListPage({
 			},
 		}),
 
-		Header(
-			data,
-			query,
-			searchRef,
-			params,
-			visible,
-			filters,
-			filterContext,
-			applyFilters,
-			addFilterOpen,
-			selected,
-		),
-		ViewTabs({ url }),
+		Header(data, visible, selected),
+		// The filter trigger rides at the right end of the tab row, the way
+		// Linear's does; the chips for whatever it sets still land underneath.
+		ViewTabs({
+			url,
+			actions: AddFilterButton(filters, filterContext, applyFilters, addFilterOpen, "icon"),
+		}),
 		FilterBar({ filters, context: filterContext, onChange: applyFilters }),
 		BulkActionsDialog({
 			open: bulkOpen,
@@ -336,7 +314,7 @@ export function IssueListPage({
 			},
 			If(
 				visible.bind((list) => list.length === 0),
-				EmptyState(query, params, data, filters, applyFilters, view, applyView),
+				EmptyState(params, data, filters, applyFilters, view, applyView),
 			),
 			...ISSUE_STATUSES.map((status) =>
 				StatusGroup(
@@ -356,23 +334,20 @@ export function IssueListPage({
 	);
 }
 
+/**
+ * The list header: what you are looking at, and how much of it.
+ *
+ * Nothing else — the search box moved to the command palette, New issue to the
+ * sidebar and the per-group plus, and Filter down onto the tab row. One line
+ * that fits on a phone without wrapping, the way Linear's does.
+ */
 function Header(
 	data: Readable<PageData>,
-	query: ReturnType<typeof signal<string>>,
-	searchRef: ReturnType<typeof signal<HTMLInputElement | null>>,
-	params: { slug: Readable<string> },
 	visible: Readable<Issue[]>,
-	filters: Readable<Filter[]>,
-	filterContext: Readable<FilterContext>,
-	applyFilters: (next: Filter[]) => void,
-	addFilterOpen: ReturnType<typeof signal<boolean>>,
 	selected: ReturnType<typeof signal<string[]>>,
 ) {
 	return Div(
-		{
-			class:
-				"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 sm:h-12 sm:flex-nowrap sm:py-0",
-		},
+		{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
 		SelectIssuesCheckbox({
 			selected,
 			issues: visible,
@@ -397,40 +372,10 @@ function Header(
 			// everything reads as 0 rather than the unfiltered total.
 			visible.bind((list) => `${list.length}`),
 		),
-
-		AddFilterButton(filters, filterContext, applyFilters, addFilterOpen),
-
-		// The search takes a full row of its own on a phone, where 14rem of
-		// input and the buttons cannot share one.
-		Div(
-			{ class: "relative order-last w-full sm:order-none sm:ml-auto sm:w-auto" },
-			Search({
-				class:
-					"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
-			}),
-			Input({
-				this: searchRef,
-				value: query,
-				placeholder: "Search issues…",
-				class:
-					"h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring sm:w-56",
-			}),
-		),
-		Button(
-			{
-				size: "sm",
-				class: "ml-auto gap-1.5 sm:ml-0",
-				"aria-label": "New issue",
-				onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key),
-			},
-			Plus({ class: "size-3.5" }),
-			Span({ class: "hidden sm:inline" }, "New issue"),
-		),
 	);
 }
 
 function EmptyState(
-	query: Readable<string>,
 	params: { slug: Readable<string> },
 	data: Readable<PageData>,
 	filters: Readable<Filter[]>,
@@ -438,38 +383,27 @@ function EmptyState(
 	view: Readable<IssueView>,
 	applyView: (next: IssueView) => void,
 ) {
-	// "Nothing here" means four different things; say which one.
+	// "Nothing here" means three different things; say which one.
 	return If(
-		query.bind((term) => term.trim() !== ""),
+		filters.bind((active) => active.length > 0),
 		Empty(
 			EmptyHeader(
-				EmptyMedia({ variant: "icon" }, Search({ "aria-hidden": true })),
-				EmptyTitle("Nothing matches"),
-				EmptyDescription(query.bind((term) => `No issues match \u201C${term.trim()}\u201D.`)),
+				EmptyMedia({ variant: "icon" }, ListFilter({ "aria-hidden": true })),
+				EmptyTitle("No matching issues"),
+				EmptyDescription("No issues match these filters."),
+			),
+			EmptyContent(
+				Button(
+					{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
+					"Clear filters",
+				),
 			),
 		),
 	)
 		.ElseIf(
-			filters.bind((active) => active.length > 0),
-			Empty(
-				EmptyHeader(
-					EmptyMedia({ variant: "icon" }, ListFilter({ "aria-hidden": true })),
-					EmptyTitle("No matching issues"),
-					EmptyDescription("No issues match these filters."),
-				),
-				EmptyContent(
-					Button(
-						{ size: "sm", variant: "secondary", onClick: () => applyFilters([]) },
-						"Clear filters",
-					),
-				),
-			),
-		)
-		.ElseIf(
 			// A tab can come up empty while the workspace is full of work, so
 			// offer the way back out rather than claiming there is nothing. The
-			// way out is All — the only tab that hides nothing, and the one the
-			// default Active tab needs when the work in flight has run dry.
+			// way out is All issues — the only tab that hides nothing.
 			view.bind((tab) => tab !== ALL_VIEW),
 			Empty(
 				EmptyHeader(
@@ -480,7 +414,7 @@ function EmptyState(
 				EmptyContent(
 					Button(
 						{ size: "sm", variant: "secondary", onClick: () => applyView(ALL_VIEW) },
-						`Show ${ISSUE_VIEW_LABELS[ALL_VIEW].toLowerCase()} issues`,
+						`Show ${ISSUE_VIEW_LABELS[ALL_VIEW].toLowerCase()}`,
 					),
 				),
 			),
@@ -550,6 +484,23 @@ function StatusGroup(
 				Span(
 					{ class: "text-muted-foreground" },
 					rows.bind((list) => `${list.length}`),
+				),
+
+				// Linear's per-group plus: files straight into this band rather than
+				// making you set the status afterwards. Always there, but muted
+				// enough that a column of them does not read as a column of buttons.
+				Button(
+					{
+						variant: "ghost",
+						size: "icon-xs",
+						class: "ml-auto text-muted-foreground hover:text-foreground",
+						title: `New ${STATUS_LABELS[status].toLowerCase()} issue`,
+						"aria-label": `New ${STATUS_LABELS[status].toLowerCase()} issue`,
+						// `undefined` on the workspace list, where the composer picks the
+						// team itself; the team key on a team route.
+						onClick: () => openCreateIssue(params.slug.get(), data.get().team?.key, { status }),
+					},
+					Plus({ class: "size-3.5" }),
 				),
 			),
 			ForEach(

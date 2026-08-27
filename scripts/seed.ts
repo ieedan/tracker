@@ -25,6 +25,7 @@ import {
 	workspaceMember,
 } from "../src/lib/server/schema.server";
 import { DEFAULT_TEAMS } from "../src/lib/domain/issues";
+import { defaultTeamLook } from "../src/lib/domain/team-icons";
 import type { IssuePriority, IssueStatus } from "../src/lib/domain/issues";
 
 const PASSWORD = "password123";
@@ -180,6 +181,9 @@ async function main(): Promise<void> {
 			workspaceId,
 			name: entry.name,
 			key: entry.key,
+			// Same tiles a real workspace is created with, so the demo looks like
+			// one rather than like two unset teams.
+			...defaultTeamLook(entry.key),
 			createdAt: new Date(),
 		});
 	}

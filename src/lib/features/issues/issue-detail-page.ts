@@ -1,6 +1,7 @@
 import { router } from "$implement/router";
 import {
 	Div,
+	Dynamic,
 	Fragment,
 	H1,
 	If,
@@ -16,7 +17,7 @@ import {
 	type Child,
 	type Readable,
 } from "@implementjs/core";
-import { ChevronLeft } from "@implementjs/lucide";
+import { Bell, BellOff, ChevronLeft } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Markdown } from "@/lib/components/markdown";
@@ -64,17 +65,33 @@ interface PageData {
 	teams: Team[];
 	members: Member[];
 	labels: Label[];
+	/** Whether the viewer is following this issue — the rail's Subscribe state. */
+	subscribed: boolean;
 	/** From the app layout — whose comments get an Edit and a Delete. */
 	user: { id: string };
+}
+
+export interface IssueDetailPageOptions {
+	/**
+	 * Rendered inside another screen — the inbox's reading pane — rather than as
+	 * the whole of /issue/:identifier.
+	 *
+	 * Two differences, both about the host: the breadcrumb header is dropped,
+	 * because the host has one of its own above this, and the rail waits for a
+	 * wider viewport, because the host is holding a list beside it and 1024px of
+	 * window is nowhere near 1024px of pane.
+	 */
+	embedded?: boolean;
 }
 
 export function IssueDetailPage({
 	data,
 	params,
+	embedded = false,
 }: {
 	data: Readable<PageData>;
 	params: { slug: Readable<string>; identifier: Readable<string> };
-}) {
+} & IssueDetailPageOptions) {
 	// `patchIssue` works over a list, so the detail page keeps a list of one.
 	const issues = signal<Issue[]>([data.get().issue]);
 	data.onChange((next) => issues.set([next.issue]));
@@ -177,7 +194,8 @@ export function IssueDetailPage({
 
 	// Wide enough for the properties rail; below this the same sections stack
 	// under the body instead, because a fixed 16rem column would eat the page.
-	const hasRail = mediaQuery("(min-width: 1024px)");
+	// Embedded, the notification list has already taken 380px off the front.
+	const hasRail = mediaQuery(embedded ? "(min-width: 1400px)" : "(min-width: 1024px)");
 
 	// Moving teams renumbers the issue, so the URL it lives at changes with it.
 	const moveTeam = (key: string) => {
@@ -303,6 +321,11 @@ export function IssueDetailPage({
 
 		Div(
 			{ class: "flex flex-col items-start gap-1 border-t border-border pt-3" },
+			SubscribeButton({
+				slug: params.slug,
+				identifier: issue.bind("identifier"),
+				subscribed: data.bind((value) => value.subscribed),
+			}),
 			CopyPromptButton({ issue, slug: params.slug }),
 			TransferIssueButton({ slug: params.slug, issue }),
 			DeleteIssueButton({ slug: params.slug, issue }),
@@ -360,21 +383,26 @@ export function IssueDetailPage({
 
 		Div(
 			{ class: "flex min-w-0 flex-1 flex-col" },
-			Div(
-				{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
-				router.Link(
-					{
-						to: "/app/:slug",
-						params: { slug: params.slug },
-						class:
-							"flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
-					},
-					ChevronLeft({ class: "size-3.5" }),
-					"Issues",
-				),
-				Span({ class: "text-muted-foreground" }, "/"),
-				Span({ class: "font-mono text-[12px] text-muted-foreground" }, issue.bind("identifier")),
-			),
+			embedded
+				? null
+				: Div(
+						{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
+						router.Link(
+							{
+								to: "/app/:slug",
+								params: { slug: params.slug },
+								class:
+									"flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
+							},
+							ChevronLeft({ class: "size-3.5" }),
+							"Issues",
+						),
+						Span({ class: "text-muted-foreground" }, "/"),
+						Span(
+							{ class: "font-mono text-[12px] text-muted-foreground" },
+							issue.bind("identifier"),
+						),
+					),
 
 			Div(
 				{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },
@@ -431,6 +459,75 @@ export function IssueDetailPage({
 
 function toggle(ids: string[], id: string): string[] {
 	return ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
+}
+
+/**
+ * Follow, or stop following, this issue — Linear's Subscribe, in the rail with
+ * the other per-issue actions.
+ *
+ * Most subscriptions arrive without anyone pressing anything: commenting on an
+ * issue subscribes you, and so does having one assigned to you. This is for the
+ * two cases those miss — something you want to watch without touching, and
+ * something you have stopped caring about. What you follow is what the
+ * Subscribed tab of My Issues lists.
+ *
+ * The state is seeded by the page load rather than fetched here, so the button
+ * renders correct on the server instead of settling a moment later. The write
+ * is optimistic and rolls back, like every other control on this page.
+ */
+function SubscribeButton({
+	slug,
+	identifier,
+	subscribed,
+}: {
+	slug: Readable<string>;
+	identifier: Readable<string>;
+	subscribed: Readable<boolean>;
+}) {
+	const on = signal(subscribed.get());
+	const pending = signal(false);
+
+	const write = async () => {
+		const next = !on.get();
+		on.set(next);
+		pending.set(true);
+
+		const { error } = await api.POST("/api/v1/workspaces/[slug]/issues/[identifier]/subscribe", {
+			params: { slug: slug.get(), identifier: identifier.get() },
+			body: { subscribed: next },
+		});
+		pending.set(false);
+
+		if (error !== undefined) {
+			on.set(!next);
+			toastError(messageOf(error, next ? "Could not subscribe" : "Could not unsubscribe"));
+		}
+	};
+
+	return Fragment(
+		// Navigating between issues reseeds the load rather than remounting the
+		// rail, so the button has to follow `data` — but never on top of a write
+		// still in flight, whose optimistic value is the newer of the two.
+		ImplementEffect([subscribed], (value) => {
+			if (!pending.get()) on.set(value);
+		}),
+
+		Button(
+			{
+				size: "sm",
+				variant: "ghost",
+				class: "h-7 w-full justify-start gap-1.5 px-1.5 text-[12px] text-muted-foreground",
+				title: on.bind((value) =>
+					value ? "Stop getting notified about this issue" : "Get notified about this issue",
+				),
+				onClick: () => void write(),
+			},
+			Dynamic([on], (value) =>
+				value ? Bell({ class: "size-3.5 text-primary" }) : BellOff({ class: "size-3.5" }),
+			),
+			on.bind((value) => (value ? "Subscribed" : "Subscribe")),
+		),
+	);
 }
 
 /**

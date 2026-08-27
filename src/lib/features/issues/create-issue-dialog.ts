@@ -13,7 +13,7 @@ import {
 	Span,
 	signal,
 } from "@implementjs/core";
-import { X } from "@implementjs/lucide";
+import { Maximize2, Minimize2, X } from "@implementjs/lucide";
 import { router } from "$implement/router";
 import { api, messageOf } from "@/lib/client/api";
 import { isTyping } from "@/lib/client/is-typing";
@@ -70,6 +70,7 @@ import {
 } from "./pickers";
 import { RepositoryPicker, toRepositoryRef, type RepositoryRef } from "./repository-picker";
 import { BodyComposer } from "./body-composer";
+import { cn } from "@/lib/utils";
 
 const open = signal(false);
 /** So the issue page can yield the drop overlay while this dialog is up. */
@@ -86,6 +87,13 @@ const preferredTeam = signal("");
  */
 const pendingTemplate = signal<IssueTemplate | null>(null);
 
+/**
+ * The status the next open should start on, consumed once by `loadContext` —
+ * how a group header's "+" files straight into its own column. Wins over a
+ * draft's saved status: the click named a column, so the composer honors it.
+ */
+const pendingStatus = signal<IssueStatus | null>(null);
+
 /** Set when a create succeeds, so an open list can splice the issue in. */
 export const issueCreated = signal<Issue | null>(null);
 
@@ -101,7 +109,9 @@ function teamRefFor(available: Team[], wanted: string): TeamRef | null {
 	const picked =
 		(wanted !== "" ? available.find((team) => team.key === wanted) : undefined) ??
 		preferDefaultTeam(available);
-	return picked === undefined ? null : { id: picked.id, name: picked.name, key: picked.key };
+	return picked === undefined
+		? null
+		: { id: picked.id, name: picked.name, key: picked.key, icon: picked.icon, color: picked.color };
 }
 
 /**
@@ -113,12 +123,17 @@ function soleRepositoryRef(available: Repository[]): RepositoryRef | null {
 	return available.length === 1 ? toRepositoryRef(available[0]!) : null;
 }
 
-export function openCreateIssue(workspaceSlug: string, teamKey?: string): void {
+export function openCreateIssue(
+	workspaceSlug: string,
+	teamKey?: string,
+	options?: { status?: IssueStatus },
+): void {
 	if (workspaceSlug === "") return;
 	slug.set(workspaceSlug);
 	preferredTeam.set(teamKey ?? "");
 	// A plain New issue is never a leftover template from a previous open.
 	pendingTemplate.set(null);
+	pendingStatus.set(options?.status ?? null);
 	open.set(true);
 }
 
@@ -175,6 +190,15 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 	);
 	const descriptionRef = signal<HTMLElement | null>(null);
 	const hasDraft = signal(false);
+	/**
+	 * The expand toggle: the panel stops sizing to its content and takes a fixed
+	 * slice of the viewport, with the body editor absorbing everything the header,
+	 * pills, and footer do not need.
+	 *
+	 * View state, not draft state — a fresh open is always compact, so the
+	 * composer never comes back a different size from the one you expect.
+	 */
+	const expanded = signal(false);
 	const statusOpen = signal(false);
 	const priorityOpen = signal(false);
 	const assigneeOpen = signal(false);
@@ -344,6 +368,12 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 				attachments.set(draft.attachments);
 				uploads.set([]);
 			}
+
+			// Consumed after the template/draft settle so a column's "+" always
+			// opens on that column, whatever the draft last said.
+			const wantedStatus = pendingStatus.get();
+			pendingStatus.set(null);
+			if (wantedStatus !== null) status.set(wantedStatus);
 
 			const [memberResult, labelResult, teamResult, repoResult, workspaceResult] =
 				await Promise.all([
@@ -619,6 +649,9 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 					focusFrame = undefined;
 				}
 				if (isOpen) {
+					// Reset before the panel paints, so an open never animates down
+					// from the size the last one was left at.
+					expanded.set(false);
 					void loadContext(slug.get());
 					// The dialog focuses the first tabbable (the team crumb). Steal
 					// it back once that pass has run so you can type a title.
@@ -648,7 +681,31 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 			ResponsiveDialogContent(
 				// The base max-width stays at the dialog's default, which keeps a
 				// phone's 1rem margins; only wider viewports get the full 3xl.
-				{ class: "gap-0 p-0 md:max-w-3xl", showCloseButton: false },
+				{
+					class: cn(
+						"gap-0 p-0 md:max-w-3xl",
+						// `height` joins the properties the panel already transitions —
+						// listing them all again because tailwind-merge keeps only the
+						// last `transition-property`, and dropping the open/close set
+						// would kill the dialog's own entrance. Behind `md:` so the
+						// drawer shape, which lives only below that breakpoint, keeps
+						// its own `transition-[translate,display]` untouched.
+						"md:transition-[height,opacity,scale,translate,display]",
+						// Growing to a fixed height means interpolating away from
+						// `auto`, which only animates where `interpolate-size` is
+						// understood. Everywhere else the panel simply snaps.
+						"md:[interpolate-size:allow-keywords]",
+						{
+							// Content-sized (`grid`) up to here; expanded it becomes a
+							// column of a known height so the body region can flex into
+							// what is left. The `data-[state=open]` twin is what actually
+							// wins the cascade — the panel's own open-state `grid` is more
+							// specific than a bare `flex`.
+							"flex flex-col h-[85vh] data-[state=open]:flex": expanded,
+						},
+					),
+					showCloseButton: false,
+				},
 				// Cmd/Ctrl+Enter files the issue from anywhere in the dialog — a
 				// property pill, the Create button, an open picker — not just the
 				// text fields. Capture phase so it runs ahead of whatever the
@@ -699,6 +756,8 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 												id: picked.id,
 												name: picked.name,
 												key: picked.key,
+												icon: picked.icon,
+												color: picked.color,
 											});
 										}
 									},
@@ -714,6 +773,26 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 							),
 						),
 					),
+					// One button that relabels rather than two that swap: activating it
+					// must not move focus, and a remounted button loses it. Only the
+					// icon inside is exchanged.
+					//
+					// Hidden below the dialog/drawer breakpoint — the drawer shape is
+					// already as tall as the viewport lets it be, and `display: none`
+					// takes it out of the tab order with it.
+					Button(
+						{
+							variant: "ghost",
+							size: "icon-sm",
+							class: "hidden size-7 shrink-0 md:inline-flex",
+							"aria-label": expanded.bind((on) => (on ? "Collapse" : "Expand")),
+							title: expanded.bind((on) => (on ? "Collapse" : "Expand")),
+							onClick: () => expanded.update((on) => !on),
+						},
+						If(expanded)
+							.Then(Minimize2({ class: "size-4", "aria-hidden": true }))
+							.Else(Maximize2({ class: "size-4", "aria-hidden": true })),
+					),
 					DialogClose(
 						{
 							variant: "ghost",
@@ -727,7 +806,10 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 
 				Div(
 					{
-						class: "flex flex-col gap-2 px-4 py-3",
+						// The one region that grows: `min-h-0` so it can also give the
+						// space back to a tall attachment grid rather than pushing the
+						// footer off the panel.
+						class: cn("flex flex-col gap-2 px-4 py-3", { "min-h-0 flex-1": expanded }),
 						onPaste: (event) => preventFilePaste(event, attach),
 					},
 					Input({
@@ -749,6 +831,9 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 						repository: () => chosenRepository.get()?.id,
 						placeholder: "Add description… @ to reference a file",
 						rows: 4,
+						// Expanded, `rows` stops deciding: the box takes whatever height
+						// the panel has left and scrolls inside it.
+						fill: expanded,
 						onSubmit: () => void submit(),
 					}),
 					AttachmentGrid({

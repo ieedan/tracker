@@ -19,12 +19,14 @@ import {
 } from "@implementjs/core";
 import {
 	ChevronDown,
+	CircleUser,
 	Inbox as InboxIcon,
 	LayoutList,
 	LayoutTemplate,
 	Menu,
 	MessageSquareQuote,
 	LogOut,
+	Pencil,
 	Plus,
 	Settings as SettingsIcon,
 	UserCog,
@@ -42,6 +44,9 @@ import {
 	DropdownMenuGroupHeading,
 	DropdownMenuItem,
 	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/lib/components/ui/drawer";
@@ -56,6 +61,14 @@ import {
 	openCreateIssue,
 	openCreateIssueFromTemplate,
 } from "@/lib/features/issues/create-issue-dialog";
+import {
+	TemplateDialog,
+	openCreateTemplate,
+	openEditTemplate,
+	templatesChanged,
+} from "@/lib/features/issues/template-dialog";
+import { seedUnreadCount, unreadCount } from "@/lib/features/inbox/unread";
+import { TeamIcon } from "@/lib/features/teams/team-icon";
 
 export interface ShellData {
 	user: App.SessionUser;
@@ -71,32 +84,48 @@ const POLL_MS = 15_000;
 /** Above this the sidebar is docked; below it lives in a drawer. */
 const DESKTOP_QUERY = "(min-width: 768px)";
 
+/**
+ * The badge is the one number on screen that must not go stale, so it polls
+ * rather than waiting for the next navigation to reseed it. It writes into the
+ * shared store rather than a local signal — see `inbox/unread.ts` — which is
+ * what leaves it with nothing of the shell's to capture.
+ */
+async function pollUnread(): Promise<void> {
+	const { data: result, error } = await api.GET("/api/v1/notifications/unread");
+	if (error === undefined) seedUnreadCount(result.count);
+}
+
 export function AppShell(
 	data: Readable<ShellData>,
 	activeSlug: Readable<string>,
 	url: Readable<{ path: string }>,
 	children: Child,
 ) {
-	const unread = signal(data.get().unread);
+	// The count itself lives in `inbox/unread.ts`, because the shell is not the
+	// only thing that moves it: reading a notification in the inbox has to drop
+	// the badge at once rather than at the next poll. The shell owns the two
+	// authoritative sources — the layout load and the poll — and nothing else
+	// writes a total.
+	seedUnreadCount(data.get().unread);
+	const unread = unreadCount;
+
 	const mobileNavOpen = signal(false);
 	const isDesktop = mediaQuery(DESKTOP_QUERY);
 
-	// The badge is the one number on screen that must not go stale, so it polls
-	// rather than waiting for the next navigation to reseed it.
-	const poll = async () => {
-		const { data: result, error } = await api.GET("/api/v1/notifications/unread");
-		if (error === undefined) unread.set(result.count);
-	};
-
 	return Div(
 		{ class: "flex h-dvh overflow-clip" },
+
+		// A client navigation reseeds the layout's load rather than remounting the
+		// shell, so a fresh count arriving that way has to land in the store too.
+		ImplementEffect([data], (shell) => seedUnreadCount(shell.unread), { immediate: false }),
+
 		ImplementLifecycle({
 			onMount: () => {
-				const timer = setInterval(() => void poll(), POLL_MS);
+				const timer = setInterval(() => void pollUnread(), POLL_MS);
 				// A tab that comes back to the foreground should catch up at once
 				// instead of waiting out the rest of the interval.
 				const onVisible = () => {
-					if (document.visibilityState === "visible") void poll();
+					if (document.visibilityState === "visible") void pollUnread();
 				};
 				document.addEventListener("visibilitychange", onVisible);
 
@@ -104,6 +133,7 @@ export function AppShell(
 				// render a page whose module has not loaded yet.
 				const slug = activeSlug.get();
 				void preloadRoute(`/app/${slug}/inbox`);
+				void preloadRoute(`/app/${slug}/my-issues`);
 				void preloadRoute(`/app/${slug}/feedback`);
 				void preloadRoute(`/app/${slug}/settings`);
 
@@ -133,15 +163,25 @@ export function AppShell(
 			onKeydown: (event) => {
 				if (isTyping(event)) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
-				if (event.key.toLowerCase() !== "c") return;
-				event.preventDefault();
-				openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path));
+				const key = event.key.toLowerCase();
+				if (key === "c") {
+					event.preventDefault();
+					openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path));
+					return;
+				}
+				// The list header lost its search box; `/` still means "find",
+				// it just lands in the palette now.
+				if (key === "/") {
+					event.preventDefault();
+					openCommandPalette(activeSlug.get());
+				}
 			},
 		}),
 
 		// Mounted once for the whole app: both are opened imperatively from
 		// hotkeys, the sidebar and the palette itself.
 		CreateIssueDialog(data.bind((shell) => shell.workspaces)),
+		TemplateDialog(),
 		CommandPalette(activeSlug),
 	);
 }
@@ -164,7 +204,10 @@ function SidebarBody(
 
 		Div(
 			{ class: "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" },
+			// What is waiting for you, then what is yours, then everything —
+			// Linear's ordering, narrowest scope first.
 			NavItem(url, activeSlug, "/app/:slug/inbox", InboxIcon, "Inbox", unread),
+			NavItem(url, activeSlug, "/app/:slug/my-issues", CircleUser, "My Issues"),
 			NavItem(url, activeSlug, "/app/:slug", LayoutList, "Issues"),
 			NavItem(url, activeSlug, "/app/:slug/feedback", MessageSquareQuote, "User feedback"),
 			NavItem(url, activeSlug, "/app/:slug/settings", SettingsIcon, "Settings"),
@@ -276,8 +319,9 @@ function teamKeyFromPath(path: string): string | undefined {
 
 /**
  * New issue, split: the button opens a blank composer, the chevron opens one of
- * the workspace's templates. Templates are fetched here rather than seeded by
- * the layout so adding one in settings shows up without a reload.
+ * the workspace's templates — and is also where templates are made and edited.
+ * The list is fetched here rather than seeded by the layout so a template
+ * created in the dialog shows up without a reload.
  */
 function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: string }>) {
 	const templates = signal<IssueTemplate[]>([]);
@@ -297,6 +341,9 @@ function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: str
 		// Switching workspaces keeps this control mounted, so the list has to
 		// follow the slug rather than only load once.
 		ImplementEffect([activeSlug], () => void load(), { immediate: false }),
+		// The dialog is mounted once in the shell and cannot reach into the two
+		// copies of this control, so it announces the change and both refetch.
+		ImplementEffect([templatesChanged], () => void load(), { immediate: false }),
 
 		Button(
 			{
@@ -350,9 +397,31 @@ function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: str
 				),
 				DropdownMenuSeparator(),
 				DropdownMenuItem(
-					{ onSelect: () => router.navigate("/app/:slug/settings", { slug: activeSlug.get() }) },
-					SettingsIcon({ class: "size-3.5" }),
-					"Manage templates",
+					{ onSelect: () => openCreateTemplate(activeSlug.get()) },
+					Plus({ class: "size-3.5" }),
+					"New template",
+				),
+				// Editing hangs off a submenu rather than a control on each row: a
+				// row's whole job is "start an issue from this", and a second
+				// target inside it is a click you can miss.
+				If(
+					templates.bind((list) => list.length > 0),
+					DropdownMenuSub(
+						DropdownMenuSubTrigger({}, Pencil({ class: "size-3.5" }), "Edit template"),
+						DropdownMenuSubContent(
+							{ class: "w-56" },
+							ForEach(
+								templates,
+								(template) => template.id,
+								(template) =>
+									DropdownMenuItem(
+										{ onSelect: () => openEditTemplate(activeSlug.get(), template.get()) },
+										LayoutTemplate({ class: "size-3.5 shrink-0" }),
+										Span({ class: "truncate" }, template.bind("name")),
+									),
+							),
+						),
+					),
 				),
 			),
 		),
@@ -415,7 +484,12 @@ function WorkspaceTile(workspace: Readable<Workspace | undefined>) {
 	return Dynamic([workspace], (value) => WorkspaceAvatar(value));
 }
 
-type NavPath = "/app/:slug" | "/app/:slug/inbox" | "/app/:slug/feedback" | "/app/:slug/settings";
+type NavPath =
+	| "/app/:slug"
+	| "/app/:slug/inbox"
+	| "/app/:slug/my-issues"
+	| "/app/:slug/feedback"
+	| "/app/:slug/settings";
 
 function NavItem(
 	url: Readable<{ path: string }>,
@@ -509,8 +583,14 @@ function UserMenu(data: Readable<ShellData>) {
 }
 
 /**
- * Teams, each linking to its own issue list. A team's key is the prefix its
- * issues carry, so it is shown beside the name rather than hidden.
+ * Teams, each linking to its own issue list.
+ *
+ * The row is a tile and a name, the way Linear reads: a coloured glyph is
+ * something you find by shape at a glance, where three monospaced letters make
+ * every row look the same until you read it. The key is what issues are
+ * prefixed with rather than what the team is called, so it moves to the row's
+ * `title` — still there when you need to know it, out of the scanning path when
+ * you do not.
  */
 function TeamNav(
 	data: Readable<ShellData>,
@@ -534,6 +614,7 @@ function TeamNav(
 					{
 						to: "/app/:slug/team/:key",
 						params: { slug: activeSlug, key: team.bind("key") },
+						title: team.bind((value) => `${value.name} (${value.key})`),
 						class: derived([active], (isActive) =>
 							cn(
 								"flex h-7 items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
@@ -543,10 +624,10 @@ function TeamNav(
 							),
 						),
 					},
-					Span(
-						{ class: "w-9 shrink-0 font-mono text-[11px] text-muted-foreground" },
-						team.bind("key"),
-					),
+					// `TeamIcon` takes plain values, so the tile is swapped rather than
+					// updated when the team behind the row changes — a rename or a newly
+					// picked icon repaints it without the row moving.
+					Dynamic([team], (value) => TeamIcon(value, "size-4")),
 					Span({ class: "truncate" }, team.bind("name")),
 					Span(
 						{ class: "ml-auto text-[11px] text-muted-foreground/70" },

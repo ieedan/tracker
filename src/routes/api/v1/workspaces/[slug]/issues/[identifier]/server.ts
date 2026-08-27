@@ -11,6 +11,7 @@ import {
 	getIssueByIdentifier,
 	insertWithNumber,
 	setIssueLabels,
+	subscribeToIssue,
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
@@ -172,6 +173,12 @@ export const PATCH = handler({
 
 		// Reassignment tells the new owner, and tells the previous one they are off it.
 		if (body.assigneeId !== undefined && body.assigneeId !== before.assigneeId) {
+			// Work landing on you is a subscription, the way commenting is. The
+			// previous assignee keeps theirs: being taken off an issue is not the
+			// same as no longer caring how it ends, and unsubscribing is one click
+			// on the issue itself.
+			await subscribeToIssue(before.id, body.assigneeId);
+
 			await notify({
 				userId: body.assigneeId,
 				actorId: user.id,

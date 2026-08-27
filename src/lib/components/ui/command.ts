@@ -13,9 +13,41 @@ import {
 	CommandLoading as CommandLoadingPrimitive,
 	CommandSeparator as CommandSeparatorPrimitive,
 	CommandViewport as CommandViewportPrimitive,
+	computeCommandScore,
 } from "@implementjs/primitives";
 import { createComponent } from "@implementjs/primitives";
 import { cn } from "@/lib/utils";
+
+/**
+ * Ranking, with exact matches pinned to the top.
+ *
+ * The primitive's default score is a fuzzy one, and fuzzy has no opinion about
+ * `ENG-1` versus `ENG-12`: every `ENG-1…` identifier opens with the characters
+ * you typed, so they all score alike and the one you actually named lands
+ * wherever the list happened to put it. When what you typed *is* one of an
+ * item's words, that item is the one you meant — so it is scored into a band
+ * above every partial match rather than shuffled in among them.
+ */
+export function exactFirstScore(value: string, search: string, keywords?: string[]): number {
+	const base = computeCommandScore(value, search, keywords);
+	if (base === 0) return 0;
+
+	const needle = search.trim().toLowerCase();
+	if (needle === "") return base;
+
+	const haystack = value.trim().toLowerCase();
+	if (haystack === needle) return 1;
+
+	// Words rather than characters: `ENG-1` is a word of "ENG-1 No way to re-run
+	// a load after a mutation", and `ENG-12` is not.
+	const matchesWord =
+		haystack.split(/\s+/).includes(needle) ||
+		keywords?.some((keyword) => keyword.trim().toLowerCase() === needle) === true;
+	if (matchesWord) return 0.99;
+
+	// Everything else keeps the order the fuzzy score gave it, under the band.
+	return base * 0.98;
+}
 
 export type CommandProps = ComponentProps<typeof CommandPrimitive>;
 export type CommandInputProps = ComponentProps<typeof CommandInputPrimitive>;
@@ -31,11 +63,12 @@ export type CommandLinkItemProps = ComponentProps<typeof CommandLinkItemPrimitiv
 export type CommandSeparatorProps = ComponentProps<typeof CommandSeparatorPrimitive>;
 
 export const Command = createComponent(function Command(
-	{ class: className, ...props }: CommandProps,
+	{ class: className, filter = exactFirstScore, ...props }: CommandProps,
 	...children: Child[]
 ) {
 	return CommandPrimitive(
 		{
+			filter,
 			...props,
 			"data-slot": "command",
 			class: cn(

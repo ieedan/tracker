@@ -65,13 +65,29 @@ import {
 	EmptyTitle,
 } from "@/lib/components/ui/empty";
 import { NOTIFICATION_TYPES, type NotificationType } from "@/lib/domain/issues";
-import type { Notification, NotificationOrder, Workspace } from "@/lib/domain/schemas";
+import type {
+	Label,
+	Member,
+	Notification,
+	NotificationOrder,
+	Team,
+	Workspace,
+} from "@/lib/domain/schemas";
 import { fullTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { InboxIssuePane, type IssuePaneContext } from "./issue-pane";
+import { adjustUnreadCount, seedUnreadCount, unreadCount } from "./unread";
 
 interface PageData {
 	notifications: Notification[];
+	// From the workspace layout, and handed to the issue pane so it does not
+	// refetch what the shell already loaded.
 	workspace: Workspace;
+	teams: Team[];
+	members: Member[];
+	labels: Label[];
+	/** From the app layout — whose comments the issue pane offers to edit. */
+	user: { id: string };
 }
 
 /** Everything, or only what you have not looked at yet. */
@@ -155,6 +171,10 @@ export function InboxPage({
 	/**
 	 * Flips read state for some ids, or for the whole inbox when `ids` is
 	 * omitted. Applied locally first and rolled back if the server disagrees.
+	 *
+	 * The sidebar badge moves with the list rather than with the response: the
+	 * count and the rows are the same fact shown twice, and waiting out a poll
+	 * before the badge agrees with what is plainly on screen reads as a bug.
 	 */
 	const setRead = async (ids: string[] | undefined, read: boolean) => {
 		const before = notifications.get();
@@ -164,13 +184,25 @@ export function InboxPage({
 		);
 		if (alreadyThere) return;
 
-		notifications.set(
-			before.map((entry) => (target === null || target.has(entry.id) ? { ...entry, read } : entry)),
+		const after = before.map((entry) =>
+			target === null || target.has(entry.id) ? { ...entry, read } : entry,
 		);
+		// Only the rows that actually changed state count against the badge —
+		// re-marking something already read moves nothing.
+		const flipped = after.filter((entry, index) => entry.read !== before[index]!.read).length;
+		const badgeBefore = unreadCount.get();
+
+		notifications.set(after);
+		// "Mark all read" clears every notification the account has, not only the
+		// page this screen is holding — so it zeroes the badge rather than
+		// subtracting what happens to be loaded.
+		if (ids === undefined && read) seedUnreadCount(0);
+		else adjustUnreadCount(read ? -flipped : flipped);
 
 		const { error } = await api.POST("/api/v1/notifications", { body: { ids, read } });
 		if (error !== undefined) {
 			notifications.set(before);
+			seedUnreadCount(badgeBefore);
 			toastError(
 				messageOf(error, read ? "Could not mark that read" : "Could not mark that unread"),
 			);
@@ -300,10 +332,17 @@ export function InboxPage({
 				),
 			),
 
-			// Right: whatever is selected.
+			// Right: whatever is selected. The issue pane scrolls its own regions,
+			// so the column holds no scrollbar of its own.
 			Div(
-				{ class: "flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto" },
-				DetailPane(selected, params, setRead),
+				{ class: "flex min-w-0 flex-1 flex-col overflow-hidden" },
+				DetailPane(selected, params, setRead, {
+					workspace: data.bind((value) => value.workspace),
+					teams: data.bind((value) => value.teams),
+					members: data.bind((value) => value.members),
+					labels: data.bind((value) => value.labels),
+					viewer: data.bind((value) => value.user),
+				}),
 			),
 		),
 	);
@@ -476,11 +515,20 @@ function NotificationRow(
 	);
 }
 
-/** The right-hand pane: the whole of one notification, and what to do with it. */
+/**
+ * The right-hand pane: a bar saying why this is in your inbox, and under it the
+ * thing it is about.
+ *
+ * For everything that names an issue — assignments, status changes, comments —
+ * that is the issue itself, the same view its own page shows. A summary card
+ * only restated the row you clicked, and left every reply and every reassign
+ * one navigation further away.
+ */
 function DetailPane(
 	selected: Readable<Notification | null>,
 	params: { slug: Readable<string> },
 	setRead: (ids: string[] | undefined, read: boolean) => Promise<void>,
+	context: IssuePaneContext,
 ) {
 	const identifier = selected.bind((value) => value?.issue?.identifier ?? "");
 
@@ -492,11 +540,19 @@ function DetailPane(
 				Div(
 					{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
 					Span(
-						{ class: "flex items-center gap-1.5 text-[12px] text-muted-foreground" },
+						{
+							class:
+								"flex shrink-0 items-center gap-1.5 text-[12px] whitespace-nowrap text-muted-foreground",
+						},
 						Dynamic([selected], (value) =>
 							value === null ? Span({}) : TypeIcon(value.type, "size-3.5"),
 						),
-						selected.bind((value) => (value === null ? "" : TYPE_LABELS[value.type])),
+						// The glyph alone carries it where the row is tight — the type is
+						// also the first thing the list row says.
+						Span(
+							{ class: "hidden sm:inline" },
+							selected.bind((value) => (value === null ? "" : TYPE_LABELS[value.type])),
+						),
 					),
 
 					Div({ class: "flex-1" }),
@@ -516,7 +572,10 @@ function DetailPane(
 						Dynamic([selected], (value) =>
 							value?.read === true ? Mail({ class: "size-3.5" }) : MailOpen({ class: "size-3.5" }),
 						),
-						selected.bind((value) => (value?.read === true ? "Mark unread" : "Mark read")),
+						Span(
+							{ class: "hidden sm:inline" },
+							selected.bind((value) => (value?.read === true ? "Mark unread" : "Mark read")),
+						),
 					),
 
 					If(
@@ -526,7 +585,7 @@ function DetailPane(
 								to: "/app/:slug/issue/:identifier",
 								params: { slug: params.slug, identifier },
 								class:
-									"inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium hover:bg-accent",
+									"inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium whitespace-nowrap hover:bg-accent",
 							},
 							ExternalLink({ class: "size-3.5" }),
 							"Open issue",
@@ -534,50 +593,53 @@ function DetailPane(
 					),
 				),
 
+				// What the notification said, in one line. The row you clicked is
+				// scrolled away up the list by the time you are reading down here.
 				Div(
-					{ class: "min-h-0 flex-1 overflow-y-auto px-6 py-5" },
-
-					Div(
-						{ class: "flex items-start gap-3" },
-						Div(
-							{ class: "mt-0.5" },
-							Dynamic([selected], (value) => (value === null ? Span({}) : UserAvatar(value.actor))),
-						),
-						Div(
-							{ class: "min-w-0 flex-1" },
-							H2(
-								{ class: "text-[15px] leading-snug font-medium" },
-								selected.bind((value) => value?.body ?? ""),
-							),
-							P(
-								{ class: "mt-1 text-[12px] text-muted-foreground" },
-								selected.bind((value) =>
-									value === null ? "" : `${value.actor.name} · ${fullTime(value.createdAt)}`,
-								),
-							),
-						),
+					{ class: "flex shrink-0 items-center gap-2 border-b border-border px-4 py-2" },
+					Dynamic([selected], (value) =>
+						value === null ? Span({}) : UserAvatar(value.actor, "size-5"),
 					),
-
-					If(
-						selected.bind((value) => value?.issue != null),
-						Div(
-							{ class: "mt-6 rounded-lg border border-border p-4" },
-							Div({ class: "text-[11px] tracking-wide text-muted-foreground uppercase" }, "Issue"),
-							router.Link(
-								{
-									to: "/app/:slug/issue/:identifier",
-									params: { slug: params.slug, identifier },
-									class: "mt-2 flex items-baseline gap-2 hover:underline",
-								},
-								Span({ class: "shrink-0 font-mono text-[12px] text-muted-foreground" }, identifier),
-								Span(
-									{ class: "min-w-0 text-[14px] font-medium" },
-									selected.bind((value) => value?.issue?.title ?? ""),
-								),
-							),
-						),
+					Span(
+						{ class: "min-w-0 truncate text-[13px]" },
+						selected.bind((value) => value?.body ?? ""),
+					),
+					Span(
+						{ class: "ml-auto hidden shrink-0 text-[11px] text-muted-foreground sm:block" },
+						selected.bind((value) => (value === null ? "" : fullTime(value.createdAt))),
 					),
 				),
+
+				// The issue, whole. An invite names none, so that one keeps the card.
+				If(selected.bind((value) => value?.issue != null))
+					.Then(InboxIssuePane({ slug: params.slug, identifier, context }))
+					.Else(
+						Div(
+							{ class: "min-h-0 flex-1 overflow-y-auto px-6 py-5" },
+							Div(
+								{ class: "flex items-start gap-3" },
+								Div(
+									{ class: "mt-0.5" },
+									Dynamic([selected], (value) =>
+										value === null ? Span({}) : UserAvatar(value.actor),
+									),
+								),
+								Div(
+									{ class: "min-w-0 flex-1" },
+									H2(
+										{ class: "text-[15px] leading-snug font-medium" },
+										selected.bind((value) => value?.body ?? ""),
+									),
+									P(
+										{ class: "mt-1 text-[12px] text-muted-foreground" },
+										selected.bind((value) =>
+											value === null ? "" : `${value.actor.name} · ${fullTime(value.createdAt)}`,
+										),
+									),
+								),
+							),
+						),
+					),
 			),
 		)
 		.Else(

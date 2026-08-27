@@ -7,7 +7,7 @@
  * already know which team it belongs to.
  */
 import { navigateTo } from "@implementjs/core";
-import { Div, ForEach, Span, signal, type Readable, type Signal } from "@implementjs/core";
+import { Div, Dynamic, ForEach, Span, signal, type Readable, type Signal } from "@implementjs/core";
 import { ChevronDown, GitBranchPlus } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
@@ -21,6 +21,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import type { Feedback, Issue, Team } from "@/lib/domain/schemas";
+import { TeamIcon } from "@/lib/features/teams/team-icon";
 
 export interface ConvertOptions {
 	slug: Readable<string>;
@@ -119,12 +120,18 @@ export function ConvertButton(options: ConvertOptions) {
 						(team) => team.id,
 						(team) =>
 							DropdownMenuItem(
-								{ onSelect: () => void run(team.get().key) },
+								// Same row as the issue composer's team menu: tile, name, key —
+								// picking a team should look the same wherever you do it.
+								{
+									onSelect: () => void run(team.get().key),
+									label: `${team.get().name} ${team.get().key}`,
+								},
+								Dynamic([team], (value) => TeamIcon(value, "size-4")),
+								Span({ class: "flex-1 truncate" }, team.bind("name")),
 								Span(
-									{ class: "w-10 shrink-0 font-mono text-[11px] text-muted-foreground" },
+									{ class: "shrink-0 font-mono text-[11px] text-muted-foreground" },
 									team.bind("key"),
 								),
-								Span({ class: "flex-1 truncate" }, team.bind("name")),
 							),
 					),
 				),

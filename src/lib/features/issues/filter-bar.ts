@@ -431,11 +431,47 @@ function FilterChip(
 /** Distinguishes the panels when two filter menus share a page. */
 let panelCount = 0;
 
-/** The Filter / Add filter trigger, in its two sizes. */
-const addTriggerClass = (variant: "primary" | "subtle") =>
-	variant === "primary"
-		? "h-7 gap-1.5 border border-border px-2 text-[12px]"
-		: "h-6 gap-1 px-2 text-[11px] text-muted-foreground";
+/**
+ * The Filter / Add filter trigger, in its three shapes.
+ *
+ * `icon` is the one on the view-tab row — Linear's filter control is a bare
+ * glyph out at the right edge, so the label lives in the tooltip instead.
+ */
+export type AddFilterVariant = "primary" | "subtle" | "icon";
+
+const addTriggerClass = (variant: AddFilterVariant) => {
+	switch (variant) {
+		case "primary":
+			return "h-7 gap-1.5 border border-border px-2 text-[12px]";
+		case "subtle":
+			return "h-6 gap-1 px-2 text-[11px] text-muted-foreground";
+		case "icon":
+			return "size-7 text-muted-foreground";
+	}
+};
+
+/** The icon-only trigger is square, so it takes a square size rather than `sm`. */
+const addTriggerSize = (variant: AddFilterVariant) => (variant === "icon" ? "icon-sm" : "sm");
+
+/** Icon size follows the trigger: the icon-only one is the only roomy one. */
+const addTriggerIconClass = (variant: AddFilterVariant) =>
+	variant === "subtle" ? "size-3" : "size-3.5";
+
+/** Icon-only: the name has to reach the tooltip and the accessibility tree. */
+const addTriggerLabel = (variant: AddFilterVariant) =>
+	variant === "icon" ? { title: "Filter", "aria-label": "Filter" } : {};
+
+/** Nothing beside the glyph when the trigger is the glyph. */
+const addTriggerText = (variant: AddFilterVariant): Child => {
+	switch (variant) {
+		case "primary":
+			return "Filter";
+		case "subtle":
+			return "Add filter";
+		case "icon":
+			return null;
+	}
+};
 
 /**
  * Add a filter. A hover-driven dropdown-plus-side-panel where there is a
@@ -447,7 +483,7 @@ export function AddFilterButton(
 	context: Readable<FilterContext>,
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
-	variant: "primary" | "subtle" = "primary",
+	variant: AddFilterVariant = "primary",
 ) {
 	const isMobile = mediaQuery(RESPONSIVE_DIALOG_QUERY);
 	return If(isMobile)
@@ -480,7 +516,7 @@ function MobileAddFilter(
 	context: Readable<FilterContext>,
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
-	variant: "primary" | "subtle",
+	variant: AddFilterVariant,
 ) {
 	const activeField = signal<FilterField | null>(null);
 	const valuesOpen = signal(false);
@@ -490,12 +526,13 @@ function MobileAddFilter(
 		Button(
 			{
 				variant: "ghost",
-				size: "sm",
+				size: addTriggerSize(variant),
 				class: addTriggerClass(variant),
+				...addTriggerLabel(variant),
 				onClick: () => open.set(true),
 			},
-			ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
-			variant === "primary" ? "Filter" : "Add filter",
+			ListFilter({ class: addTriggerIconClass(variant) }),
+			addTriggerText(variant),
 		),
 		Drawer(
 			{ open },
@@ -566,7 +603,7 @@ function DesktopAddFilter(
 	context: Readable<FilterContext>,
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
-	variant: "primary" | "subtle",
+	variant: AddFilterVariant,
 ) {
 	// What the shared panel is showing. The popover tracks what it is anchored
 	// *to*; this is what it is anchored *for*.
@@ -603,11 +640,12 @@ function DesktopAddFilter(
 			DropdownMenuTrigger(
 				{
 					variant: "ghost",
-					size: "sm",
+					size: addTriggerSize(variant),
 					class: addTriggerClass(variant),
+					...addTriggerLabel(variant),
 				},
-				ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
-				variant === "primary" ? "Filter" : "Add filter",
+				ListFilter({ class: addTriggerIconClass(variant) }),
+				addTriggerText(variant),
 			),
 			DropdownMenuContent(
 				{ class: "w-44", align: "start" },

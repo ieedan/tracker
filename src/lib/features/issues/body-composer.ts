@@ -33,7 +33,10 @@ import {
 	ImplementEffect,
 	ImplementLifecycle,
 	P,
+	derived,
+	isReadable,
 	signal,
+	type Readable,
 	type Signal,
 } from "@implementjs/core";
 import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
@@ -65,6 +68,15 @@ export interface BodyComposerOptions {
 	rows?: number;
 	/** Grow with the text instead of scrolling inside a capped box. */
 	autoGrow?: boolean;
+	/**
+	 * Take the height the parent has left instead of the one `rows` asks for,
+	 * scrolling inside it. For a caller that owns the height — the expanded
+	 * create dialog — where `rows` is only the collapsed minimum.
+	 *
+	 * Reactive so a toggle can flip it in place: remounting the box would throw
+	 * away the undo history along with the caret.
+	 */
+	fill?: boolean | Readable<boolean>;
 	autofocus?: boolean;
 	class?: string;
 	/** Handed out so a caller can focus the box or tell whether it has focus. */
@@ -90,6 +102,18 @@ export function focusBody(node: HTMLElement): void {
 export function BodyComposer(options: BodyComposerOptions) {
 	const host = options.element ?? signal<HTMLElement | null>(null);
 	const empty = options.value.bind((text) => text.trim() === "");
+
+	/**
+	 * Both boxes in the chain have to opt in for a percentage height to
+	 * resolve: the root, and the editor that is actually filled. Normalised to
+	 * a readable here so the caller can hand over either a fixed answer or a
+	 * toggle, and everything downstream only has to know about the toggle.
+	 */
+	const filling: Readable<boolean> = isReadable<boolean>(options.fill)
+		? options.fill
+		: signal(options.fill === true);
+	/** Capped instead, when the caller has neither given height nor taken it. */
+	const capped = derived([filling], (fills) => !fills && options.autoGrow !== true);
 
 	/**
 	 * The body as it was last drawn. An edit arriving on the signal is only
@@ -158,7 +182,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 	};
 
 	return Div(
-		{ class: "relative flex flex-col" },
+		{ class: cn("relative flex flex-col", { "min-h-0 flex-1": filling }) },
 
 		ImplementLifecycle({
 			onMount: () => {
@@ -195,10 +219,15 @@ export function BodyComposer(options: BodyComposerOptions) {
 			spellcheck: true,
 			class: cn(
 				bodyComposerClass,
-				// Capped rather than endless when the caller has no room to give:
-				// a dialog that grows with the body pushes its own buttons off
-				// the screen.
-				options.autoGrow === true ? null : "max-h-48 overflow-y-auto",
+				{
+					// Everything the rest of the panel does not need, when the caller
+					// owns the height and has said so.
+					"min-h-0 flex-1 overflow-y-auto": filling,
+					// Capped rather than endless when the caller has neither given
+					// height nor taken it: a dialog that grows with the body pushes
+					// its own buttons off the screen.
+					"max-h-48 overflow-y-auto": capped,
+				},
 				options.class,
 			),
 			style: {

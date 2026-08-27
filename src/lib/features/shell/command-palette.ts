@@ -10,7 +10,7 @@ import {
 	Span,
 	signal,
 } from "@implementjs/core";
-import { Inbox, LayoutList, Moon, Plus, Settings } from "@implementjs/lucide";
+import { CircleUser, Inbox, LayoutList, Moon, Plus, Settings } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
 import {
 	Command,
@@ -112,21 +112,32 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 							CommandGroupItems(
 								CommandItem(
 									{
-										value: "issues list",
-										onSelect: () =>
-											go(() => router.navigate("/app/:slug", { slug: activeSlug.get() })),
-									},
-									LayoutList({ class: "size-3.5" }),
-									"Issues",
-								),
-								CommandItem(
-									{
 										value: "inbox notifications",
 										onSelect: () =>
 											go(() => router.navigate("/app/:slug/inbox", { slug: activeSlug.get() })),
 									},
 									Inbox({ class: "size-3.5" }),
 									"Inbox",
+								),
+								CommandItem(
+									{
+										// The words someone would actually type for it — the tab names
+										// included, since all three land on the same screen.
+										value: "my issues assigned created subscribed mine",
+										onSelect: () =>
+											go(() => router.navigate("/app/:slug/my-issues", { slug: activeSlug.get() })),
+									},
+									CircleUser({ class: "size-3.5" }),
+									"My Issues",
+								),
+								CommandItem(
+									{
+										value: "issues list",
+										onSelect: () =>
+											go(() => router.navigate("/app/:slug", { slug: activeSlug.get() })),
+									},
+									LayoutList({ class: "size-3.5" }),
+									"Issues",
 								),
 								CommandItem(
 									{

@@ -41,6 +41,7 @@ import {
 } from "@/lib/domain/issues";
 import type { Label, Member, Team, TeamRef, UserSummary, Workspace } from "@/lib/domain/schemas";
 import { WorkspaceAvatar } from "@/lib/components/workspace-avatar";
+import { TeamIcon } from "@/lib/features/teams/team-icon";
 import { cn } from "@/lib/utils";
 
 const triggerClass =
@@ -356,6 +357,16 @@ export function LabelChips(labels: Readable<Label[]>) {
 	);
 }
 
+/**
+ * The team's tile, or the generic people glyph while no team is chosen — the
+ * tile is a real node, so it is rebuilt rather than bound to.
+ */
+function TeamFace(current: Readable<TeamRef | null>, className?: string) {
+	return Dynamic([current], (team) =>
+		team === null ? Users({ class: cn("size-3.5", className) }) : TeamIcon(team, className),
+	);
+}
+
 /** Which team owns the issue — and therefore what its identifier reads. */
 export function TeamPicker(
 	current: Readable<TeamRef | null>,
@@ -372,11 +383,12 @@ export function TeamPicker(
 						variant: "ghost",
 						size: "sm",
 						class: cn(
-							"h-auto min-h-0 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
+							"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
 							options.class,
 						),
 						title: "Team",
 					},
+					TeamFace(current, "size-4"),
 					Span(
 						{ class: "font-mono leading-none" },
 						current.bind((team) => team?.key ?? "Team"),
@@ -394,7 +406,7 @@ export function TeamPicker(
 						),
 						title: "Team",
 					},
-					Users({ class: "size-3.5" }),
+					TeamFace(current, "size-4"),
 					Span(
 						{ class: options.showLabel === true ? "" : "font-mono" },
 						current.bind((team) => team?.key ?? "Team"),
@@ -432,12 +444,19 @@ export function TeamPicker(
 					(team) => team.id,
 					(team) =>
 						DropdownMenuRadioItem(
-							{ value: team.get().key },
+							// The tile falls back to the team's initial, which would otherwise
+							// be part of what the filter matches on; the key is worth keeping
+							// searchable, so it joins the name rather than replacing it.
+							{
+								value: team.get().key,
+								label: `${team.get().name} ${team.get().key}`,
+							},
+							Dynamic([team], (value) => TeamIcon(value, "size-4")),
+							Span({ class: "flex-1 truncate" }, team.bind("name")),
 							Span(
-								{ class: "w-10 shrink-0 font-mono text-[11px] text-muted-foreground" },
+								{ class: "shrink-0 font-mono text-[11px] text-muted-foreground" },
 								team.bind("key"),
 							),
-							Span({ class: "flex-1 truncate" }, team.bind("name")),
 						),
 				),
 			),
@@ -525,14 +544,18 @@ export function WorkspacePicker(
 	);
 }
 
-/** The small monospace team tag shown on a workspace-wide issue row. */
+/**
+ * The small team tag shown on a workspace-wide issue row — the tile beside the
+ * key, so a row is scannable by color before you read the letters.
+ */
 export function TeamBadge(team: Readable<TeamRef>) {
 	return Span(
 		{
 			class:
-				"shrink-0 rounded border border-border px-1 font-mono text-[10px] text-muted-foreground",
-			title: team.get().name,
+				"inline-flex shrink-0 items-center gap-1 rounded border border-border py-px pr-1 pl-0.5 font-mono text-[10px] text-muted-foreground",
+			title: team.bind((value) => value.name),
 		},
+		Dynamic([team], (value) => TeamIcon(value, "size-3")),
 		team.bind("key"),
 	);
 }

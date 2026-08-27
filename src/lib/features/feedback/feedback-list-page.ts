@@ -10,10 +10,17 @@ import {
 	signal,
 	type Readable,
 } from "@implementjs/core";
-import { ArrowRight, ExternalLink, MessageSquareQuote, Search } from "@implementjs/lucide";
+import {
+	ArrowRight,
+	ExternalLink,
+	MessageSquareQuote,
+	Search,
+	Settings as SettingsIcon,
+} from "@implementjs/lucide";
 import { Button } from "@/lib/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -22,6 +29,8 @@ import {
 import {
 	FEEDBACK_STATUSES,
 	FEEDBACK_STATUS_LABELS,
+	type FeedbackBoard,
+	type FeedbackIntake,
 	type FeedbackStatus,
 } from "@/lib/domain/feedback";
 import type { Feedback, Label, Team, Workspace } from "@/lib/domain/schemas";
@@ -31,6 +40,7 @@ import { FeedbackStatusIcon } from "./glyphs";
 import { patchFeedback } from "./feedback-store";
 import { FeedbackLabelPicker, FeedbackStatusPicker, VisibilityIcon } from "./pickers";
 import { ConvertButton } from "./convert";
+import { FeedbackSettingsDialog } from "./feedback-settings-dialog";
 
 interface PageData {
 	feedback: Feedback[];
@@ -52,6 +62,19 @@ export function FeedbackListPage({
 	const query = signal("");
 	/** `null` means every status — the default view. */
 	const statusFilter = signal<FeedbackStatus | null>(null);
+
+	// Intake setup lives on this screen now, so the two settings it writes are
+	// held here: kit cannot re-run a load after a mutation, and opening the
+	// board has to light up the Public board button without a reload.
+	const intake = signal<FeedbackIntake>(data.get().workspace.feedbackIntake);
+	const board = signal<FeedbackBoard>(data.get().workspace.feedbackBoard);
+	data.onChange((next) => {
+		intake.set(next.workspace.feedbackIntake);
+		board.set(next.workspace.feedbackBoard);
+	});
+	const settingsOpen = signal(false);
+	/** Only an admin may change them — the endpoint refuses anyone else. */
+	const canConfigure = data.bind((value) => value.workspace.role === "admin");
 
 	const visible = derived([feedback, query, statusFilter], (list, term, status) => {
 		const needle = term.trim().toLowerCase();
@@ -96,9 +119,24 @@ export function FeedbackListPage({
 				}),
 			),
 
+			If(
+				canConfigure,
+				Button(
+					{
+						size: "icon-sm",
+						variant: "ghost",
+						class: "shrink-0",
+						title: "Feedback settings",
+						"aria-label": "Feedback settings",
+						onClick: () => settingsOpen.set(true),
+					},
+					SettingsIcon({ class: "size-3.5" }),
+				),
+			),
+
 			// Only worth offering when there is a board to look at.
 			If(
-				data.bind((value) => value.workspace.feedbackBoard === "public"),
+				board.bind((value) => value === "public"),
 				Button(
 					{
 						size: "sm",
@@ -116,7 +154,7 @@ export function FeedbackListPage({
 			{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto" },
 			If(
 				visible.bind((list) => list.length === 0),
-				EmptyState(query, statusFilter, data),
+				EmptyState(query, statusFilter, params, intake, canConfigure, () => settingsOpen.set(true)),
 			),
 			ForEach(
 				visible,
@@ -124,6 +162,8 @@ export function FeedbackListPage({
 				(entry) => FeedbackRow(entry, feedback, data, params),
 			),
 		),
+
+		FeedbackSettingsDialog({ open: settingsOpen, slug: params.slug, intake, board }),
 	);
 }
 
@@ -298,7 +338,10 @@ function FeedbackRow(
 function EmptyState(
 	query: Readable<string>,
 	statusFilter: Readable<FeedbackStatus | null>,
-	data: Readable<PageData>,
+	params: { slug: Readable<string> },
+	intake: Readable<FeedbackIntake>,
+	canConfigure: Readable<boolean>,
+	onSetup: () => void,
 ) {
 	return If(
 		query.bind((term) => term.trim() !== ""),
@@ -332,10 +375,22 @@ function EmptyState(
 					EmptyMedia({ variant: "icon" }, MessageSquareQuote({ "aria-hidden": true })),
 					EmptyTitle("No feedback yet"),
 					EmptyDescription(
-						data.bind((value) =>
-							value.workspace.feedbackIntake === "disabled"
-								? "Feedback intake is closed. Open it in Settings to start collecting."
-								: `POST to /api/v1/workspaces/${value.workspace.slug}/user-feedback to send some.`,
+						derived([intake, params.slug], (mode, slug) =>
+							mode === "disabled"
+								? "Feedback intake is closed. Open it to start collecting."
+								: `POST to /api/v1/workspaces/${slug}/user-feedback to send some.`,
+						),
+					),
+				),
+				// Nothing here yet is exactly when someone is looking for the way to
+				// turn intake on, so the setup is offered rather than described.
+				If(
+					canConfigure,
+					EmptyContent(
+						Button(
+							{ size: "sm", class: "gap-1.5", onClick: onSetup },
+							SettingsIcon({ class: "size-3.5" }),
+							"Set up feedback",
 						),
 					),
 				),
