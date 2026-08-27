@@ -59,7 +59,7 @@ import {
 	type IssueStatus,
 } from "@/lib/domain/issues";
 import type { Activity, Attachment, Comment, Issue } from "@/lib/domain/schemas";
-import { AttachmentGrid } from "@/lib/features/attachments/attachment-list";
+import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
 import { beginUploads, preventFilePaste } from "@/lib/features/attachments/file-drop";
 import type { Upload } from "@/lib/features/attachments/uploader";
 import { relativeTime } from "@/lib/format";
@@ -175,8 +175,15 @@ function CommentRow(
 	const draft = signal(comment.get().body);
 	const draftRef = signal<HTMLElement | null>(null);
 	const confirmingDelete = signal(false);
-	/** Images pasted while rewording, and the ones still on their way up. */
-	const attached = signal<Attachment[]>([]);
+	/**
+	 * What the row shows: the comment's own files, plus anything pasted since
+	 * the server last said, minus anything taken off.
+	 *
+	 * A signal rather than a derived over the comment, because removing goes
+	 * through `removeAttachment` — which takes a file off the list first and
+	 * puts it back if the server refuses.
+	 */
+	const attachments = signal<Attachment[]>(comment.get().attachments);
 	const uploads = signal<Upload[]>([]);
 
 	/**
@@ -193,7 +200,7 @@ function CommentRow(
 			slug: slug.get(),
 			commentId: comment.get().id,
 			uploads,
-			onUploaded: (attachment) => attached.push(attachment),
+			onUploaded: (attachment) => attachments.push(attachment),
 		});
 	};
 
@@ -269,6 +276,10 @@ function CommentRow(
 				}),
 			),
 
+			// A comment that came back from the server — saved, or loaded afresh —
+			// is the last word on which files are on it.
+			ImplementEffect([comment], (value) => attachments.set(value.attachments)),
+
 			// The stored comment fills the box, and again when it changes somewhere
 			// else — but never on top of what is being typed here.
 			ImplementEffect([comment], (value) => {
@@ -304,14 +315,16 @@ function CommentRow(
 					Markdown(comment.bind("body"), { class: "mt-0.5" }),
 				),
 			AttachmentGrid({
-				// What the server has, plus anything pasted since it last said so —
-				// by id, because the next load hands back the same rows.
-				attachments: derived([comment, attached], (value, extra) => {
-					const known = new Set(value.attachments.map((entry) => entry.id));
-					return [...value.attachments, ...extra.filter((entry) => !known.has(entry.id))];
-				}),
+				attachments,
 				uploads,
 				slug,
+				// Only the uploader may take a file off, which is the rule the
+				// server keeps too. Asked once because the answer cannot change
+				// while the row is up: neither the viewer nor the comment's author
+				// is going to become someone else.
+				onRemove: isAuthor.get()
+					? (attachment) => void removeAttachment(slug.get(), attachment, attachments)
+					: undefined,
 			}),
 			DeleteCommentDialog({
 				open: confirmingDelete,
