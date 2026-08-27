@@ -21,6 +21,7 @@ import {
 	CreateCommentBody,
 	CreateIssueBody,
 	CreateLabelBody,
+	IssueStatusSchema,
 	LinkPullRequestBody,
 	TransferIssueBody,
 	UpdateFeedbackBody,
@@ -309,9 +310,7 @@ export const MCP_TOOLS: McpTool[] = [
 		readOnly: true,
 		input: v.object({
 			team: v.optional(v.pipe(v.string(), v.description('Team key, e.g. "ENG".'))),
-			status: v.optional(
-				v.array(v.picklist(["backlog", "todo", "in_progress", "done", "canceled"])),
-			),
+			status: v.optional(v.array(IssueStatusSchema)),
 			priority: v.optional(v.array(v.picklist(["none", "low", "medium", "high", "urgent"]))),
 			assignee: v.optional(
 				v.pipe(v.string(), v.description('A user id, or "none" for unassigned issues.')),

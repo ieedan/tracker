@@ -47,9 +47,12 @@ export function GithubMark(props: { class?: string } = {}) {
 const STATUS_COLOR: Record<IssueStatus, string> = {
 	backlog: "#8a8f98",
 	todo: "#8a8f98",
+	rework: "#f2994a",
 	in_progress: "#f2c94c",
+	in_review: "#4cb782",
 	done: "#5e6ad2",
 	canceled: "#6b6f76",
+	duplicate: "#6b6f76",
 };
 
 /**
@@ -65,13 +68,22 @@ function statusMarkup(status: IssueStatus): string {
 			return `<svg viewBox="0 0 16 16" width="14" height="14">${ring} stroke-dasharray="2.2 2.2"/></svg>`;
 		case "todo":
 			return `<svg viewBox="0 0 16 16" width="14" height="14">${ring}/></svg>`;
+		case "rework":
+			// A quarter-filled dial: work has come back around, but not far.
+			return `<svg viewBox="0 0 16 16" width="14" height="14">${ring}/><path d="M8 8 L8 3.2 A4.8 4.8 0 0 1 12.8 8 Z" fill="${color}"/></svg>`;
 		case "in_progress":
 			// A half-filled dial: the ring plus a 180° wedge drawn from the centre.
 			return `<svg viewBox="0 0 16 16" width="14" height="14">${ring}/><path d="M8 8 L8 3.2 A4.8 4.8 0 0 1 8 12.8 Z" fill="${color}"/></svg>`;
+		case "in_review":
+			// A three-quarter-filled dial: nearly done, one pass from review left.
+			return `<svg viewBox="0 0 16 16" width="14" height="14">${ring}/><path d="M8 8 L8 3.2 A4.8 4.8 0 1 1 3.2 8 Z" fill="${color}"/></svg>`;
 		case "done":
 			return `<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="7.2" fill="${color}"/><path d="M4.8 8.2 L7 10.4 L11.2 5.8" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 		case "canceled":
 			return `<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="7.2" fill="${color}"/><path d="M5.4 5.4 L10.6 10.6 M10.6 5.4 L5.4 10.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>`;
+		case "duplicate":
+			// Two overlapping squares — the universal copy glyph — on a filled circle.
+			return `<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="7.2" fill="${color}"/><rect x="4.6" y="6.2" width="5.6" height="5.6" rx="1" fill="none" stroke="#fff" stroke-width="1.3"/><rect x="6.6" y="4.2" width="5.6" height="5.6" rx="1" fill="none" stroke="#fff" stroke-width="1.3"/></svg>`;
 	}
 }
 
