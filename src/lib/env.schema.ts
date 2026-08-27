@@ -51,7 +51,11 @@ export const serverEnvSchema = {
 	 * be in it.
 	 *
 	 * Never set these on a deployment whose database holds real data: anyone who
-	 * can open the login page can press the button and land in that account.
+	 * can open the login page can press the button and land in that account. Nor
+	 * on the Vercel project for a preview's sake — the build writes them there
+	 * and a value from the project would only name an account the freshly
+	 * branched preview database does not have; `PREVIEW_DEMO_LOGIN_*` is the
+	 * knob for that, and `scripts/preview-db.ts` says why.
 	 */
 	DEMO_LOGIN_EMAIL: v.optional(v.string(), ""),
 	DEMO_LOGIN_PASSWORD: v.optional(v.string(), ""),
