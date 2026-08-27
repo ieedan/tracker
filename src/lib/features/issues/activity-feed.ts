@@ -18,7 +18,7 @@ import {
 	ForEach,
 	Fragment,
 	If,
-	ImplementLifecycle,
+	ImplementEffect,
 	Span,
 	derived,
 	signal,
@@ -50,7 +50,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
-import { Textarea } from "@/lib/components/ui/textarea";
 import {
 	ISSUE_PRIORITIES,
 	ISSUE_STATUSES,
@@ -59,9 +58,12 @@ import {
 	type IssuePriority,
 	type IssueStatus,
 } from "@/lib/domain/issues";
-import type { Activity, Comment, Issue } from "@/lib/domain/schemas";
-import { AttachmentGrid } from "@/lib/features/attachments/attachment-list";
+import type { Activity, Attachment, Comment, Issue } from "@/lib/domain/schemas";
+import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
+import { beginUploads, preventFilePaste } from "@/lib/features/attachments/file-drop";
+import type { Upload } from "@/lib/features/attachments/uploader";
 import { relativeTime } from "@/lib/format";
+import { BodyComposer } from "./body-composer";
 
 /**
  * One row of the timeline. A union would be tidier, but ForEach hands the
@@ -81,7 +83,7 @@ interface TimelineRow {
  * state up when one fails.
  */
 export interface CommentActions {
-	/** The signed-in user — Edit and Delete only show on their own comments. */
+	/** The signed-in user — a comment is only editable by the one who wrote it. */
 	viewerId: Readable<string>;
 	/** Admins may delete anyone's comment. Editing stays with the author. */
 	isAdmin: Readable<boolean>;
@@ -142,6 +144,7 @@ export function IssueTimeline({ comments, activity, issue, slug, actions }: Issu
 				: CommentRow(
 						row.bind((value) => value.comment!),
 						slug,
+						() => issue.get().repository?.id,
 						actions,
 					),
 	);
@@ -156,12 +159,50 @@ function wasEdited(value: Comment): boolean {
 	return Date.parse(value.updatedAt) - Date.parse(value.createdAt) > 1000;
 }
 
-function CommentRow(comment: Readable<Comment>, slug: Readable<string>, actions: CommentActions) {
-	const editing = signal(false);
-	const draft = signal("");
-	const draftRef = signal<HTMLTextAreaElement | null>(null);
-	const saving = signal(false);
+/**
+ * One comment, which for its author is the box it was written in.
+ *
+ * Your own comment is the editor, the same way the description is: click into
+ * the words and the caret is where you pressed, because there is nothing to
+ * exchange for a field first. Everyone else's is rendered and stays that way.
+ */
+function CommentRow(
+	comment: Readable<Comment>,
+	slug: Readable<string>,
+	repository: () => string | undefined,
+	actions: CommentActions,
+) {
+	const draft = signal(comment.get().body);
+	const draftRef = signal<HTMLElement | null>(null);
 	const confirmingDelete = signal(false);
+	/**
+	 * What the row shows: the comment's own files, plus anything pasted since
+	 * the server last said, minus anything taken off.
+	 *
+	 * A signal rather than a derived over the comment, because removing goes
+	 * through `removeAttachment` — which takes a file off the list first and
+	 * puts it back if the server refuses.
+	 */
+	const attachments = signal<Attachment[]>(comment.get().attachments);
+	const uploads = signal<Upload[]>([]);
+
+	/**
+	 * A screenshot pasted into a comment belongs to that comment.
+	 *
+	 * The box being editable is what makes this necessary: a paste the page
+	 * does not catch is one the browser drops into the document as an `<img>`,
+	 * which the serializer has no markdown for — so the picture went nowhere
+	 * and took a blank line's worth of nothing with it.
+	 */
+	const attach = (files: File[]) => {
+		beginUploads({
+			files,
+			slug: slug.get(),
+			commentId: comment.get().id,
+			uploads,
+			onUploaded: (attachment) => attachments.push(attachment),
+		});
+	};
 
 	const isAuthor = derived([actions.viewerId, comment], (id, value) => value.author.id === id);
 	const canDelete = derived([isAuthor, actions.isAdmin], (author, admin) => author || admin);
@@ -175,27 +216,32 @@ function CommentRow(comment: Readable<Comment>, slug: Readable<string>, actions:
 		}
 	};
 
-	const beginEdit = () => {
-		draft.set(comment.get().body);
-		editing.set(true);
-	};
-
-	const save = async () => {
+	/**
+	 * Leaving the box is the save, as it is on the description — there is no
+	 * Save button to press because there is no editor to be in or out of.
+	 *
+	 * A refused save leaves the words where they are rather than reverting
+	 * them: the box still holds what was typed, and `onEdit` has already said
+	 * what went wrong.
+	 */
+	const commit = () => {
+		const current = comment.get().body;
 		const next = draft.get().trim();
-		if (next === "" || saving.get()) return;
-		if (next === comment.get().body) {
-			editing.set(false);
+		if (next === current) return;
+		// A comment cannot be emptied by deleting its text. Ending one is its
+		// own decision, and the menu is where it is made.
+		if (next === "") {
+			draft.set(current);
 			return;
 		}
-		saving.set(true);
-		const done = await actions.onEdit(comment.get().id, next);
-		saving.set(false);
-		// A refused save keeps the box up: the words are still only in it.
-		if (done) editing.set(false);
+		void actions.onEdit(comment.get().id, next);
 	};
 
 	return Div(
-		{ class: "group/comment flex gap-3" },
+		{
+			class: "group/comment flex gap-3",
+			onPaste: (event) => preventFilePaste(event, attach),
+		},
 		UserAvatar(comment.get().author, "mt-0.5"),
 		Div(
 			{ class: "min-w-0 flex-1" },
@@ -224,69 +270,62 @@ function CommentRow(comment: Readable<Comment>, slug: Readable<string>, actions:
 					),
 				),
 				CommentMenu({
-					isAuthor,
 					canDelete,
 					onCopy: () => void copy(),
-					onEdit: beginEdit,
 					onDelete: () => confirmingDelete.set(true),
 				}),
 			),
-			If(editing)
+
+			// A comment that came back from the server — saved, or loaded afresh —
+			// is the last word on which files are on it.
+			ImplementEffect([comment], (value) => attachments.set(value.attachments)),
+
+			// The stored comment fills the box, and again when it changes somewhere
+			// else — but never on top of what is being typed here.
+			ImplementEffect([comment], (value) => {
+				const node = draftRef.get();
+				if (node !== null && node === document.activeElement) return;
+				draft.set(value.body);
+			}),
+
+			If(isAuthor)
 				.Then(
-					// Focus is taken on mount rather than through `autofocus` — the
-					// attribute is honoured once per document, and this box appears
-					// well after the page has spent it.
-					ImplementLifecycle({
-						onMount: () => {
-							const node = draftRef.get();
-							if (node === null) return;
-							node.focus();
-							node.setSelectionRange(node.value.length, node.value.length);
+					// The same box the comment was written in, so rewording one reads
+					// exactly like writing it did.
+					BodyComposer({
+						value: draft,
+						element: draftRef,
+						slug: () => slug.get(),
+						repository,
+						placeholder: "Write a comment…",
+						autoGrow: true,
+						class: "mt-0.5",
+						onBlur: commit,
+						// Blur saves, so ⌘⏎ only has to leave the box.
+						onSubmit: () => draftRef.get()?.blur(),
+						onEscape: () => {
+							draft.set(comment.get().body);
+							draftRef.get()?.blur();
 						},
 					}),
-					// A plain box holding the raw markdown — the same source the
-					// composer took, handed back to be reworded.
-					Div(
-						{ class: "mt-1.5 flex flex-col gap-2" },
-						Textarea({
-							this: draftRef,
-							value: draft,
-							rows: 3,
-							class: "max-h-64 text-[13px]",
-							onKeydown: (event) => {
-								if (event.key === "Escape") editing.set(false);
-								if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void save();
-							},
-						}),
-						Div(
-							{ class: "flex justify-end gap-2" },
-							Button(
-								{
-									size: "sm",
-									variant: "secondary",
-									disabled: saving,
-									onClick: () => editing.set(false),
-								},
-								"Cancel",
-							),
-							Button(
-								{
-									size: "sm",
-									loading: saving,
-									disabled: draft.bind((value) => value.trim() === ""),
-									onClick: () => void save(),
-								},
-								"Save",
-							),
-						),
-					),
 				)
 				.Else(
 					// Comment bodies are markdown; change events below are not. Only this
 					// branch renders through it, so a status line stays one plain sentence.
 					Markdown(comment.bind("body"), { class: "mt-0.5" }),
 				),
-			AttachmentGrid({ attachments: comment.bind("attachments"), slug }),
+			AttachmentGrid({
+				attachments,
+				uploads,
+				slug,
+				// Only the uploader may take a file off, which is the rule the
+				// server keeps too. Asked once because the answer cannot change
+				// while the row is up: neither the viewer nor the comment's author
+				// is going to become someone else.
+				onRemove: isAuthor.get()
+					? (attachment) => void removeAttachment(slug.get(), attachment, attachments)
+					: undefined,
+			}),
 			DeleteCommentDialog({
 				open: confirmingDelete,
 				onConfirm: () => actions.onDelete(comment.get().id),
@@ -295,12 +334,15 @@ function CommentRow(comment: Readable<Comment>, slug: Readable<string>, actions:
 	);
 }
 
-/** The row's "…": Copy for everyone, Edit and Delete only where they apply. */
+/**
+ * The row's "…": Copy for everyone, Delete where it applies.
+ *
+ * No Edit. Your own comment is already the box it was written in, so the item
+ * would only put the caret somewhere clicking the words puts it anyway.
+ */
 function CommentMenu(props: {
-	isAuthor: Readable<boolean>;
 	canDelete: Readable<boolean>;
 	onCopy: () => void;
-	onEdit: () => void;
 	onDelete: () => void;
 }) {
 	return Div(
@@ -319,10 +361,6 @@ function CommentMenu(props: {
 			DropdownMenuContent(
 				{ class: "w-36", align: "end" },
 				DropdownMenuItem({ onSelect: props.onCopy }, Copy({ class: "size-3.5" }), "Copy text"),
-				If(
-					props.isAuthor,
-					DropdownMenuItem({ onSelect: props.onEdit }, Pencil({ class: "size-3.5" }), "Edit"),
-				),
 				If(
 					props.canDelete,
 					DropdownMenuItem(

@@ -40,6 +40,7 @@ import {
 	type Signal,
 } from "@implementjs/core";
 import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
+import { renderMarkdown } from "@/lib/components/markdown";
 import { cn } from "@/lib/utils";
 import { MentionMenu, fileMentions } from "./file-mentions";
 import { insertLink, toggleWrap, type SelectionState } from "./markdown-commands";
@@ -193,169 +194,207 @@ export function BodyComposer(options: BodyComposerOptions) {
 			},
 		}),
 
-		// A body that changed anywhere else — a draft restored, an issue edited
-		// in another tab — has to be redrawn. Never while the caret is in the
-		// box, which would move the text out from under whoever is typing.
+		/**
+		 * A body set from outside the box — a posted comment clearing it, Escape
+		 * putting the stored words back, a draft restored — drawn as given.
+		 *
+		 * Not guarded on focus. Whether an edit made elsewhere should land on
+		 * what someone is in the middle of typing is a question about the body,
+		 * not about the box, and the callers that can answer it already do:
+		 * both the description and a comment leave their draft alone while the
+		 * caret is in it. Guarding here as well only broke the resets that are
+		 * deliberate — clearing after a ⌘⏎ post left the words on screen with
+		 * the placeholder drawn underneath them, because the value emptied and
+		 * the box never heard about it.
+		 */
 		ImplementEffect(
 			[options.value],
 			(text) => {
 				const node = host.get();
 				if (node === null || text === drawn) return;
-				if (typeof document !== "undefined" && document.activeElement === node) return;
 				drawn = text;
 				paint(node, text);
+				// Keeping the caret is part of the reset: a cleared box you are
+				// still standing in is where the next comment gets typed.
+				if (typeof document !== "undefined" && document.activeElement === node) {
+					focusBody(node);
+				}
 			},
 			{ immediate: false },
 		),
 
-		Div({
-			this: host,
-			contentEditable: "true",
-			role: "textbox",
-			"aria-multiline": true,
-			"aria-label": options.placeholder,
-			// The browser's own spelling underline is worth keeping; its
-			// formatting shortcuts are not, since ⌘B here writes markdown.
-			spellcheck: true,
-			class: cn(
-				bodyComposerClass,
-				{
-					// Everything the rest of the panel does not need, when the caller
-					// owns the height and has said so.
-					"min-h-0 flex-1 overflow-y-auto": filling,
-					// Capped rather than endless when the caller has neither given
-					// height nor taken it: a dialog that grows with the body pushes
-					// its own buttons off the screen.
-					"max-h-48 overflow-y-auto": capped,
+		Div(
+			{
+				this: host,
+				contentEditable: "true",
+				role: "textbox",
+				"aria-multiline": true,
+				"aria-label": options.placeholder,
+				// The browser's own spelling underline is worth keeping; its
+				// formatting shortcuts are not, since ⌘B here writes markdown.
+				spellcheck: true,
+				class: cn(
+					bodyComposerClass,
+					{
+						// Everything the rest of the panel does not need, when the caller
+						// owns the height and has said so.
+						"min-h-0 flex-1 overflow-y-auto": filling,
+						// Capped rather than endless when the caller has neither given
+						// height nor taken it: a dialog that grows with the body pushes
+						// its own buttons off the screen.
+						"max-h-48 overflow-y-auto": capped,
+					},
+					options.class,
+				),
+				style: {
+					minHeight: options.rows === undefined ? "auto" : `${options.rows * 1.6}em`,
 				},
-				options.class,
-			),
-			style: {
-				minHeight: options.rows === undefined ? "auto" : `${options.rows * 1.6}em`,
-			},
 
-			onInput: (event) => {
-				if (composing) return;
-				const node = host.get();
-				// A delete that took the last of the text with it leaves the block
-				// that held it behind — an empty heading, an empty quote — and the
-				// marker for a block nobody can see is not part of the body.
-				if (node !== null && event.inputType.startsWith("delete") && isBlank(node)) {
-					apply({ value: "", start: 0, end: 0 });
-					return;
-				}
-				const next = read();
-				// Nothing the markdown can tell apart from what is already
-				// drawn — a browser tidying its own DOM, most often.
-				if (next === null || next.value === drawn) return;
-				apply(next, { typed: true });
-			},
+				onInput: (event) => {
+					if (composing) return;
+					const node = host.get();
+					// A delete that took the last of the text with it leaves the block
+					// that held it behind — an empty heading, an empty quote — and the
+					// marker for a block nobody can see is not part of the body.
+					if (node !== null && event.inputType.startsWith("delete") && isBlank(node)) {
+						apply({ value: "", start: 0, end: 0 });
+						return;
+					}
+					const next = read();
+					// Nothing the markdown can tell apart from what is already
+					// drawn — a browser tidying its own DOM, most often.
+					if (next === null || next.value === drawn) return;
+					apply(next, { typed: true });
+				},
 
-			onCompositionstart: () => {
-				composing = true;
-			},
-			onCompositionend: () => {
-				composing = false;
-				const next = read();
-				if (next !== null) apply(next, { typed: true });
-			},
+				onCompositionstart: () => {
+					composing = true;
+				},
+				onCompositionend: () => {
+					composing = false;
+					const next = read();
+					if (next !== null) apply(next, { typed: true });
+				},
 
-			onKeydown: (event) => {
-				// The mention menu claims the arrows, Enter, Tab and Escape while
-				// it is open, so it gets the event first.
-				if (mentions.onKeydown(event)) return;
+				onKeydown: (event) => {
+					// The mention menu claims the arrows, Enter, Tab and Escape while
+					// it is open, so it gets the event first.
+					if (mentions.onKeydown(event)) return;
 
-				if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-					event.preventDefault();
-					submit();
-					return;
-				}
-				if (event.key === "Escape") {
-					options.onEscape?.();
-					return;
-				}
-				if (event.key === "Enter") {
+					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+						event.preventDefault();
+						submit();
+						return;
+					}
+					if (event.key === "Escape") {
+						options.onEscape?.();
+						return;
+					}
+					if (event.key === "Enter") {
+						event.preventDefault();
+						const current = read();
+						if (current !== null && current.start >= 0) apply(breakLine(current, event.shiftKey));
+						return;
+					}
+					if (event.key === "Backspace") {
+						const current = read();
+						const undone = current === null ? null : unmark(current);
+						if (undone === null) return;
+						event.preventDefault();
+						apply(undone);
+						return;
+					}
+					if (event.key === "Tab") {
+						const current = read();
+						const nested = current === null ? null : indent(current, event.shiftKey);
+						// Only a list answers Tab; everywhere else it still leaves the
+						// box, which is the only way out of a body with the keyboard.
+						if (nested === null) return;
+						event.preventDefault();
+						apply(nested);
+						return;
+					}
+
+					if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+
+					const key = event.key.toLowerCase();
+					if (key === "z") {
+						// Ours rather than the browser's: every edit here redraws the
+						// document, which is not a thing the native stack can replay.
+						event.preventDefault();
+						const step = event.shiftKey ? history.redo() : history.undo();
+						if (step !== null) apply(step, { record: false });
+						return;
+					}
+					if (key === "y") {
+						event.preventDefault();
+						const step = history.redo();
+						if (step !== null) apply(step, { record: false });
+						return;
+					}
+
+					const shortcut = SHORTCUTS[key];
+					if (shortcut !== undefined && !event.shiftKey) {
+						event.preventDefault();
+						command(shortcut);
+					}
+				},
+
+				onPaste: (event) => {
+					// Pasted files are the attachment grid's business, and it is
+					// listening further up.
+					if (filesFromClipboard(event).length > 0) return;
+					const text = event.clipboardData?.getData("text/plain") ?? "";
+					if (text === "") return;
 					event.preventDefault();
 					const current = read();
-					if (current !== null && current.start >= 0) apply(breakLine(current, event.shiftKey));
-					return;
-				}
-				if (event.key === "Backspace") {
-					const current = read();
-					const undone = current === null ? null : unmark(current);
-					if (undone === null) return;
-					event.preventDefault();
-					apply(undone);
-					return;
-				}
-				if (event.key === "Tab") {
-					const current = read();
-					const nested = current === null ? null : indent(current, event.shiftKey);
-					// Only a list answers Tab; everywhere else it still leaves the
-					// box, which is the only way out of a body with the keyboard.
-					if (nested === null) return;
-					event.preventDefault();
-					apply(nested);
-					return;
-				}
+					if (current === null || current.start < 0) return;
+					apply({
+						value: current.value.slice(0, current.start) + text + current.value.slice(current.end),
+						start: current.start + text.length,
+						end: current.start + text.length,
+					});
+				},
 
-				if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+				onBlur: () => {
+					// Picking from the menu blurs the box, and a caller that commits
+					// on blur would close the editor out from under the insertion.
+					if (mentions.open.get()) return;
+					// The blank line a list or a quote was stepped out of is a line with
+					// nothing on it, and nobody meant to post one. Taken off on the way
+					// out rather than as it is typed, where it is the line the caret is
+					// standing on.
+					const tidy = options.value.get().replace(/\s+$/, "");
+					if (tidy !== options.value.get()) {
+						drawn = tidy;
+						options.value.set(tidy);
+					}
+					options.onBlur?.();
+				},
 
-				const key = event.key.toLowerCase();
-				if (key === "z") {
-					// Ours rather than the browser's: every edit here redraws the
-					// document, which is not a thing the native stack can replay.
+				onMousedown: (event) => {
+					const node = host.get();
+					if (node === null || node.contains(document.activeElement)) return;
+					// A body you have not clicked into yet is one you are reading, and a
+					// link in it is there to be followed the way it is anywhere else on
+					// the page — a browser will not follow one inside an editable box on
+					// its own. Once the caret is in here the same click places it
+					// instead, so the link's own words can be edited like any others.
+					const anchor = (event.target as HTMLElement).closest("a");
+					// A mention is not editable text, so the browser already follows it.
+					if (anchor === null || anchor.hasAttribute("data-mention-path")) return;
+					const href = anchor.getAttribute("href");
+					if (href === null) return;
 					event.preventDefault();
-					const step = event.shiftKey ? history.redo() : history.undo();
-					if (step !== null) apply(step, { record: false });
-					return;
-				}
-				if (key === "y") {
-					event.preventDefault();
-					const step = history.redo();
-					if (step !== null) apply(step, { record: false });
-					return;
-				}
-
-				const shortcut = SHORTCUTS[key];
-				if (shortcut !== undefined && !event.shiftKey) {
-					event.preventDefault();
-					command(shortcut);
-				}
+					window.open(href, "_blank", "noreferrer");
+				},
 			},
 
-			onPaste: (event) => {
-				// Pasted files are the attachment grid's business, and it is
-				// listening further up.
-				if (filesFromClipboard(event).length > 0) return;
-				const text = event.clipboardData?.getData("text/plain") ?? "";
-				if (text === "") return;
-				event.preventDefault();
-				const current = read();
-				if (current === null || current.start < 0) return;
-				apply({
-					value: current.value.slice(0, current.start) + text + current.value.slice(current.end),
-					start: current.start + text.length,
-					end: current.start + text.length,
-				});
-			},
-
-			onBlur: () => {
-				// Picking from the menu blurs the box, and a caller that commits
-				// on blur would close the editor out from under the insertion.
-				if (mentions.open.get()) return;
-				// The blank line a list or a quote was stepped out of is a line with
-				// nothing on it, and nobody meant to post one. Taken off on the way
-				// out rather than as it is typed, where it is the line the caret is
-				// standing on.
-				const tidy = options.value.get().replace(/\s+$/, "");
-				if (tidy !== options.value.get()) {
-					drawn = tidy;
-					options.value.set(tidy);
-				}
-				options.onBlur?.();
-			},
-		}),
+			// The body as the server can send it, so a description is on the page
+			// before the script that would draw it has run. `paint` builds the same
+			// nodes on mount and takes over from there.
+			...renderMarkdown(options.value.get()),
+		),
 
 		If(
 			empty,
