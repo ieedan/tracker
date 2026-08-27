@@ -157,7 +157,20 @@ export function openCreateIssueFromTemplate(
 	open.set(true);
 }
 
-export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
+/**
+ * What the shell already knows about the workspace it is showing. The layout
+ * load hands it the teams, so the composer has no reason to open blank and wait
+ * on its own fetch for them — see `loadContext`.
+ */
+export interface KnownScope {
+	slug: Readable<string>;
+	teams: Readable<Team[]>;
+}
+
+export function CreateIssueDialog(
+	knownWorkspaces?: Readable<Workspace[]>,
+	knownScope?: KnownScope,
+) {
 	const title = signal("");
 	const description = signal("");
 	const status = signal<IssueStatus>("backlog");
@@ -328,6 +341,16 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 		}
 	};
 
+	/**
+	 * The shell's teams, but only when they are the ones for the workspace being
+	 * loaded — it holds a single workspace's teams, so they say nothing about a
+	 * workspace the crumb has retargeted to.
+	 */
+	const knownTeamsFor = (workspaceSlug: string): Team[] =>
+		knownScope !== undefined && knownScope.slug.get() === workspaceSlug
+			? knownScope.teams.get()
+			: [];
+
 	const loadContext = async (workspaceSlug: string) => {
 		hydrating = true;
 		// A fresh open always starts in the workspace it was opened from, and any
@@ -375,6 +398,33 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 			const wantedStatus = pendingStatus.get();
 			pendingStatus.set(null);
 			if (wantedStatus !== null) status.set(wantedStatus);
+
+			// Draft team wins when it still exists; otherwise Engineering. With no
+			// draft, open on the team you were looking at, then Engineering. A
+			// template that pins no team is not an instruction to ignore where you
+			// were — it falls through to the same defaults as a plain open.
+			const wantedTeam =
+				template !== null
+					? (template.team?.key ?? preferredTeam.get())
+					: draft !== null
+						? (draft.teamKey ?? "")
+						: preferredTeam.get();
+
+			// ENG-68: the team is what gives the issue its identifier, and the create
+			// button stays disabled without one — so a composer that opens teamless
+			// is not merely missing a crumb, it cannot be used at all. Waiting on the
+			// requests below is waiting on the slowest of five, which is how the
+			// dialog came to sit on a blank "Team" pill. The shell already loaded
+			// this workspace's teams, so open on those and let the response reconcile
+			// them (issue counts move, a team may have been added since).
+			const seededTeams = knownTeamsFor(workspaceSlug);
+			let seededKey: string | null = null;
+			if (seededTeams.length > 0) {
+				teams.set(seededTeams);
+				const seed = teamRefFor(seededTeams, wantedTeam);
+				seededKey = seed?.key ?? null;
+				chosenTeam.set(seed);
+			}
 
 			const [memberResult, labelResult, teamResult, repoResult, workspaceResult] =
 				await Promise.all([
@@ -443,17 +493,17 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 			if (teamResult.error !== undefined) return;
 			teams.set(teamResult.data);
 
-			// Draft team wins when it still exists; otherwise Engineering. With no
-			// draft, open on the team you were looking at, then Engineering. A
-			// template that pins no team is not an instruction to ignore where you
-			// were — it falls through to the same defaults as a plain open.
-			const wanted =
-				template !== null
-					? (template.team?.key ?? preferredTeam.get())
-					: draft !== null
-						? (draft.teamKey ?? "")
-						: preferredTeam.get();
-			chosenTeam.set(teamRefFor(teamResult.data, wanted));
+			// Swap the seeded team for its freshly fetched self — the same answer
+			// whenever the seed was current, and the right one when it was not —
+			// without undoing a pick made while these requests were in flight. Now
+			// that the picker opens on real teams, that pick is reachable.
+			const held = chosenTeam.get();
+			chosenTeam.set(
+				teamRefFor(
+					teamResult.data,
+					held !== null && seededKey !== null && held.key !== seededKey ? held.key : wantedTeam,
+				),
+			);
 		} finally {
 			hydrating = false;
 		}

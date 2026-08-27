@@ -181,7 +181,16 @@ export function AppShell(
 
 		// Mounted once for the whole app: both are opened imperatively from
 		// hotkeys, the sidebar and the palette itself.
-		CreateIssueDialog(data.bind((shell) => shell.workspaces)),
+		CreateIssueDialog(
+			data.bind((shell) => shell.workspaces),
+			// The slug comes off the same load as the teams rather than off the
+			// route, so a composer opened mid-navigation cannot pair one
+			// workspace's slug with another's teams.
+			{
+				slug: data.bind((shell) => shell.workspace.slug),
+				teams: data.bind((shell) => shell.teams),
+			},
+		),
 		TemplateDialog(),
 		CommandPalette(activeSlug),
 	);
