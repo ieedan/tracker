@@ -71,13 +71,27 @@ interface PageData {
 	user: { id: string };
 }
 
+export interface IssueDetailPageOptions {
+	/**
+	 * Rendered inside another screen — the inbox's reading pane — rather than as
+	 * the whole of /issue/:identifier.
+	 *
+	 * Two differences, both about the host: the breadcrumb header is dropped,
+	 * because the host has one of its own above this, and the rail waits for a
+	 * wider viewport, because the host is holding a list beside it and 1024px of
+	 * window is nowhere near 1024px of pane.
+	 */
+	embedded?: boolean;
+}
+
 export function IssueDetailPage({
 	data,
 	params,
+	embedded = false,
 }: {
 	data: Readable<PageData>;
 	params: { slug: Readable<string>; identifier: Readable<string> };
-}) {
+} & IssueDetailPageOptions) {
 	// `patchIssue` works over a list, so the detail page keeps a list of one.
 	const issues = signal<Issue[]>([data.get().issue]);
 	data.onChange((next) => issues.set([next.issue]));
@@ -180,7 +194,8 @@ export function IssueDetailPage({
 
 	// Wide enough for the properties rail; below this the same sections stack
 	// under the body instead, because a fixed 16rem column would eat the page.
-	const hasRail = mediaQuery("(min-width: 1024px)");
+	// Embedded, the notification list has already taken 380px off the front.
+	const hasRail = mediaQuery(embedded ? "(min-width: 1400px)" : "(min-width: 1024px)");
 
 	// Moving teams renumbers the issue, so the URL it lives at changes with it.
 	const moveTeam = (key: string) => {
@@ -368,21 +383,26 @@ export function IssueDetailPage({
 
 		Div(
 			{ class: "flex min-w-0 flex-1 flex-col" },
-			Div(
-				{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
-				router.Link(
-					{
-						to: "/app/:slug",
-						params: { slug: params.slug },
-						class:
-							"flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
-					},
-					ChevronLeft({ class: "size-3.5" }),
-					"Issues",
-				),
-				Span({ class: "text-muted-foreground" }, "/"),
-				Span({ class: "font-mono text-[12px] text-muted-foreground" }, issue.bind("identifier")),
-			),
+			embedded
+				? null
+				: Div(
+						{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-4" },
+						router.Link(
+							{
+								to: "/app/:slug",
+								params: { slug: params.slug },
+								class:
+									"flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground",
+							},
+							ChevronLeft({ class: "size-3.5" }),
+							"Issues",
+						),
+						Span({ class: "text-muted-foreground" }, "/"),
+						Span(
+							{ class: "font-mono text-[12px] text-muted-foreground" },
+							issue.bind("identifier"),
+						),
+					),
 
 			Div(
 				{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-8 sm:py-6" },

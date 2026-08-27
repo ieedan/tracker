@@ -26,6 +26,7 @@ import {
 	Menu,
 	MessageSquareQuote,
 	LogOut,
+	Pencil,
 	Plus,
 	Settings as SettingsIcon,
 	UserCog,
@@ -43,6 +44,9 @@ import {
 	DropdownMenuGroupHeading,
 	DropdownMenuItem,
 	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/lib/components/ui/drawer";
@@ -57,6 +61,12 @@ import {
 	openCreateIssue,
 	openCreateIssueFromTemplate,
 } from "@/lib/features/issues/create-issue-dialog";
+import {
+	TemplateDialog,
+	openCreateTemplate,
+	openEditTemplate,
+	templatesChanged,
+} from "@/lib/features/issues/template-dialog";
 import { seedUnreadCount, unreadCount } from "@/lib/features/inbox/unread";
 import { TeamIcon } from "@/lib/features/teams/team-icon";
 
@@ -171,6 +181,7 @@ export function AppShell(
 		// Mounted once for the whole app: both are opened imperatively from
 		// hotkeys, the sidebar and the palette itself.
 		CreateIssueDialog(data.bind((shell) => shell.workspaces)),
+		TemplateDialog(),
 		CommandPalette(activeSlug),
 	);
 }
@@ -308,8 +319,9 @@ function teamKeyFromPath(path: string): string | undefined {
 
 /**
  * New issue, split: the button opens a blank composer, the chevron opens one of
- * the workspace's templates. Templates are fetched here rather than seeded by
- * the layout so adding one in settings shows up without a reload.
+ * the workspace's templates — and is also where templates are made and edited.
+ * The list is fetched here rather than seeded by the layout so a template
+ * created in the dialog shows up without a reload.
  */
 function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: string }>) {
 	const templates = signal<IssueTemplate[]>([]);
@@ -329,6 +341,9 @@ function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: str
 		// Switching workspaces keeps this control mounted, so the list has to
 		// follow the slug rather than only load once.
 		ImplementEffect([activeSlug], () => void load(), { immediate: false }),
+		// The dialog is mounted once in the shell and cannot reach into the two
+		// copies of this control, so it announces the change and both refetch.
+		ImplementEffect([templatesChanged], () => void load(), { immediate: false }),
 
 		Button(
 			{
@@ -382,9 +397,31 @@ function NewIssueControl(activeSlug: Readable<string>, url: Readable<{ path: str
 				),
 				DropdownMenuSeparator(),
 				DropdownMenuItem(
-					{ onSelect: () => router.navigate("/app/:slug/settings", { slug: activeSlug.get() }) },
-					SettingsIcon({ class: "size-3.5" }),
-					"Manage templates",
+					{ onSelect: () => openCreateTemplate(activeSlug.get()) },
+					Plus({ class: "size-3.5" }),
+					"New template",
+				),
+				// Editing hangs off a submenu rather than a control on each row: a
+				// row's whole job is "start an issue from this", and a second
+				// target inside it is a click you can miss.
+				If(
+					templates.bind((list) => list.length > 0),
+					DropdownMenuSub(
+						DropdownMenuSubTrigger({}, Pencil({ class: "size-3.5" }), "Edit template"),
+						DropdownMenuSubContent(
+							{ class: "w-56" },
+							ForEach(
+								templates,
+								(template) => template.id,
+								(template) =>
+									DropdownMenuItem(
+										{ onSelect: () => openEditTemplate(activeSlug.get(), template.get()) },
+										LayoutTemplate({ class: "size-3.5 shrink-0" }),
+										Span({ class: "truncate" }, template.bind("name")),
+									),
+							),
+						),
+					),
 				),
 			),
 		),

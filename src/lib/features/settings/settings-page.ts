@@ -21,10 +21,8 @@ import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker
 import { MembersSection } from "./members-section";
 import { WorkspaceAgentsSection } from "./workspace-agents-section";
 import { ApiKeysSection } from "./api-keys-section";
-import { FeedbackSection } from "./feedback-section";
 import { RepositoriesSection } from "./repositories-section";
 import { TeamsSection } from "./teams-section";
-import { TemplatesSection } from "./templates-section";
 import { WebhooksSection } from "./webhooks-section";
 
 interface PageData {
@@ -42,9 +40,9 @@ export function SettingsPage({
 	data: Readable<PageData>;
 	params: { slug: Readable<string> };
 }) {
-	// Webhooks and feedback intake are configuration-heavy — event matrices,
-	// condition builders, payload templates — and phone screens make them worse,
-	// not smaller. They only mount where there is room; a note stands in below.
+	// Webhooks are configuration-heavy — an event matrix, a condition builder, a
+	// payload template — and phone screens make that worse, not smaller. The
+	// section only mounts where there is room; a note stands in below.
 	const wide = mediaQuery("(min-width: 768px)");
 
 	return Div(
@@ -64,15 +62,7 @@ export function SettingsPage({
 					data.bind((value) => value.workspace.role === "admin"),
 				),
 				LabelsSection(data, params),
-				TemplatesSection(params.slug),
 				RepositoriesSection(params),
-				If(
-					wide,
-					FeedbackSection(
-						data.bind((value) => value.workspace),
-						params,
-					),
-				),
 				WorkspaceAgentsSection(params.slug),
 				If(wide, WebhooksSection(params.slug, copy)),
 				ApiKeysSection(copy),
@@ -83,7 +73,7 @@ export function SettingsPage({
 							class:
 								"rounded-md border border-dashed border-border p-3 text-[12px] text-muted-foreground",
 						},
-						"Feedback intake and webhooks are set up on a larger screen.",
+						"Webhooks are set up on a larger screen.",
 					),
 				),
 			),
