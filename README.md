@@ -99,6 +99,16 @@ them on a deployment holding real data** — anyone who can open the login page
 can press the button. Nothing sets them for production. Typing the credentials
 still works too: **demo@tracker.dev** / **password123**.
 
+Those two are written by the build, not read from it: a preview database is a
+copy of the seeded template minutes old, so the only account it is guaranteed to
+hold is the seeded one, and `DEMO_LOGIN_EMAIL` set on the Vercel project is
+ignored on that path. Setting it there is what produced ENG-74 — a button
+labelled with an address the preview's database had never heard of, answering
+"Invalid email or password" to every reviewer who pressed it. A template seeded
+by something other than `pnpm db:seed` names its account in
+`PREVIEW_DEMO_LOGIN_EMAIL` and `PREVIEW_DEMO_LOGIN_PASSWORD` instead: preview-only
+by name, and honoured only with both halves set.
+
 GitHub on previews is its own choice: a separate App (which keeps production's
 private key and its list of installations out of preview deployments), the
 production App, or nothing. Repository linking works either way.

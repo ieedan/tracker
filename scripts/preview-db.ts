@@ -80,11 +80,37 @@ function previewOrigins(): { baseURL: string | null; trusted: string[] } {
  * but demo data. A preview that fell back to the project-wide `DATABASE_URL`
  * takes neither for granted and gets no button.
  *
- * An explicit `DEMO_LOGIN_EMAIL` on the Vercel project wins, for a preview
- * template seeded with something other than `scripts/seed.ts`.
+ * `DEMO_LOGIN_*` set on the Vercel project is deliberately *not* honoured here,
+ * and that is the fix for ENG-74. Vercel applies a variable to whichever
+ * environments it was scoped to, so a `DEMO_LOGIN_EMAIL` added for some other
+ * deployment also lands on every preview build — where it names an account
+ * this preview's database, a copy of the seed template minutes old, does not
+ * have. The button then goes out labelled with that address and answers
+ * "Invalid email or password" to everyone who presses it. On this path the
+ * database's contents are known, so the credentials are read from the same
+ * constant `seed.ts` creates rather than from the environment.
+ *
+ * A preview template seeded with something other than `scripts/seed.ts` names
+ * its account in `PREVIEW_DEMO_LOGIN_EMAIL` / `PREVIEW_DEMO_LOGIN_PASSWORD`
+ * instead: preview-only by name, so it cannot arrive from a deployment that
+ * shares nothing with this one, and honoured only with both halves present —
+ * half a pair is a button that cannot work.
  */
 function demoLogin(): Record<string, string> {
-	if ((process.env.DEMO_LOGIN_EMAIL ?? "") !== "") return {};
+	const email = process.env.PREVIEW_DEMO_LOGIN_EMAIL ?? "";
+	const password = process.env.PREVIEW_DEMO_LOGIN_PASSWORD ?? "";
+
+	if (email !== "" && password !== "") {
+		console.log(`preview: one-click sign-in as ${email} (PREVIEW_DEMO_LOGIN_*)`);
+		return { DEMO_LOGIN_EMAIL: email, DEMO_LOGIN_PASSWORD: password };
+	}
+	if (email !== "" || password !== "") {
+		console.log(
+			"preview: PREVIEW_DEMO_LOGIN_EMAIL and PREVIEW_DEMO_LOGIN_PASSWORD have to be set " +
+				"together — using the seeded demo account instead.",
+		);
+	}
+
 	console.log(`preview: one-click sign-in as ${DEMO_ACCOUNT.email}`);
 	return {
 		DEMO_LOGIN_EMAIL: DEMO_ACCOUNT.email,
