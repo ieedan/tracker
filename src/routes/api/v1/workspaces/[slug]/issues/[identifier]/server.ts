@@ -15,7 +15,7 @@ import {
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
-import { notify } from "@/lib/server/notifications.server";
+import { issueAudience, notify } from "@/lib/server/notifications.server";
 import { requireRepository } from "@/lib/server/repositories.server";
 import { recordActivity, type ActivityInput } from "@/lib/server/activity.server";
 import {
@@ -182,7 +182,6 @@ export const PATCH = handler({
 			await notify({
 				userId: body.assigneeId,
 				actorId: user.id,
-				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: before.id,
 				type: "issue_assigned",
@@ -191,7 +190,6 @@ export const PATCH = handler({
 			await notify({
 				userId: before.assigneeId,
 				actorId: user.id,
-				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: before.id,
 				type: "issue_unassigned",
@@ -199,19 +197,15 @@ export const PATCH = handler({
 			});
 		}
 
-		// A status change is interesting to whoever owns the issue and whoever filed it.
+		// A status change is interesting to everyone following the issue. The
+		// assignee named in this same request is not one of them yet if the
+		// subscribe above is what put them there, so read the audience after it.
 		if (body.status !== undefined && body.status !== before.status) {
 			const message = `${user.name} moved ${identifier} to ${STATUS_LABELS[body.status]}`;
-			const audience = new Set(
-				[before.assigneeId, body.assigneeId, before.creatorId].filter(
-					(id): id is string => id != null && id !== "",
-				),
-			);
-			for (const userId of audience) {
+			for (const userId of await issueAudience(before.id)) {
 				await notify({
 					userId,
 					actorId: user.id,
-					onBehalfOfId: locals.agent?.installedByUserId,
 					workspaceId: workspace.id,
 					issueId: before.id,
 					type: "issue_status_changed",

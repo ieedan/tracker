@@ -23,7 +23,7 @@ import { recordActivity } from "./activity.server";
 import { db } from "./db.server";
 import { emitIssueEvent } from "./events.server";
 import { getIssueById } from "./issues.server";
-import { notify } from "./notifications.server";
+import { issueAudience, notify } from "./notifications.server";
 import type { RemotePullRequestEvent } from "./providers/types.server";
 import {
 	account,
@@ -385,12 +385,7 @@ async function moveIssue(
 
 	const reference = `${repo.owner}/${repo.name}#${event.pull.number}`;
 	const message = `${reference} moved ${identifier} to ${STATUS_LABELS[status]}`;
-	const audience = new Set(
-		[target.row.assigneeId, target.row.creatorId].filter(
-			(id): id is string => id != null && id !== "",
-		),
-	);
-	for (const userId of audience) {
+	for (const userId of await issueAudience(target.row.id)) {
 		await notify({
 			userId,
 			actorId: actor.id,

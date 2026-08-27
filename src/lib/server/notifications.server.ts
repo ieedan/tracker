@@ -3,21 +3,13 @@ import { nanoid } from "nanoid";
 import type { NotificationType } from "@/lib/domain/issues";
 import type { Notification, NotificationOrder } from "@/lib/domain/schemas";
 import { db } from "./db.server";
-import { issue, notification, team, user, workspace } from "./schema.server";
+import { issue, issueSubscriber, notification, team, user, workspace } from "./schema.server";
 import { identifierFor, toUser } from "./serialize.server";
 
 interface NotifyInput {
 	/** Who should see it. Silently dropped when this is the actor. */
 	userId: string | null | undefined;
 	actorId: string;
-	/**
-	 * When an agent is acting, the human who authorized it — pass
-	 * `locals.agent?.installedByUserId`.
-	 *
-	 * Their agent doing something on their behalf is still them doing it, so it
-	 * is dropped the same way notifying yourself is.
-	 */
-	onBehalfOfId?: string | null | undefined;
 	workspaceId: string;
 	issueId?: string | null;
 	type: NotificationType;
@@ -29,13 +21,17 @@ interface NotifyInput {
  *
  * Notifying yourself is a no-op — you already know you did it — which is why
  * every caller can pass an assignee straight through without checking first.
- * That extends to your own agent: it acts on your delegation, so its work does
- * not come back to you as news.
+ *
+ * An agent is not you, even one you installed. It runs unattended for long
+ * stretches and its results — a comment with what it found, an issue it moved
+ * to In Review, work it handed back to you — are the news you are waiting for.
+ * Suppressing them because you authorized the agent once is what emptied the
+ * inbox for anyone whose workspace is mostly agent traffic, so the only actor
+ * that stays quiet is the recipient themselves.
  */
 export async function notify(input: NotifyInput): Promise<void> {
 	if (input.userId === null || input.userId === undefined) return;
 	if (input.userId === input.actorId) return;
-	if (input.userId === input.onBehalfOfId) return;
 
 	await db.insert(notification).values({
 		id: nanoid(),
@@ -47,6 +43,28 @@ export async function notify(input: NotifyInput): Promise<void> {
 		body: input.body,
 		createdAt: new Date(),
 	});
+}
+
+/**
+ * Everyone who should hear about something happening on an issue.
+ *
+ * The answer is "whoever follows it" — the `issue_subscriber` rows, which are
+ * written for you when you file an issue, when one is assigned to you, when you
+ * comment, and when you press Subscribe. Deriving the audience from
+ * participation instead (assignee plus creator, which is what every call site
+ * used to do inline) meant Subscribe changed nothing about what reached your
+ * inbox and unsubscribing from a noisy issue you happened to file changed
+ * nothing either.
+ *
+ * Callers still address assignment notifications at the assignee directly: "X
+ * assigned ENG-1 to you" is not news for a bystander.
+ */
+export async function issueAudience(issueId: string): Promise<string[]> {
+	const rows = await db
+		.select({ userId: issueSubscriber.userId })
+		.from(issueSubscriber)
+		.where(eq(issueSubscriber.issueId, issueId));
+	return rows.map((row) => row.userId);
 }
 
 export async function listNotifications(

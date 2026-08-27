@@ -9,7 +9,7 @@ import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { emitCommentEvent } from "@/lib/server/events.server";
 import { getIssueById, subscribeToIssue } from "@/lib/server/issues.server";
-import { notify } from "@/lib/server/notifications.server";
+import { issueAudience, notify } from "@/lib/server/notifications.server";
 import { comment, issue, team, user } from "@/lib/server/schema.server";
 import { identifierFor, toComment } from "@/lib/server/serialize.server";
 import { handler, json } from "./$types";
@@ -106,16 +106,10 @@ export const POST = handler({
 		await subscribeToIssue(target.issue.id, locals.agent?.installedByUserId);
 
 		const identifier = identifierFor(target.team.key, target.issue.number);
-		const audience = new Set(
-			[target.issue.assigneeId, target.issue.creatorId].filter(
-				(id): id is string => id != null && id !== "",
-			),
-		);
-		for (const userId of audience) {
+		for (const userId of await issueAudience(target.issue.id)) {
 			await notify({
 				userId,
 				actorId: author.id,
-				onBehalfOfId: locals.agent?.installedByUserId,
 				workspaceId: workspace.id,
 				issueId: target.issue.id,
 				type: "issue_commented",
