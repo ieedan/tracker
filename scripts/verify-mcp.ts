@@ -220,7 +220,7 @@ const listed = await (async () => {
 	return (body.result as { tools: Record<string, never>[] }).tools;
 })();
 {
-	check("every tool is listed", listed.length === 29, listed.length);
+	check("every tool is listed", listed.length === 30, listed.length);
 	const names = listed.map((entry) => String(entry.name));
 	check(
 		"names are unchanged",
@@ -242,6 +242,7 @@ const listed = await (async () => {
 				"list_teams",
 				"list_labels",
 				"create_label",
+				"delete_label",
 				"list_members",
 				"get_workspace",
 				"list_webhooks",
@@ -313,7 +314,7 @@ const listed = await (async () => {
 				(entry) => (entry.annotations as { destructiveHint?: boolean }).destructiveHint === true,
 			)
 			.map((entry) => entry.name)
-			.join(",") === "delete_issue,delete_webhook",
+			.join(",") === "delete_issue,delete_label,delete_webhook",
 	);
 	// A webhook's conditions are the one recursive schema here — `v.lazy` over a
 	// group of rules — and the JSON Schema for it is a `$ref`. If the `$defs` it

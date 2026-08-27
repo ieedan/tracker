@@ -44,8 +44,10 @@ export const OPENID_SCOPES = ["openid", "profile", "email", "offline_access"] as
  * whole scope would only break the parts that were always allowed.
  *
  * `labels:write` is likewise grantable. It was carved out of `workspace:write`
- * precisely so an agent can create a label without being given the rest of that
- * scope, and the endpoint behind it is member-level.
+ * precisely so an agent can work with labels without being given the rest of
+ * that scope. Creating one is member-level; deleting one moved to
+ * `requireAdminAccess` alongside the webhook routes, so it too is satisfiable —
+ * by an agent whose approver is an admin, and only there.
  *
  * `webhooks:*` left this set in ENG-65. The webhook routes moved to
  * `requireAdminAccess`, which admits an agent whose approver is an admin — so

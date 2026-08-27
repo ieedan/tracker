@@ -31,9 +31,9 @@ export const POST = handler({
 		// `labels:write` rather than `workspace:write`: creating a label is a
 		// member-level act, and an agent that only needs to file a well-labelled
 		// issue should not have to be handed repositories, teams and settings to
-		// do it. There is no rename endpoint, and deleting one sits behind
-		// `workspace:write` and an admin check, so this scope means "create" and
-		// nothing else.
+		// do it. The same scope also covers deleting one, but that endpoint puts
+		// `requireAdminAccess` in front of it — so this scope on its own means
+		// "create", and there is no rename endpoint at all.
 		requirePermission(locals, "labels", "write");
 		const row = {
 			id: nanoid(),

@@ -523,6 +523,17 @@ export const MCP_TOOLS: McpTool[] = [
 			await callApi(event, "POST", `/api/v1/workspaces/${slug}/labels`, withoutWorkspace(input)),
 	}),
 	scoped({
+		name: "delete_label",
+		title: "Delete a label",
+		description:
+			"Remove a label from the workspace. It comes off every issue, template and piece of feedback that carries it, and this cannot be undone. Needs the person who authorized you to be an admin. Pass an `id` from `list_labels`.",
+		readOnly: false,
+		destructive: true,
+		input: v.object({ id: v.string(), ...workspaceArg }),
+		handle: async ({ input, event, slug }) =>
+			await callApi(event, "DELETE", `/api/v1/workspaces/${slug}/labels/${segment(input.id)}`),
+	}),
+	scoped({
 		name: "list_members",
 		title: "List members",
 		description:

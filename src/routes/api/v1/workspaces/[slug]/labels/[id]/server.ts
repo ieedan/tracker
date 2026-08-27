@@ -2,7 +2,11 @@ import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
+import {
+	requireAdminAccess,
+	requireMembership,
+	requirePermission,
+} from "@/lib/server/guards.server";
 import { label } from "@/lib/server/schema.server";
 import { handler } from "./$types";
 
@@ -11,11 +15,18 @@ const Params = v.object({ slug: v.string(), id: v.string() });
 /**
  * Deletes a label, workspace-wide.
  *
- * `workspace:write` rather than the `labels:write` that creating uses, and
- * behind `requireAdmin` on top. The label scope was carved out so an agent
- * could file a well-labelled issue without being handed the rest of the
- * workspace; letting it also satisfy this would quietly turn every credential
- * already holding it into one that can strip a label off every issue there is.
+ * `labels:write`, the same scope creating uses, behind `requireAdminAccess` on
+ * top. The scope was carved out so an agent working with labels need not be
+ * handed repositories, teams and settings as well, and that argument covers
+ * removing one as much as adding one — `workspace:write` here would have meant
+ * a label-managing agent taking the whole workspace with it.
+ *
+ * The guard is what keeps that honest, and it is the ENG-65 webhook pattern
+ * rather than a lifting of the never-admin cap. For a person it is exactly
+ * `requireAdmin`: `delegatedRole` is their own role, so no human gains anything
+ * they did not already have. For an agent the bot stays capped at `member` and
+ * the check falls on the person who installed it, so an agent can clean up a
+ * workspace's labels only where its approver could have done it by hand.
  *
  * Nothing is left behind. The three join tables — `issue_label`,
  * `feedback_label` and `issue_template_label` — cascade, so the label simply
@@ -30,8 +41,8 @@ export const DELETE = handler({
 	params: Params,
 	response: v.object({ deleted: v.boolean() }),
 	async handle({ locals, params }) {
-		const membership = requireAdmin(await requireMembership(locals, params.slug));
-		requirePermission(locals, "workspace", "write");
+		const membership = requireAdminAccess(await requireMembership(locals, params.slug));
+		requirePermission(locals, "labels", "write");
 
 		// Scoped to the workspace, so a label id from somewhere else is a 404
 		// rather than a delete.

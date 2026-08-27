@@ -33,7 +33,7 @@ export const API_KEY_RESOURCE_HINTS: Record<ApiKeyResource, string> = {
 	issues: "Issues, comments, and attachments.",
 	workspace: "The workspace itself, plus its teams and templates.",
 	labels:
-		"The workspace's labels. Writing creates new ones; renaming is not offered, and deleting one is an admin act behind Workspace.",
+		"The workspace's labels. Writing creates new ones, and deletes them if you are an admin. Renaming is not offered.",
 	members: "People in the workspace, and invite links.",
 	webhooks:
 		"Outgoing webhooks and their delivery log. Writing means workspace events can be sent to an endpoint this credential picks.",
