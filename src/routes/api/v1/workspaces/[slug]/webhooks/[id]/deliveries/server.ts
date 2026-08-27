@@ -3,7 +3,11 @@ import { and, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { WebhookDeliverySchema } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
-import { requireAdmin, requireMembership, requirePermission } from "@/lib/server/guards.server";
+import {
+	requireAdminAccess,
+	requireMembership,
+	requirePermission,
+} from "@/lib/server/guards.server";
 import { webhook, webhookDelivery } from "@/lib/server/schema.server";
 import { toDelivery } from "@/lib/server/serialize.server";
 import { handler } from "./$types";
@@ -25,7 +29,7 @@ export const GET = handler({
 	}),
 	response: v.array(WebhookDeliverySchema),
 	async handle({ locals, params, query }) {
-		const membership = requireAdmin(await requireMembership(locals, params.slug));
+		const membership = requireAdminAccess(await requireMembership(locals, params.slug));
 		requirePermission(locals, "webhooks", "read");
 
 		const owned = await db

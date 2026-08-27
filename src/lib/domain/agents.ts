@@ -46,8 +46,13 @@ export const OPENID_SCOPES = ["openid", "profile", "email", "offline_access"] as
  * `labels:write` is likewise grantable. It was carved out of `workspace:write`
  * precisely so an agent can create a label without being given the rest of that
  * scope, and the endpoint behind it is member-level.
+ *
+ * `webhooks:*` left this set in ENG-65. The webhook routes moved to
+ * `requireAdminAccess`, which admits an agent whose approver is an admin — so
+ * the scope is now satisfiable, and an agent can subscribe itself to the events
+ * it cares about instead of asking a person to click through the settings page.
  */
-const ADMIN_ONLY_SCOPES = new Set<AgentScope>(["members:write", "webhooks:read", "webhooks:write"]);
+const ADMIN_ONLY_SCOPES = new Set<AgentScope>(["members:write"]);
 
 export function isAgentGrantableScope(scope: AgentScope): boolean {
 	return !ADMIN_ONLY_SCOPES.has(scope);
@@ -55,6 +60,24 @@ export function isAgentGrantableScope(scope: AgentScope): boolean {
 
 /** The scopes a dynamically-registered client is allowed to ask for. */
 export const AGENT_GRANTABLE_SCOPES: AgentScope[] = AGENT_SCOPES.filter(isAgentGrantableScope);
+
+/**
+ * Grantable, but never handed out for saying nothing.
+ *
+ * Registration is open and a client that names no scopes is given the default
+ * set, on the reasoning that the tools are not independently useful — creating
+ * an issue needs a team key, and finding one needs `workspace:read`. Webhooks
+ * are not like that. A webhook posts workspace events to a URL the agent picks,
+ * so it is the one scope where "the client did not say" should mean no rather
+ * than yes: a client that wants it has to name it, and the person approving it
+ * then sees it spelled out on the consent screen.
+ */
+const OPT_IN_SCOPES = new Set<AgentScope>(["webhooks:read", "webhooks:write"]);
+
+/** What a client registering without a `scope` of its own is given. */
+export const AGENT_DEFAULT_SCOPES: AgentScope[] = AGENT_GRANTABLE_SCOPES.filter(
+	(scope) => !OPT_IN_SCOPES.has(scope),
+);
 
 /**
  * What an agent client may register for, including `offline_access`.
