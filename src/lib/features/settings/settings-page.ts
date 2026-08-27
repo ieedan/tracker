@@ -11,10 +11,14 @@ import {
 	signal,
 	type Child,
 	type Readable,
+	type Signal,
 } from "@implementjs/core";
+import { X } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
@@ -61,7 +65,11 @@ export function SettingsPage({
 					params.slug,
 					data.bind((value) => value.workspace.role === "admin"),
 				),
-				LabelsSection(data, params),
+				LabelsSection(
+					data,
+					params,
+					data.bind((value) => value.workspace.role === "admin"),
+				),
 				RepositoriesSection(params),
 				WorkspaceAgentsSection(params.slug),
 				If(wide, WebhooksSection(params.slug, copy)),
@@ -153,13 +161,52 @@ function WorkspaceSection(data: Readable<PageData>, params: { slug: Readable<str
 	);
 }
 
-function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string> }) {
+/**
+ * Labels, and what a workspace does with them.
+ *
+ * Everyone reads the set and anyone can add to it — filing a well-labelled
+ * issue is member-level work, and the create endpoint is scoped that way on
+ * purpose. Deleting is not: a label is shared, so removing it takes it off
+ * every issue that carried it at once. That one is admin-only, and goes through
+ * a confirmation rather than sitting one stray click away inside the pill.
+ */
+function LabelsSection(
+	data: Readable<PageData>,
+	params: { slug: Readable<string> },
+	isAdmin: Readable<boolean>,
+) {
 	const labels = signal(data.get().labels);
 	data.onChange((next) => labels.set(next.labels));
 
 	const name = signal("");
 	const color = signal<string>(LABEL_COLORS[0]);
 	const creating = signal(false);
+
+	// Snapshotted rather than cleared on close: the dialog names the label it is
+	// about, and text that blanks out while the thing is still on screen reads
+	// like something went wrong.
+	const doomed = signal<Label | null>(null);
+	const confirming = signal(false);
+	const deleting = signal(false);
+
+	const remove = async () => {
+		const target = doomed.get();
+		if (target === null || deleting.get()) return;
+
+		deleting.set(true);
+		const { error } = await api.DELETE("/api/v1/workspaces/[slug]/labels/[id]", {
+			params: { slug: params.slug.get(), id: target.id },
+		});
+		deleting.set(false);
+
+		if (error !== undefined) {
+			toastError(messageOf(error, "Could not delete the label"));
+			return;
+		}
+		labels.update((list) => list.filter((entry) => entry.id !== target.id));
+		confirming.set(false);
+		toastSuccess(`Deleted ${target.name}`);
+	};
 
 	const create = async () => {
 		const trimmed = name.get().trim();
@@ -192,17 +239,40 @@ function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string
 				(label) =>
 					Span(
 						{
-							class:
-								"inline-flex h-6 items-center gap-1.5 rounded-full border border-border px-2.5 text-[12px]",
+							// The remove button brings its own right-hand padding, so the
+							// pill gives that side back when there is one.
+							class: isAdmin.bind((admin) =>
+								admin
+									? "inline-flex h-6 items-center gap-1.5 rounded-full border border-border py-0 pr-1 pl-2.5 text-[12px]"
+									: "inline-flex h-6 items-center gap-1.5 rounded-full border border-border px-2.5 text-[12px]",
+							),
 						},
 						Span({
 							class: "size-2 rounded-full",
 							style: { backgroundColor: label.get().color },
 						}),
 						label.bind("name"),
+						If(
+							isAdmin,
+							Button(
+								{
+									size: "icon-xs",
+									variant: "ghost",
+									class: "size-4 rounded-full text-muted-foreground hover:text-destructive",
+									title: label.bind((value) => `Delete ${value.name}`),
+									onClick: () => {
+										doomed.set(label.get());
+										confirming.set(true);
+									},
+								},
+								X({ class: "size-3" }),
+							),
+						),
 					),
 			),
 		),
+
+		DeleteLabelDialog(doomed, confirming, deleting, remove),
 
 		// The swatches take their own row on a phone, where nine circles plus an
 		// input plus a button cannot share one.
@@ -233,6 +303,63 @@ function LabelsSection(data: Readable<PageData>, params: { slug: Readable<string
 				},
 			}),
 			Button({ size: "sm", loading: creating, onClick: () => void create() }, "Add label"),
+		),
+	);
+}
+
+/**
+ * The confirmation in front of a label delete.
+ *
+ * Deleting one is not a per-issue act: the label comes off everything that
+ * carried it, workspace-wide, and there is no undo. So the dialog names the
+ * label rather than asking "are you sure", and the confirm is the only
+ * destructive control on it.
+ */
+function DeleteLabelDialog(
+	doomed: Readable<Label | null>,
+	open: Signal<boolean>,
+	deleting: Readable<boolean>,
+	confirm: () => Promise<void>,
+) {
+	const labelName = doomed.bind((value) => value?.name ?? "");
+
+	return ResponsiveDialog(
+		{ open },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-md" },
+			Div(
+				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+				DialogTitle({ class: "text-[15px] font-semibold" }, "Delete label"),
+				DialogDescription(
+					{ class: "text-[12px]" },
+					labelName.bind(
+						(value) =>
+							`This cannot be undone. "${value}" comes off every issue, template and piece of feedback that carries it, for everyone in the workspace.`,
+					),
+				),
+			),
+
+			Div(
+				{ class: "flex justify-end gap-2 border-t border-border px-4 py-3" },
+				Button(
+					{
+						size: "sm",
+						variant: "secondary",
+						disabled: deleting,
+						onClick: () => open.set(false),
+					},
+					"Cancel",
+				),
+				Button(
+					{
+						size: "sm",
+						variant: "destructive",
+						loading: deleting,
+						onClick: () => void confirm(),
+					},
+					"Delete label",
+				),
+			),
 		),
 	);
 }
