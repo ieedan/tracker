@@ -327,7 +327,6 @@ export function TemplateDialog() {
 						repository: () => repository.get()?.id,
 						placeholder: "## Steps to reproduce\n\n## Expected\n\n## Actual",
 						rows: 6,
-						toolbar: true,
 						onSubmit: () => void submit(),
 					}),
 				),

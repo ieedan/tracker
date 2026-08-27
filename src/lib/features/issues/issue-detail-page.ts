@@ -51,7 +51,7 @@ import { IssueTimeline, type CommentActions } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
 import { PullRequestLink } from "./pull-request-link";
-import { BodyComposer } from "./body-composer";
+import { BodyComposer, focusBody } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
 import { DeleteIssueButton } from "./delete-issue";
 
@@ -620,7 +620,7 @@ function EditableDescription(
 	params: { slug: Readable<string> },
 ) {
 	const draft = signal("");
-	const draftRef = signal<HTMLTextAreaElement | null>(null);
+	const draftRef = signal<HTMLElement | null>(null);
 	const editing = signal(false);
 
 	const commit = () => {
@@ -650,12 +650,10 @@ function EditableDescription(
 				ImplementLifecycle({
 					onMount: () => {
 						const node = draftRef.get();
-						if (node === null) return;
-						node.focus();
 						// Where a click landed in the rendered body says nothing about
-						// where it landed in the source, so the caret goes to the end —
+						// where it landed in the editor, so the caret goes to the end —
 						// which is where a body is carried on from anyway.
-						node.setSelectionRange(node.value.length, node.value.length);
+						if (node !== null) focusBody(node);
 					},
 				}),
 				// The same box as the create dialog, so an issue body is written the
@@ -671,8 +669,6 @@ function EditableDescription(
 					// the worst of both.
 					rows: 4,
 					autoGrow: true,
-					renderMentions: true,
-					toolbar: true,
 					onBlur: commit,
 					// Blur commits, so ⌘⏎ only has to leave the box.
 					onSubmit: () => draftRef.get()?.blur(),
@@ -736,7 +732,7 @@ function CommentThread(
 ) {
 	const draft = signal("");
 	const posting = signal(false);
-	const draftRef = signal<HTMLTextAreaElement | null>(null);
+	const draftRef = signal<HTMLElement | null>(null);
 	const draftAttachments = signal<Attachment[]>([]);
 	const draftUploads = signal<Upload[]>([]);
 
@@ -791,8 +787,8 @@ function CommentThread(
 				onPaste: (event) => preventFilePaste(event, attach),
 			},
 			// The same box as the description and the create dialog — the same `@`
-			// wiring, the same toolbar, the same preview — so a comment is written
-			// the way every other body on the page is.
+			// wiring, the same keys, the same markdown as it is written — so a
+			// comment is written the way every other body on the page is.
 			BodyComposer({
 				value: draft,
 				element: draftRef,
@@ -801,7 +797,6 @@ function CommentThread(
 				placeholder: "Leave a comment… @ to reference a file",
 				rows: 3,
 				autoGrow: true,
-				toolbar: true,
 				onSubmit: () => void post(),
 			}),
 			AttachmentGrid({

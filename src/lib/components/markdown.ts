@@ -98,10 +98,15 @@ export function renderMarkdown(text: string): Child[] {
 }
 
 /**
- * A `@file` reference, as the composer's overlay also draws it.
+ * A `@file` reference, as the composer draws it too.
  *
  * Lives here rather than beside the `@` machinery so the dependency runs one
  * way: this is a component, the mention menu is a feature that uses it.
+ *
+ * The pill shows the file's name and the full path is kept on the element,
+ * because the composer edits these: it reads the body back out of the rendered
+ * DOM, and a pill that only knew what it displayed would come back as a
+ * mention of a file one directory deep.
  */
 export function MentionLink(path: string, url: string): Child {
 	return A(
@@ -112,6 +117,7 @@ export function MentionLink(path: string, url: string): Child {
 			class:
 				"inline-flex items-center gap-1 rounded border border-border bg-secondary/50 px-1 font-mono text-[0.9em] hover:border-ring",
 			title: url,
+			"data-mention-path": path,
 		},
 		`@${path.slice(path.lastIndexOf("/") + 1)}`,
 	);
@@ -174,10 +180,29 @@ type Block =
  */
 const MAX_DEPTH = 8;
 
-const FENCE = /^ {0,3}(```+|~~~+)[ \t]*([^`\n]*)$/;
+// The info string, the URL patterns below, and every other run that swallows
+// "anything that is not one of these characters" stop at a control character
+// too. No body has one in it on purpose — but the composer parses the body
+// with the caret written into it as one, and a run that ate the caret would
+// carry it off into an attribute, where it is neither on screen nor findable.
+const CONTROL = "\\u0000-\\u001f";
+const FENCE = new RegExp(`^ {0,3}(\`{3,}|~{3,})[ \\t]*([^\`\\n${CONTROL}]*)$`);
 const HEADING = /^ {0,3}(#{1,6})[ \t]+(.*)$/;
 const RULE = /^ {0,3}([-*_])[ \t]*(?:\1[ \t]*){2,}$/;
-const QUOTE = /^ {0,3}>/;
+/**
+ * A `>` opens a quote when something follows it, and continues one whatever
+ * follows it.
+ *
+ * The two differ over a line that is only `>`, and they differ because the
+ * composer parses the body on every keystroke: a lone `>` is a quote nobody
+ * has finished asking for yet, and converting on it would take the character
+ * off the screen a keystroke before the author typed the space — leaving the
+ * space they then type as the first character of the quote. Inside a quote the
+ * same line is the blank one between two quoted paragraphs, and has to keep
+ * the quote open.
+ */
+const QUOTE_OPENS = /^ {0,3}>.+/;
+const QUOTE_HOLDS = /^ {0,3}>/;
 const ITEM = /^( *)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(.*)$/;
 
 interface ItemMatch {
@@ -210,7 +235,7 @@ function startsBlock(line: string): boolean {
 		FENCE.test(line) ||
 		HEADING.test(line) ||
 		RULE.test(line) ||
-		QUOTE.test(line) ||
+		QUOTE_OPENS.test(line) ||
 		matchItem(line) !== null
 	);
 }
@@ -267,7 +292,9 @@ function parseBlocks(source: string, depth: number): Block[] {
 				kind: "heading",
 				level: heading[1]!.length,
 				// `## Title ##` is the closed form; the trailing hashes are syntax.
-				text: heading[2]!.replace(/[ \t]+#+[ \t]*$/, "").trim(),
+				// Whitespace either side of the text is left alone — see the note on
+				// the paragraph case below.
+				text: heading[2]!.replace(/[ \t]+#+[ \t]*$/, ""),
 			});
 			index++;
 			continue;
@@ -279,11 +306,11 @@ function parseBlocks(source: string, depth: number): Block[] {
 			continue;
 		}
 
-		if (QUOTE.test(line)) {
+		if (QUOTE_OPENS.test(line)) {
 			const quoted: string[] = [];
 			while (index < lines.length) {
 				const current = lines[index]!;
-				if (QUOTE.test(current)) {
+				if (QUOTE_HOLDS.test(current)) {
 					quoted.push(current.replace(/^ {0,3}> ?/, ""));
 					index++;
 					continue;
@@ -311,9 +338,15 @@ function parseBlocks(source: string, depth: number): Block[] {
 			continue;
 		}
 
+		// Lines go in as they are. Trimming them here would read better in the
+		// source and cost nothing on a posted body — a paragraph's whitespace
+		// collapses on screen either way — but the composer edits the body
+		// through this parser, and a space the parse throws away is a space you
+		// cannot type: it would vanish from the text the moment the box redrew,
+		// taking the caret's place in the line with it.
 		const paragraph: string[] = [];
 		while (index < lines.length && lines[index]!.trim() !== "" && !startsBlock(lines[index]!)) {
-			paragraph.push(lines[index]!.trim());
+			paragraph.push(lines[index]!);
 			index++;
 		}
 		blocks.push({ kind: "paragraph", text: paragraph.join("\n") });
@@ -516,7 +549,8 @@ interface InlineContext {
 
 const PUNCTUATION = /[\\`*_{}[\]()#+\-.!~<>|]/;
 const WORD = /[\p{L}\p{N}]/u;
-const BARE_URL = /^https?:\/\/[^\s<>]+/;
+const AUTOLINK = new RegExp(`^<((?:https?://|mailto:)[^\\s<>${CONTROL}]+)>`);
+const BARE_URL = new RegExp(`^https?://[^\\s<>${CONTROL}]+`);
 
 const CODE_CLASS =
 	"rounded border border-border bg-secondary/50 px-1 py-0.5 font-mono text-[0.9em] break-words";
@@ -581,7 +615,7 @@ function inline(text: string, context: InlineContext): Child[] {
 		}
 
 		if (char === "<") {
-			const auto = /^<((?:https?:\/\/|mailto:)[^\s<>]+)>/.exec(text.slice(index));
+			const auto = AUTOLINK.exec(text.slice(index));
 			if (auto !== null) {
 				flush();
 				out.push(renderTarget(auto[1]!, [auto[1]!], context));
