@@ -11,14 +11,5 @@
 	"repository": "https://github.com/ieedan/tracker",
 	"keywords": ["issue-tracker", "issues", "project-management", "feedback", "webhooks", "mcp"],
 	"icon": "./assets/logo.png",
-	"mcpServers": "./.mcp.json",
-	"userConfig": {
-		"url": {
-			"type": "string",
-			"title": "tracker URL",
-			"description": "Origin of your tracker instance, with no trailing slash — the plugin appends /api/mcp. Defaults to the hosted one; point it at your own deployment, or at http://localhost:5173 for a local checkout.",
-			"default": "https://tracker.implementjs.dev",
-			"required": true
-		}
-	}
+	"mcpServers": "./.mcp.json"
 }
