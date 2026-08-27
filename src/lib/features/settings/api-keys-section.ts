@@ -27,7 +27,8 @@ import {
 	EmptyTitle,
 } from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import { Label } from "@/lib/components/ui/label";
 import {
 	API_KEY_EXPIRATIONS,
@@ -235,13 +236,13 @@ function CreateApiKeyDialog(
 		open.set(false);
 	};
 
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
 			if (isOpen) reset();
 		}),
-		DialogContent(
-			{ class: "max-w-md gap-0 p-0" },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-md" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Create API key"),

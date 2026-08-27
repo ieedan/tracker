@@ -26,8 +26,10 @@ const styles = {
 	form: "flex flex-col gap-3.5",
 	field: "flex flex-col gap-1.5",
 	label: "text-[13px] font-medium",
+	// A real 16px below sm — not `text-base`, which the 15px root undercuts —
+	// so mobile Safari does not zoom onto a focused field.
 	input:
-		"h-9 rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-[3px] focus:ring-ring/25",
+		"h-9 rounded-md border border-input bg-background px-3 text-[16px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-[3px] focus:ring-ring/25 sm:text-sm",
 	error: "text-xs text-destructive empty:hidden",
 	footer: "mt-6 text-center text-sm text-muted-foreground",
 	link: "text-foreground underline underline-offset-4 hover:text-primary",

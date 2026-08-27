@@ -46,7 +46,8 @@ import {
 	EmptyTitle,
 } from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -616,17 +617,18 @@ function WebhookDialog(
 
 	const isEdit = editing.bind((hook) => hook !== null);
 
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
 			if (isOpen) reset();
 		}),
-		DialogContent(
+		ResponsiveDialogContent(
 			// Wide, because the events list and the condition chips are both
 			// horizontal things that were being wrapped to death in a narrow column.
-			// `sm:` prefixed, because the dialog's own default is `sm:max-w-lg` and
-			// an unprefixed `max-w-*` does not override a responsive one.
-			{ class: "flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-4xl" },
+			// `md:` prefixed, because below md this is a drawer with its own
+			// geometry, and the dialog shape's default is a responsive `sm:max-w-lg`
+			// an unprefixed `max-w-*` would not override anyway.
+			{ class: "flex max-h-[85vh] flex-col gap-0 p-0 md:max-w-4xl" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 pt-3" },
 				DialogTitle(

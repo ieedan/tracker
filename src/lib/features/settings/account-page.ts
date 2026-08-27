@@ -23,7 +23,7 @@ export function AccountPage({ data }: { data: Readable<PageData> }) {
 			H1({ class: "text-[15px] font-semibold tracking-tight" }, "Account"),
 		),
 		Div(
-			{ class: "min-h-0 flex-1 overflow-y-auto px-6 py-6" },
+			{ class: "min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-6 sm:py-6" },
 			Div(
 				{ class: "mx-auto flex max-w-2xl flex-col gap-10" },
 				ProfileSection(data),

@@ -1,7 +1,8 @@
 import {
-	context,
+	Fragment,
 	If,
-	mediaQuery,
+	ImplementLifecycle,
+	context,
 	signal,
 	type Child,
 	type ComponentProps,
@@ -53,20 +54,34 @@ export const ResponsiveDialog = createComponent(function ResponsiveDialog(
 	{ open, query = RESPONSIVE_DIALOG_QUERY, ...props }: ResponsiveDialogProps,
 	...children: Child[]
 ) {
-	// one signal across both shapes, so a drawer left open on a phone that turns
-	// into a tablet comes back as an open dialog rather than nothing at all
+	// one signal across both shapes, so the modal cannot lose its open state to
+	// the shape decision below
 	const openSignal: Signal<boolean> = signal(open ?? false);
-	const isMobile = mediaQuery(query);
 
-	return If(isMobile)
-		.Then(
+	// The shape is decided once per mount, on the client — NOT tracked live from
+	// the media query. Following the viewport would remount the same children
+	// from one root into the other, and a remounted DropdownMenu never opens
+	// again (implementjs ENG-28): on a phone the SSR answer is "desktop", so
+	// every picker inside the drawer arrived already broken. A dialog is closed
+	// while nothing is looking at it, so mounting neither shape during SSR shows
+	// nothing less; the price is that crossing the breakpoint after load keeps
+	// the shape until the next mount.
+	const shape = signal<"drawer" | "dialog" | null>(null);
+
+	return Fragment(
+		ImplementLifecycle({
+			onMount: () => shape.set(window.matchMedia(query).matches ? "drawer" : "dialog"),
+		}),
+		If(
+			shape.bind((value) => value === "drawer"),
 			ResponsiveDialogCtx.Provide("drawer").To(Drawer({ ...props, open: openSignal }, ...children)),
-		)
-		.Else(
+		).ElseIf(
+			shape.bind((value) => value === "dialog"),
 			ResponsiveDialogCtx.Provide("dialog").To(
 				Dialog({ open: openSignal, preventScroll: props.preventScroll }, ...children),
 			),
-		);
+		),
+	);
 });
 
 export const ResponsiveDialogTrigger = createComponent(function ResponsiveDialogTrigger(
