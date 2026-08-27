@@ -2,97 +2,60 @@
  * The box an issue body or comment is written in.
  *
  * One component, used by the create dialog, the issue page, and the comment
- * box, so the three cannot drift apart: the same classes, the same `@`
- * wiring, the same keys, the same toolbar.
+ * box, so the three cannot drift apart: the same classes, the same `@` wiring,
+ * the same keys.
  *
- * It is always a live textarea. The issue page used to show the body as a
- * paragraph and swap in a textarea on click, which reads as two fields — the
- * text moves as the boxes trade places, the click that opened the editor is
- * spent on the paragraph rather than on the text, and the freshly mounted
- * textarea only takes focus if the document has not already honoured an
- * `autofocus` somewhere (it usually has). Keeping the textarea mounted means
- * the click lands on the field itself: focus is the browser's, and the caret
- * goes where you pressed.
+ * It is a live markdown editor, not a textarea and not a preview of one. What
+ * is on screen is the body as it will be posted — `**bold**` is bold, `# ` is
+ * a heading, a fenced block is a highlighted block — and the markers are not
+ * drawn at all, because the moment a construct is complete it stops being
+ * text. The body is still *stored* as markdown; the round trip that keeps
+ * those two facts compatible lives in markdown-dom.ts, and is worth reading
+ * before changing anything here.
  *
- * The markdown is styled where it is written rather than behind a Preview tab.
- * A tab is two views of one field — write in one, check your work in the other
- * — and everything that makes the box a box (the caret, the selection, the
- * scroll position, the `@` menu) had to be carried across the switch and put
- * back. lib/features/issues/markdown-decorations.ts draws the styling onto the
- * text instead, as an overlay on the live textarea, so there is one view and
- * nothing to hand over.
+ * Everything an edit can be is a string edit on that markdown:
  *
- * The optional toolbar is the rest of the WYSIWYG: buttons and shortcuts that
- * write the markdown into the source for you. Deliberately not a rich-text
- * editor — the body stays the text it stores, and both overlays keep lining up
- * because the on-screen text is still the raw characters.
+ * - typing, which the browser does to the DOM and this reads back;
+ * - Enter, Backspace over a marker and Tab, which continue or undo the
+ *   markdown the caret is standing in;
+ * - ⌘B, ⌘I, ⌘E and ⌘K, which run the same commands the box has always had;
+ * - a paste, which is markdown the moment it lands;
+ * - a file picked from the `@` menu.
+ *
+ * There is no formatting toolbar. Markdown typed into the box turns into
+ * formatting as it is written, which is the whole point of the thing — a row
+ * of buttons that write the characters for you is a second way to do what
+ * typing already does.
  */
 import {
 	Div,
 	If,
 	ImplementEffect,
 	ImplementLifecycle,
-	ImplementWindow,
-	Textarea,
-	derived,
+	P,
 	signal,
-	type Child,
 	type Signal,
 } from "@implementjs/core";
-import {
-	Bold,
-	Code,
-	Heading,
-	Italic,
-	Link,
-	List,
-	ListOrdered,
-	SquareCode,
-	Strikethrough,
-	TextQuote,
-} from "@implementjs/lucide";
-import { Button } from "@/lib/components/ui/button";
+import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
 import { cn } from "@/lib/utils";
-import { MentionMenu, MentionText, fileMentions, hasMention } from "./file-mentions";
-import { DecoratedText } from "./markdown-decorations";
-import {
-	cycleHeading,
-	insertLink,
-	toggleBulletList,
-	toggleCodeBlock,
-	toggleNumberedList,
-	toggleQuote,
-	toggleWrap,
-	type SelectionState,
-} from "./markdown-commands";
+import { MentionMenu, fileMentions } from "./file-mentions";
+import { insertLink, toggleWrap, type SelectionState } from "./markdown-commands";
+import { isBlank, paint, render, serialize, type SourceSelection } from "./markdown-dom";
 
 /**
- * What the box and the layers drawn over it have to agree on: the size, the
- * line height, and where a line breaks. A hair's difference in any of them and
- * the two wrap in different places, which is the one way an overlay gives
- * itself away.
- */
-const TEXT_LAYOUT = "text-[13px] leading-normal break-words whitespace-pre-wrap";
-
-/**
- * How a body box looks, in one place.
+ * How a body reads, in one place.
  *
- * No border and no ring: the box is the text. Anything that paints an edge
- * around it while you type is the thing that made the issue page feel like a
- * different control from the composer.
+ * The same size, leading and margin rules a posted body is drawn with, so the
+ * text does not move when a draft becomes a comment.
  */
-export const bodyComposerClass = cn(
-	"w-full resize-none border-0 bg-transparent p-0 outline-none placeholder:text-muted-foreground",
-	// Transparent, not hidden: the box still holds the text, the selection and
-	// the caret — the overlay only paints it. `caret-foreground` is the half of
-	// that the colour would otherwise take with it, since a caret with no colour
-	// of its own is the colour of the text.
-	"text-transparent caret-foreground",
-	TEXT_LAYOUT,
-);
+export const bodyComposerClass =
+	// `pre-wrap` where a posted body collapses its whitespace: a space typed at
+	// the end of a line has to stay on screen and hold the caret's place, or
+	// the space you just pressed is one the box appears to have swallowed.
+	"w-full text-[13px] leading-relaxed break-words whitespace-pre-wrap outline-none [&>:first-child]:mt-0 [&>:last-child]:mb-0";
 
 export interface BodyComposerOptions {
-	/** The body being written. Two-way: typing writes straight back into it. */
+	/** The body being written, as markdown. Two-way: editing writes into it. */
 	value: Signal<string>;
 	slug: () => string;
 	/** Which repository `@` searches, when the issue has one. */
@@ -100,19 +63,12 @@ export interface BodyComposerOptions {
 	placeholder?: string;
 	/** The box's minimum height, in lines. */
 	rows?: number;
-	/** Grow with the text instead of scrolling inside a fixed box. */
+	/** Grow with the text instead of scrolling inside a capped box. */
 	autoGrow?: boolean;
-	/**
-	 * Draw `@file` references as links while the box is not focused. The text
-	 * underneath is still the textarea's, so the click is never intercepted.
-	 */
-	renderMentions?: boolean;
-	/** The formatting toolbar and its shortcuts. */
-	toolbar?: boolean;
 	autofocus?: boolean;
 	class?: string;
-	/** Handed out so a caller can tell whether the caret is in this box. */
-	element?: Signal<HTMLTextAreaElement | null>;
+	/** Handed out so a caller can focus the box or tell whether it has focus. */
+	element?: Signal<HTMLElement | null>;
 	/** ⌘⏎. */
 	onSubmit?: () => void;
 	/** Not called while the mention menu is open — picking a file blurs. */
@@ -120,168 +76,274 @@ export interface BodyComposerOptions {
 	onEscape?: () => void;
 }
 
+/** Puts the caret at the end of a body, which is where one is carried on from. */
+export function focusBody(node: HTMLElement): void {
+	node.focus();
+	const range = document.createRange();
+	range.selectNodeContents(node);
+	range.collapse(false);
+	const selection = window.getSelection();
+	selection?.removeAllRanges();
+	selection?.addRange(range);
+}
+
 export function BodyComposer(options: BodyComposerOptions) {
-	const element = options.element ?? signal<HTMLTextAreaElement | null>(null);
-	const overlay = signal<HTMLDivElement | null>(null);
-	const focused = signal(false);
+	const host = options.element ?? signal<HTMLElement | null>(null);
+	const empty = options.value.bind((text) => text.trim() === "");
+
+	/**
+	 * The body as it was last drawn. An edit arriving on the signal is only
+	 * this component's own if it matches — a flag would depend on when the
+	 * signal notifies, and this does not.
+	 */
+	let drawn = options.value.get();
+	/** A composition (an IME, a long-press accent) is not finished text. */
+	let composing = false;
+
+	const history = createHistory({ value: drawn, start: -1, end: -1 });
+
+	const read = (): SourceSelection | null => {
+		const node = host.get();
+		return node === null ? null : serialize(node);
+	};
+
+	/**
+	 * Puts a body and a caret on screen, and hands the body to the caller.
+	 *
+	 * Every edit ends here, including a keystroke the browser already applied:
+	 * re-drawing from the markdown is what turns a finished `**bold**` into
+	 * bold text, and what keeps the DOM to the shapes the serializer knows.
+	 */
+	const apply = (next: SourceSelection, how: { record?: boolean; typed?: boolean } = {}): void => {
+		const node = host.get();
+		if (node === null) return;
+
+		// A keystroke is already on screen where the browser put it, so a caret
+		// this cannot place is a reason to leave the drawing until the next one.
+		// Everything else has nothing on screen yet and has to be drawn.
+		render(node, next, how.typed !== true);
+		if (how.record !== false) history.record(next);
+		drawn = next.value;
+		options.value.set(next.value);
+		mentions.refresh(next.value, next.end, node);
+	};
+
+	/** An edit expressed the way the toolbar commands always expressed one. */
+	const command = (transform: (state: SelectionState) => SelectionState): void => {
+		const current = read();
+		if (current === null || current.start < 0) return;
+		apply(transform(current));
+	};
 
 	const mentions = fileMentions({
-		value: options.value,
 		slug: options.slug,
 		repository: options.repository,
-		element,
+		insert: (start, markdown) => {
+			const current = read();
+			if (current === null || current.start < 0) return;
+			// From the `@` to the caret is the run being replaced; the trailing
+			// space is so typing carries on outside the mention.
+			const inserted = `${markdown} `;
+			apply({
+				value: current.value.slice(0, start) + inserted + current.value.slice(current.end),
+				start: start + inserted.length,
+				end: start + inserted.length,
+			});
+			host.get()?.focus();
+		},
 	});
 
-	const grow = () => {
-		const node = element.get();
-		if (node === null || options.autoGrow !== true) return;
-		// `auto` first so the box can shrink again; `scrollHeight` is never less
-		// than the height `rows` gives it, so the minimum needs no arithmetic.
-		node.style.height = "auto";
-		node.style.height = `${node.scrollHeight}px`;
-	};
-
-	/**
-	 * Puts the decoration layer back over the text it decorates.
-	 *
-	 * Two things move it: a scrollbar, which takes width from the box's text but
-	 * not from an `inset-0` layer's, so the two would wrap a character apart
-	 * from each other; and scrolling, which the layer does not do on its own.
-	 */
-	const align = () => {
-		const node = element.get();
-		const layer = overlay.get();
-		if (node === null || layer === null) return;
-		layer.style.width = `${node.clientWidth}px`;
-		layer.scrollTop = node.scrollTop;
-	};
-
-	/** Everything the text having changed asks of the box. */
-	const sync = () => {
-		grow();
-		align();
-	};
-
-	const overlaid = derived(
-		[options.value, focused],
-		(text, active) => options.renderMentions === true && !active && hasMention(text),
-	);
-
-	/**
-	 * Runs one command against the live selection and puts the caret where the
-	 * command said. The value goes through the signal — the same road typing
-	 * takes — so the overlay, the growing, and the caller all see it.
-	 */
-	const apply = (command: (state: SelectionState) => SelectionState) => {
-		const node = element.get();
-		if (node === null) return;
-		const next = command({
-			value: options.value.get(),
-			start: node.selectionStart ?? 0,
-			end: node.selectionEnd ?? 0,
-		});
-		options.value.set(next.value);
-		queueMicrotask(() => {
-			node.focus();
-			node.setSelectionRange(next.start, next.end);
-		});
+	const submit = (): void => {
+		options.onSubmit?.();
 	};
 
 	return Div(
-		{ class: "flex flex-col" },
+		{ class: "relative flex flex-col" },
 
-		// Static, not `If`: whether a composer has a toolbar never changes
-		// while it is mounted.
-		options.toolbar === true ? ComposerToolbar({ apply }) : null,
+		ImplementLifecycle({
+			onMount: () => {
+				const node = host.get();
+				if (node === null) return;
+				paint(node, options.value.get());
+				if (options.autofocus === true) focusBody(node);
+			},
+		}),
 
-		Div(
-			{ class: "relative" },
-			ImplementLifecycle({ onMount: () => sync() }),
-			// Text arriving from anywhere but the keyboard — a draft restored, an
-			// edit made elsewhere — has to resize the box too.
-			ImplementEffect([options.value], () => sync(), { immediate: false }),
-			// A narrower window rewraps the box; the layer has to rewrap with it.
-			ImplementWindow({ onResize: () => align() }),
+		// A body that changed anywhere else — a draft restored, an issue edited
+		// in another tab — has to be redrawn. Never while the caret is in the
+		// box, which would move the text out from under whoever is typing.
+		ImplementEffect(
+			[options.value],
+			(text) => {
+				const node = host.get();
+				if (node === null || text === drawn) return;
+				if (typeof document !== "undefined" && document.activeElement === node) return;
+				drawn = text;
+				paint(node, text);
+			},
+			{ immediate: false },
+		),
 
-			// The markdown, drawn onto the text as it is typed. It steps aside for
-			// the mention overlay below, which draws the same text its own way.
-			Div(
+		Div({
+			this: host,
+			contentEditable: "true",
+			role: "textbox",
+			"aria-multiline": true,
+			"aria-label": options.placeholder,
+			// The browser's own spelling underline is worth keeping; its
+			// formatting shortcuts are not, since ⌘B here writes markdown.
+			spellcheck: true,
+			class: cn(
+				bodyComposerClass,
+				// Capped rather than endless when the caller has no room to give:
+				// a dialog that grows with the body pushes its own buttons off
+				// the screen.
+				options.autoGrow === true ? null : "max-h-48 overflow-y-auto",
+				options.class,
+			),
+			style: {
+				minHeight: options.rows === undefined ? "auto" : `${options.rows * 1.6}em`,
+			},
+
+			onInput: (event) => {
+				if (composing) return;
+				const node = host.get();
+				// A delete that took the last of the text with it leaves the block
+				// that held it behind — an empty heading, an empty quote — and the
+				// marker for a block nobody can see is not part of the body.
+				if (node !== null && event.inputType.startsWith("delete") && isBlank(node)) {
+					apply({ value: "", start: 0, end: 0 });
+					return;
+				}
+				const next = read();
+				// Nothing the markdown can tell apart from what is already
+				// drawn — a browser tidying its own DOM, most often.
+				if (next === null || next.value === drawn) return;
+				apply(next, { typed: true });
+			},
+
+			onCompositionstart: () => {
+				composing = true;
+			},
+			onCompositionend: () => {
+				composing = false;
+				const next = read();
+				if (next !== null) apply(next, { typed: true });
+			},
+
+			onKeydown: (event) => {
+				// The mention menu claims the arrows, Enter, Tab and Escape while
+				// it is open, so it gets the event first.
+				if (mentions.onKeydown(event)) return;
+
+				if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+					event.preventDefault();
+					submit();
+					return;
+				}
+				if (event.key === "Escape") {
+					options.onEscape?.();
+					return;
+				}
+				if (event.key === "Enter") {
+					event.preventDefault();
+					const current = read();
+					if (current !== null && current.start >= 0) apply(breakLine(current, event.shiftKey));
+					return;
+				}
+				if (event.key === "Backspace") {
+					const current = read();
+					const undone = current === null ? null : unmark(current);
+					if (undone === null) return;
+					event.preventDefault();
+					apply(undone);
+					return;
+				}
+				if (event.key === "Tab") {
+					const current = read();
+					const nested = current === null ? null : indent(current, event.shiftKey);
+					// Only a list answers Tab; everywhere else it still leaves the
+					// box, which is the only way out of a body with the keyboard.
+					if (nested === null) return;
+					event.preventDefault();
+					apply(nested);
+					return;
+				}
+
+				if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+
+				const key = event.key.toLowerCase();
+				if (key === "z") {
+					// Ours rather than the browser's: every edit here redraws the
+					// document, which is not a thing the native stack can replay.
+					event.preventDefault();
+					const step = event.shiftKey ? history.redo() : history.undo();
+					if (step !== null) apply(step, { record: false });
+					return;
+				}
+				if (key === "y") {
+					event.preventDefault();
+					const step = history.redo();
+					if (step !== null) apply(step, { record: false });
+					return;
+				}
+
+				const shortcut = SHORTCUTS[key];
+				if (shortcut !== undefined && !event.shiftKey) {
+					event.preventDefault();
+					command(shortcut);
+				}
+			},
+
+			onPaste: (event) => {
+				// Pasted files are the attachment grid's business, and it is
+				// listening further up.
+				if (filesFromClipboard(event).length > 0) return;
+				const text = event.clipboardData?.getData("text/plain") ?? "";
+				if (text === "") return;
+				event.preventDefault();
+				const current = read();
+				if (current === null || current.start < 0) return;
+				apply({
+					value: current.value.slice(0, current.start) + text + current.value.slice(current.end),
+					start: current.start + text.length,
+					end: current.start + text.length,
+				});
+			},
+
+			onBlur: () => {
+				// Picking from the menu blurs the box, and a caller that commits
+				// on blur would close the editor out from under the insertion.
+				if (mentions.open.get()) return;
+				// The blank line a list or a quote was stepped out of is a line with
+				// nothing on it, and nobody meant to post one. Taken off on the way
+				// out rather than as it is typed, where it is the line the caret is
+				// standing on.
+				const tidy = options.value.get().replace(/\s+$/, "");
+				if (tidy !== options.value.get()) {
+					drawn = tidy;
+					options.value.set(tidy);
+				}
+				options.onBlur?.();
+			},
+		}),
+
+		If(
+			empty,
+			P(
 				{
-					this: overlay,
-					class: cn("pointer-events-none absolute inset-0 overflow-hidden", TEXT_LAYOUT, {
-						hidden: overlaid,
-					}),
+					// Sits on the first line rather than in the box: the box holds a
+					// paragraph even when the body is empty, and two things cannot
+					// share that line without one of them moving.
+					class:
+						"pointer-events-none absolute top-0 left-0 text-[13px] leading-relaxed text-muted-foreground",
 					"aria-hidden": true,
 				},
-				DecoratedText(options.value),
+				options.placeholder ?? "",
 			),
-
-			If(
-				overlaid,
-				Div(
-					{
-						// Clicks fall through to the textarea, so the box is still one
-						// target — except on a link itself, which is the one thing here
-						// you would rather follow than put a caret in.
-						class: cn(
-							"pointer-events-none absolute inset-0 [&_a]:pointer-events-auto",
-							TEXT_LAYOUT,
-						),
-						"aria-hidden": true,
-					},
-					MentionText(options.value),
-				),
-			),
-
-			Textarea({
-				this: element,
-				value: options.value,
-				placeholder: options.placeholder,
-				rows: options.rows,
-				autofocus: options.autofocus,
-				class: cn(bodyComposerClass, options.class),
-				onInput: (event) => {
-					mentions.onInput(event);
-					sync();
-				},
-				// The layer does not scroll itself: it is drawn over a box that does.
-				onScroll: () => align(),
-				onFocus: () => focused.set(true),
-				onBlur: () => {
-					focused.set(false);
-					// Picking from the menu blurs the box, and a caller that commits on
-					// blur would close the editor out from under the insertion.
-					if (mentions.open.get()) return;
-					options.onBlur?.();
-				},
-				onKeydown: (event) => {
-					// The mention menu claims the arrows, Enter and Escape while it is
-					// open, so it gets the event first.
-					mentions.onKeydown(event);
-					if (event.defaultPrevented) return;
-					if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-						options.onSubmit?.();
-						return;
-					}
-					if (event.key === "Escape") {
-						options.onEscape?.();
-						return;
-					}
-					if (options.toolbar === true && (event.metaKey || event.ctrlKey) && !event.altKey) {
-						// The editor shortcuts every markdown box teaches: ⌘B, ⌘I, ⌘E,
-						// ⌘K. Only with the toolbar, so a bare composer keeps the
-						// browser's own bindings.
-						const command = SHORTCUTS[event.key.toLowerCase()];
-						if (command !== undefined && !event.shiftKey) {
-							event.preventDefault();
-							apply(command);
-						}
-					}
-				},
-			}),
-
-			MentionMenu(mentions),
 		),
+
+		MentionMenu(mentions),
 	);
 }
 
@@ -293,53 +355,221 @@ const SHORTCUTS: Record<string, (state: SelectionState) => SelectionState> = {
 	k: insertLink,
 };
 
-/**
- * The formatting row above the box.
- *
- * Every control acts on `mousedown` and prevents the default, so the textarea
- * never loses focus: the selection a button formats is the one that was
- * visible when it was pressed.
- */
-function ComposerToolbar({
-	apply,
-}: {
-	apply: (command: (state: SelectionState) => SelectionState) => void;
-}) {
-	const tool = (
-		icon: (props: { class?: string }) => Child,
-		label: string,
-		command: (state: SelectionState) => SelectionState,
-	) =>
-		Button(
-			{
-				variant: "ghost",
-				size: "icon-xs",
-				type: "button",
-				title: label,
-				"aria-label": label,
-				// Reachable through the shortcuts and the box itself; tabbing
-				// through ten buttons on the way out of a comment is not a path.
-				tabIndex: -1,
-				class: "text-muted-foreground hover:text-foreground",
-				onMousedown: (event) => {
-					event.preventDefault();
-					apply(command);
-				},
-			},
-			icon({ class: "size-3.5" }),
-		);
+/* -------------------------------------------------------------------------- */
+/* The keys that mean something to markdown                                    */
+/* -------------------------------------------------------------------------- */
 
-	return Div(
-		{ class: "mb-2 flex flex-wrap items-center gap-0.5 border-b border-border pb-1.5" },
-		tool(Bold, "Bold (⌘B)", (state) => toggleWrap(state, "**")),
-		tool(Italic, "Italic (⌘I)", (state) => toggleWrap(state, "*")),
-		tool(Strikethrough, "Strikethrough", (state) => toggleWrap(state, "~~")),
-		tool(Code, "Inline code (⌘E)", (state) => toggleWrap(state, "`", "code")),
-		tool(SquareCode, "Code block", toggleCodeBlock),
-		tool(Heading, "Heading", cycleHeading),
-		tool(List, "Bulleted list", toggleBulletList),
-		tool(ListOrdered, "Numbered list", toggleNumberedList),
-		tool(TextQuote, "Quote", toggleQuote),
-		tool(Link, "Link (⌘K)", insertLink),
-	);
+interface Line {
+	start: number;
+	end: number;
+	text: string;
+}
+
+function lineAt(value: string, index: number): Line {
+	const start = index === 0 ? 0 : value.lastIndexOf("\n", index - 1) + 1;
+	const found = value.indexOf("\n", index);
+	const end = found === -1 ? value.length : found;
+	return { start, end, text: value.slice(start, end) };
+}
+
+const ITEM = /^([ \t]*)([-*+]|\d{1,9}[.)])([ \t]+)(.*)$/;
+const QUOTE = /^( {0,3}> ?)(.*)$/;
+const MARKER = /^[ \t]*(?:#{1,6} |> ?|[-*+] |\d{1,9}[.)] )/;
+const FENCE = /^ {0,3}(?:```|~~~)/;
+
+/** Whether the caret is inside a fenced block, where a newline is just a newline. */
+function fenced(value: string, index: number): boolean {
+	let open = false;
+	for (const line of value.slice(0, index).split("\n")) {
+		if (FENCE.test(line)) open = !open;
+	}
+	return open;
+}
+
+/**
+ * Enter, which continues whatever the caret is standing in.
+ *
+ * A list makes another item, a quote another quoted line, a fenced block a
+ * plain newline, and anything else a new paragraph. Enter on an item with
+ * nothing in it leaves the list instead of making a second empty one — the
+ * second press is how everyone ends a list.
+ */
+function breakLine(state: SelectionState, soft: boolean): SelectionState {
+	const { value, start, end } = state;
+	const before = value.slice(0, start);
+	const after = value.slice(end);
+	const line = lineAt(value, start);
+
+	const insert = (text: string): SelectionState => ({
+		value: before + text + after,
+		start: start + text.length,
+		end: start + text.length,
+	});
+
+	if (fenced(value, start)) {
+		// Enter inside a block is a newline, except on a line with nothing on
+		// it — a code block has no other way out, since every key that would
+		// leave it is a key you might want to type into it.
+		return line.text === "" ? leaveFence(state, line) : insert("\n");
+	}
+	if (soft) return insert("\n");
+
+	const item = ITEM.exec(line.text);
+	if (item !== null) {
+		const indent = item[1]!;
+		const marker = item[2]!;
+		const gap = item[3]!;
+		if (item[4] === "") {
+			// Nothing in the item: drop the marker and step out of the list.
+			return {
+				value: `${value.slice(0, line.start)}\n${value.slice(line.end)}`,
+				start: line.start + 1,
+				end: line.start + 1,
+			};
+		}
+		const next = /^\d/.test(marker)
+			? `${Number.parseInt(marker, 10) + 1}${marker.slice(-1)}`
+			: marker;
+		return insert(`\n${indent}${next}${gap}`);
+	}
+
+	const quote = QUOTE.exec(line.text);
+	if (quote !== null) {
+		if (quote[2] === "") {
+			return {
+				value: `${value.slice(0, line.start)}\n${value.slice(line.end)}`,
+				start: line.start + 1,
+				end: line.start + 1,
+			};
+		}
+		return insert("\n> ");
+	}
+
+	// A blank line is what separates two paragraphs; one newline inside a
+	// paragraph is a line break, which is what Shift+Enter is for.
+	return insert("\n\n");
+}
+
+/**
+ * Steps out of a fenced block, past its closing fence.
+ *
+ * The empty line the caret is on goes with it — it was the request to leave,
+ * not a line of the program. The serializer always writes a closing fence, so
+ * there is one to step over unless the block is the last thing in the body and
+ * has not been read back yet.
+ */
+function leaveFence(state: SelectionState, line: Line): SelectionState {
+	const { value } = state;
+	const closing = lineAt(value, Math.min(line.end + 1, value.length));
+	const closed = closing.start > line.start && FENCE.test(closing.text);
+
+	const before = value.slice(0, line.start);
+	const rail = closed ? closing.text : "```";
+	const after = closed ? value.slice(closing.end) : value.slice(line.end);
+	const caret = before.length + rail.length + 2;
+	return { value: `${before}${rail}\n\n${after}`, start: caret, end: caret };
+}
+
+/**
+ * Backspace at the head of a block's content, which takes the block's markup
+ * off rather than a character out.
+ *
+ * The caret sits after the marker because the marker is not on screen — a
+ * heading is drawn as a heading — so this is the only reading of Backspace
+ * there that does anything visible. Everywhere else it returns null and the
+ * browser deletes a character, which the round trip picks up as usual.
+ */
+function unmark(state: SelectionState): SelectionState | null {
+	const { value, start, end } = state;
+	if (start < 0 || start !== end) return null;
+
+	const line = lineAt(value, start);
+	if (fenced(value, start)) return null;
+
+	const marker = MARKER.exec(line.text);
+	if (marker === null || start !== line.start + marker[0].length) return null;
+
+	return {
+		value: value.slice(0, line.start) + line.text.slice(marker[0].length) + value.slice(line.end),
+		start: line.start,
+		end: line.start,
+	};
+}
+
+/** Tab inside a list, which is the only place it means anything but "leave". */
+function indent(state: SelectionState, out: boolean): SelectionState | null {
+	const { value, start, end } = state;
+	if (start < 0) return null;
+
+	const line = lineAt(value, start);
+	const item = ITEM.exec(line.text);
+	if (item === null) return null;
+
+	const width = item[1]!.length;
+	if (out && width === 0) return null;
+
+	const moved = out ? Math.max(0, width - 2) : width + 2;
+	const shift = moved - width;
+	const next = " ".repeat(moved) + line.text.slice(width);
+	return {
+		value: value.slice(0, line.start) + next + value.slice(line.end),
+		start: start + shift,
+		end: end + shift,
+	};
+}
+
+/* -------------------------------------------------------------------------- */
+/* Undo                                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The editor's own undo.
+ *
+ * The browser's stack replays DOM operations, and every edit here throws the
+ * DOM away and draws a new one from the markdown, so there is nothing for it
+ * to replay. A stack of bodies is the honest version: each entry is a body and
+ * a caret, and a run of typing collapses into one so that ⌘Z takes back a
+ * word rather than a letter.
+ */
+const COALESCE_MS = 600;
+const DEPTH = 200;
+
+function createHistory(initial: SourceSelection) {
+	const past: SourceSelection[] = [initial];
+	const future: SourceSelection[] = [];
+	let last = 0;
+
+	return {
+		record(state: SourceSelection): void {
+			future.length = 0;
+			const previous = past.at(-1);
+			const now = Date.now();
+			const typed =
+				previous !== undefined &&
+				now - last < COALESCE_MS &&
+				state.value.length === previous.value.length + 1 &&
+				!state.value.endsWith("\n");
+
+			last = now;
+			if (typed) past[past.length - 1] = state;
+			else past.push(state);
+			if (past.length > DEPTH) past.shift();
+		},
+
+		undo(): SourceSelection | null {
+			if (past.length < 2) return null;
+			const current = past.pop();
+			if (current !== undefined) future.push(current);
+			last = 0;
+			return past.at(-1) ?? null;
+		},
+
+		redo(): SourceSelection | null {
+			const next = future.pop();
+			if (next === undefined) return null;
+			past.push(next);
+			last = 0;
+			return next;
+		},
+	};
 }

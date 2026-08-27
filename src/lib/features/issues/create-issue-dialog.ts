@@ -173,7 +173,7 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 		[chosenWorkspace, slug],
 		(workspace, origin) => workspace?.slug ?? origin,
 	);
-	const descriptionRef = signal<HTMLTextAreaElement | null>(null);
+	const descriptionRef = signal<HTMLElement | null>(null);
 	const hasDraft = signal(false);
 	const statusOpen = signal(false);
 	const priorityOpen = signal(false);
@@ -749,7 +749,6 @@ export function CreateIssueDialog(knownWorkspaces?: Readable<Workspace[]>) {
 						repository: () => chosenRepository.get()?.id,
 						placeholder: "Add description… @ to reference a file",
 						rows: 4,
-						toolbar: true,
 						onSubmit: () => void submit(),
 					}),
 					AttachmentGrid({
