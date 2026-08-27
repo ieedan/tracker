@@ -4,13 +4,13 @@ import { db } from "@/lib/server/db.server";
 import { unreadCount } from "@/lib/server/notifications.server";
 import { workspace, workspaceMember } from "@/lib/server/schema.server";
 import { toWorkspace, userImageUrl } from "@/lib/server/serialize.server";
-import type { LoadEvent } from "./$types";
+import type { LayoutLoadEvent } from "./$types";
 
 /**
  * The shell's data: who you are, which workspaces you can switch to, and how
  * many notifications are waiting. Every page under /app reads this.
  */
-export default async function load({ locals }: LoadEvent) {
+export default async function load({ locals }: LayoutLoadEvent) {
 	// hooks.server.ts already redirects an anonymous visitor; this narrows the type.
 	if (locals.user === null) redirect(303, "/login");
 

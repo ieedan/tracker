@@ -69,8 +69,7 @@
 											"lastUsedAt",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -105,8 +104,7 @@
 									},
 									"required": [
 										"ok"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -282,8 +280,7 @@
 											"expiresAt",
 											"permissions"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -390,8 +387,7 @@
 								"required": [
 									"name",
 									"permissions"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -569,8 +565,7 @@
 									"required": [
 										"key",
 										"plaintext"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -681,8 +676,7 @@
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -835,8 +829,7 @@
 										"user",
 										"authVia",
 										"agent"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -866,8 +859,7 @@
 								},
 								"required": [
 									"imageKey"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -932,8 +924,7 @@
 										"image",
 										"type",
 										"harness"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1098,8 +1089,7 @@
 											"issue",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -1129,8 +1119,7 @@
 										"type": "boolean"
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -1149,8 +1138,7 @@
 									},
 									"required": [
 										"ok"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1179,8 +1167,7 @@
 									},
 									"required": [
 										"count"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1218,8 +1205,7 @@
 									"filename",
 									"contentType",
 									"size"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -1246,8 +1232,7 @@
 										"key",
 										"uploadUrl",
 										"contentType"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1327,8 +1312,7 @@
 											"feedbackBoard",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -1356,8 +1340,7 @@
 								},
 								"required": [
 									"name"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -1424,8 +1407,7 @@
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1511,8 +1493,7 @@
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1569,8 +1550,7 @@
 										"type": "string"
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -1637,8 +1617,7 @@
 										"feedbackIntake",
 										"feedbackBoard",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -1710,8 +1689,7 @@
 											"name",
 											"connectedBy"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -1764,8 +1742,7 @@
 									"filename",
 									"contentType",
 									"size"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -1878,8 +1855,7 @@
 										"attachment",
 										"uploadUrl",
 										"contentType"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -2003,8 +1979,7 @@
 										"url",
 										"uploadedBy",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -2079,8 +2054,7 @@
 											"path",
 											"url"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -2156,8 +2130,7 @@
 											"revoked",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -2197,8 +2170,7 @@
 										"maximum": 2160
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -2252,8 +2224,7 @@
 										"expiresAt",
 										"revoked",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -2801,8 +2772,7 @@
 											"createdAt",
 											"updatedAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -2903,8 +2873,7 @@
 								"required": [
 									"teamKey",
 									"title"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -3334,8 +3303,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -3792,8 +3760,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -3890,8 +3857,7 @@
 										}
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -4321,8 +4287,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -4529,8 +4494,7 @@
 											"labels",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -4742,8 +4706,7 @@
 											"createdAt",
 											"updatedAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -4794,8 +4757,7 @@
 								},
 								"required": [
 									"body"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -4977,8 +4939,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -5033,8 +4994,7 @@
 								},
 								"required": [
 									"body"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -5216,8 +5176,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -5369,8 +5328,7 @@
 										{
 											"type": "null"
 										}
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -5415,8 +5373,7 @@
 								},
 								"required": [
 									"reference"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -5492,8 +5449,7 @@
 										"repository",
 										"syncedAt",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -5537,8 +5493,7 @@
 									},
 									"required": [
 										"unlinked"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -5590,8 +5545,7 @@
 								"required": [
 									"workspaceSlug",
 									"teamKey"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -6021,8 +5975,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6071,8 +6024,7 @@
 											"name",
 											"color"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -6111,8 +6063,7 @@
 								"required": [
 									"name",
 									"color"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -6139,8 +6090,7 @@
 										"id",
 										"name",
 										"color"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6251,8 +6201,7 @@
 											"user",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -6293,8 +6242,7 @@
 								},
 								"required": [
 									"email"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -6383,8 +6331,7 @@
 										"role",
 										"user",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6433,8 +6380,7 @@
 								},
 								"required": [
 									"role"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -6523,8 +6469,7 @@
 										"role",
 										"user",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6680,8 +6625,7 @@
 											"index",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -6719,8 +6663,7 @@
 										"maxLength": 120
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -6823,8 +6766,7 @@
 										"description",
 										"index",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6954,8 +6896,7 @@
 										"description",
 										"index",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -6999,8 +6940,7 @@
 									},
 									"required": [
 										"unlinked"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -7130,8 +7070,7 @@
 										"description",
 										"index",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -7196,8 +7135,7 @@
 											"description",
 											"linked"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -7295,8 +7233,7 @@
 										"installUrl",
 										"connected",
 										"reusable"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -7342,8 +7279,7 @@
 								},
 								"required": [
 									"externalId"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -7366,8 +7302,7 @@
 									"required": [
 										"connected",
 										"account"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -7424,8 +7359,7 @@
 											"issueCount",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -7463,8 +7397,7 @@
 								},
 								"required": [
 									"name"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -7499,8 +7432,7 @@
 										"key",
 										"issueCount",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -7732,8 +7664,7 @@
 											"createdAt",
 											"updatedAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -7845,8 +7776,7 @@
 								},
 								"required": [
 									"name"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -8056,8 +7986,7 @@
 										"labels",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -8171,8 +8100,7 @@
 										}
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -8382,8 +8310,7 @@
 										"labels",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -8726,8 +8653,7 @@
 											"createdAt",
 											"updatedAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -8789,8 +8715,7 @@
 								},
 								"required": [
 									"title"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -9016,8 +8941,7 @@
 										"issue",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -9270,8 +9194,7 @@
 										"issue",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -9341,8 +9264,7 @@
 										}
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -9568,8 +9490,7 @@
 										"issue",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -9613,8 +9534,7 @@
 									},
 									"required": [
 										"deleted"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -9737,8 +9657,7 @@
 											"createdAt",
 											"updatedAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -9787,8 +9706,7 @@
 								},
 								"required": [
 									"body"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -9881,8 +9799,7 @@
 										"internal",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -9963,8 +9880,7 @@
 										"default": "accepted"
 									}
 								},
-								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								"required": []
 							}
 						}
 					}
@@ -10394,8 +10310,7 @@
 										"attachments",
 										"createdAt",
 										"updatedAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -10441,8 +10356,7 @@
 								},
 								"required": [
 									"email"
-								],
-								"$schema": "http://json-schema.org/draft-07/schema#"
+								]
 							}
 						}
 					}
@@ -10461,8 +10375,7 @@
 									},
 									"required": [
 										"subscribed"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -10643,7 +10556,6 @@
 											"failingSince"
 										]
 									},
-									"$schema": "http://json-schema.org/draft-07/schema#",
 									"$defs": {
 										"0": {
 											"anyOf": [
@@ -10852,7 +10764,6 @@
 									"url",
 									"events"
 								],
-								"$schema": "http://json-schema.org/draft-07/schema#",
 								"$defs": {
 									"1": {
 										"anyOf": [
@@ -11106,7 +11017,6 @@
 										"webhook",
 										"secret"
 									],
-									"$schema": "http://json-schema.org/draft-07/schema#",
 									"$defs": {
 										"2": {
 											"anyOf": [
@@ -11319,7 +11229,6 @@
 									}
 								},
 								"required": [],
-								"$schema": "http://json-schema.org/draft-07/schema#",
 								"$defs": {
 									"3": {
 										"anyOf": [
@@ -11561,7 +11470,6 @@
 										"lastDeliveryStatus",
 										"failingSince"
 									],
-									"$schema": "http://json-schema.org/draft-07/schema#",
 									"$defs": {
 										"4": {
 											"anyOf": [
@@ -11825,8 +11733,7 @@
 											"deliveredAt",
 											"createdAt"
 										]
-									},
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									}
 								}
 							}
 						}
@@ -11995,8 +11902,7 @@
 										"payload",
 										"responseBody",
 										"requestHeaders"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -12137,8 +12043,7 @@
 										"nextAttemptAt",
 										"deliveredAt",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
@@ -12271,8 +12176,7 @@
 										"nextAttemptAt",
 										"deliveredAt",
 										"createdAt"
-									],
-									"$schema": "http://json-schema.org/draft-07/schema#"
+									]
 								}
 							}
 						}
