@@ -14,6 +14,13 @@ import { defineConfig } from "vite";
 const mcpClientCors = { origin: true as const };
 
 export default defineConfig({
+	// Core is a singleton: renderToString installs the server document and
+	// location into module state that the router reads back during the same
+	// mount. If the dependency graph ever carries two copies of core — e.g. the
+	// app's range resolves to a core published minutes before kit's exactly
+	// pinned one, as on Vercel's non-frozen install — the second copy sees no
+	// server environment and SSR dies on `window is not defined`.
+	resolve: { dedupe: ["@implementjs/core"] },
 	server: { cors: mcpClientCors },
 	preview: { cors: mcpClientCors },
 	plugins: [
