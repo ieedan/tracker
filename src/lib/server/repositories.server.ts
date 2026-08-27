@@ -5,8 +5,9 @@
  * knows it is talking to GitHub.
  */
 import { error } from "@implementjs/kit/server";
-import { and, asc, count, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { rankPath } from "@/lib/domain/fuzzy";
 import type { GitProviderId } from "@/lib/domain/providers";
 import type { PullRequest, Repository } from "@/lib/domain/schemas";
 import { db } from "./db.server";
@@ -219,10 +220,45 @@ export async function reindexRepository(repositoryRow: RepositoryRow): Promise<R
 }
 
 /**
+ * How many candidates are pulled back for ranking. The scorer is the part that
+ * decides the order, but running it over a fifty-thousand-file index on every
+ * keystroke would not do, so SQLite narrows first and ranks a poolful.
+ */
+const RANKING_POOL = 500;
+
+/**
+ * A `LIKE` pattern that matches the query as a subsequence: `mcp` becomes
+ * `%m%c%p%`, which is true of every path the scorer could score and false of
+ * every path it could not. That is what lets `@` reach a file whose name is
+ * spelled across two directories, rather than only the ones containing the
+ * query as one literal run.
+ *
+ * `%`, `_` and the escape character itself are literal characters in a path, so
+ * they are escaped rather than left to mean what they mean to `LIKE`.
+ */
+function subsequencePattern(term: string): string {
+	let pattern = "%";
+	for (const character of term) {
+		if (character === "%" || character === "_" || character === "\\") pattern += "\\";
+		pattern += character;
+		pattern += "%";
+	}
+	return pattern;
+}
+
+/**
  * Files matching a query, for `@` autocomplete.
  *
- * Ranked so a basename match beats a match buried in a directory name — typing
- * `schema` should surface `schema.server.ts` before `src/schema/thing.ts`.
+ * Matched as a subsequence and ranked by {@link rankPath}, so typing carries
+ * through directory names: `libmcp` finds `src/lib/server/mcp/tools.ts` and
+ * `schema` still puts `schema.server.ts` above `src/schema/thing.ts`. SQLite
+ * cuts the index down to paths the scorer could possibly like — cheap, and
+ * index-free either way, since no `LIKE` starting in `%` can use one — and the
+ * scorer settles the order among those.
+ *
+ * The pool is ordered by how literally each row matches before it is cut, so if
+ * a query is loose enough to reach past {@link RANKING_POOL} rows, what
+ * survives the cut is the part the scorer would have liked anyway.
  */
 export async function searchFiles(
 	workspaceId: string,
@@ -231,16 +267,12 @@ export async function searchFiles(
 	const term = options.query.trim().toLowerCase();
 	const limit = Math.min(options.limit ?? 20, 50);
 
-	const scope = [eq(repository.workspaceId, workspaceId)];
-	if (options.repositoryId !== undefined) scope.push(eq(repository.id, options.repositoryId));
-
-	const conditions = [...scope];
+	const conditions = [eq(repository.workspaceId, workspaceId)];
+	if (options.repositoryId !== undefined) conditions.push(eq(repository.id, options.repositoryId));
 	if (term !== "") {
-		const match = or(
-			like(repositoryFile.name, `%${term}%`),
-			like(repositoryFile.path, `%${term}%`),
+		conditions.push(
+			sql`lower(${repositoryFile.path}) like ${subsequencePattern(term)} escape '\\'`,
 		);
-		if (match !== undefined) conditions.push(match);
 	}
 
 	const rows = await db
@@ -249,16 +281,28 @@ export async function searchFiles(
 		.innerJoin(repository, eq(repository.id, repositoryFile.repositoryId))
 		.where(and(...conditions))
 		.orderBy(
-			// Basename hits first, then shortest path — the shallow file is almost
-			// always the one meant.
-			sql`case when lower(${repositoryFile.name}) like ${`${term}%`} then 0
-			         when lower(${repositoryFile.name}) like ${`%${term}%`} then 1
-			         else 2 end`,
+			// A literal hit on the basename, then anywhere on the basename, then
+			// anywhere on the path, then whatever only matches loosely — and the
+			// shortest path within each. Only a tiebreak among what is kept: the
+			// scorer below re-orders everything that survives.
+			sql`case when instr(lower(${repositoryFile.name}), ${term}) = 1 then 0
+			         when instr(lower(${repositoryFile.name}), ${term}) > 0 then 1
+			         when instr(lower(${repositoryFile.path}), ${term}) > 0 then 2
+			         else 3 end`,
 			sql`length(${repositoryFile.path})`,
 		)
-		.limit(limit);
+		.limit(term === "" ? limit : RANKING_POOL);
 
-	return rows.map((row) => ({
+	const ranked: Array<{ row: (typeof rows)[number]; score: number }> = [];
+	for (const row of rows) {
+		const rank = rankPath(term, row.file.path);
+		// The pattern already guarantees a subsequence, so this only drops rows
+		// whose only reading of the query is one the scorer refuses.
+		if (rank !== null) ranked.push({ row, score: rank.score });
+	}
+	ranked.sort((left, right) => right.score - left.score);
+
+	return ranked.slice(0, limit).map(({ row }) => ({
 		repositoryId: row.repo.id,
 		fullName: `${row.repo.owner}/${row.repo.name}`,
 		path: row.file.path,
