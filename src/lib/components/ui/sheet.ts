@@ -12,9 +12,8 @@ import {
 } from "@implementjs/primitives";
 import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button";
 import { TabOrder } from "./tab-order";
-import { swallowTapThrough } from "./tap-through";
 import { cn } from "@/lib/utils";
-import { createComponent, mergeProps } from "@implementjs/primitives";
+import { createComponent } from "@implementjs/primitives";
 
 /**
  * A sheet is the dialog primitive wearing a drawer costume: same focus trap,
@@ -79,23 +78,18 @@ export const SheetOverlay = createComponent(function SheetOverlay(
 	...children: Child[]
 ) {
 	return DialogOverlayPrimitive(
-		// A tap on the scrim dismisses the sheet, and must not also click the
-		// page the sheet was covering. See `swallowTapThrough` (ENG-69).
-		mergeProps(
-			{ onPointerdown: swallowTapThrough },
-			{
-				...props,
-				"data-slot": "sheet-overlay",
-				class: cn(
-					"fixed inset-0 z-50 bg-black/50",
-					"transition-[opacity,display] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transition-discrete motion-reduce:transition-none",
-					"data-[state=open]:block data-[state=open]:opacity-100",
-					"data-[state=closed]:pointer-events-none data-[state=closed]:hidden data-[state=closed]:opacity-0",
-					"starting:data-[state=open]:opacity-0",
-					className,
-				),
-			},
-		),
+		{
+			...props,
+			"data-slot": "sheet-overlay",
+			class: cn(
+				"fixed inset-0 z-50 bg-black/50",
+				"transition-[opacity,display] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transition-discrete motion-reduce:transition-none",
+				"data-[state=open]:block data-[state=open]:opacity-100",
+				"data-[state=closed]:pointer-events-none data-[state=closed]:hidden data-[state=closed]:opacity-0",
+				"starting:data-[state=open]:opacity-0",
+				className,
+			),
+		},
 		...children,
 	);
 });
