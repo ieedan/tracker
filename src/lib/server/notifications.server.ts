@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { NotificationType } from "@/lib/domain/issues";
 import type { Notification, NotificationOrder } from "@/lib/domain/schemas";
@@ -65,6 +65,44 @@ export async function issueAudience(issueId: string): Promise<string[]> {
 		.from(issueSubscriber)
 		.where(eq(issueSubscriber.issueId, issueId));
 	return rows.map((row) => row.userId);
+}
+
+/**
+ * Notification types that name you rather than the issue.
+ *
+ * "Aidan assigned ENG-1 to you" is addressed at one person and is still worth
+ * seeing after the issue is closed — someone put that on your plate, and the
+ * fact that it ended without you is the part you would want to notice. The rest
+ * are broadcasts to everyone following, and a broadcast about an issue that has
+ * since been settled is exactly the backlog nobody reads.
+ *
+ * An `@you` in a comment body belongs here too, once comment bodies are scanned
+ * for one — there is no such notification type yet.
+ */
+const ADDRESSED_TYPES: NotificationType[] = ["issue_assigned", "issue_unassigned"];
+
+/**
+ * Clears the inbox chatter an issue accumulated on its way to being closed.
+ *
+ * Called at the moment an issue moves into a terminal status, before the
+ * notification announcing that move is written — so "moved ENG-1 to Done"
+ * arrives unread on top of a clean slate rather than clearing itself.
+ *
+ * Only what was already waiting is swept. A comment that arrives on an issue
+ * that was closed last week is new, so it stays unread; this is about the
+ * pile-up behind a decision, not about muting the issue forever.
+ */
+export async function readNotificationsForClosedIssue(issueId: string): Promise<void> {
+	await db
+		.update(notification)
+		.set({ readAt: new Date() })
+		.where(
+			and(
+				eq(notification.issueId, issueId),
+				isNull(notification.readAt),
+				notInArray(notification.type, ADDRESSED_TYPES),
+			),
+		);
 }
 
 export async function listNotifications(

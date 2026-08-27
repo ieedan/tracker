@@ -15,7 +15,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { IssueStatus } from "@/lib/domain/issues";
-import { STATUS_LABELS, STATUS_ORDER } from "@/lib/domain/issues";
+import { isClosedStatus, STATUS_LABELS, STATUS_ORDER } from "@/lib/domain/issues";
 import type { IssueMention } from "@/lib/domain/mentions";
 import { pullRequestMentions } from "@/lib/domain/mentions";
 import type { GitProviderId } from "@/lib/domain/providers";
@@ -23,7 +23,7 @@ import { recordActivity } from "./activity.server";
 import { db } from "./db.server";
 import { emitIssueEvent } from "./events.server";
 import { getIssueById } from "./issues.server";
-import { issueAudience, notify } from "./notifications.server";
+import { issueAudience, notify, readNotificationsForClosedIssue } from "./notifications.server";
 import type { RemotePullRequestEvent } from "./providers/types.server";
 import {
 	account,
@@ -330,7 +330,7 @@ async function issuesForMentions(workspaceId: string, mentions: IssueMention[]):
  */
 function nextStatus(event: RemotePullRequestEvent, target: Target): IssueStatus | null {
 	const current = target.row.status;
-	if (current === "done" || current === "canceled" || current === "duplicate") return null;
+	if (isClosedStatus(current)) return null;
 
 	const state = event.pull.state;
 	if (state === "merged") return target.closes ? "done" : null;
@@ -382,6 +382,11 @@ async function moveIssue(
 	if (updated === undefined || updated.status !== status) return;
 
 	await recordActivity(target.row.id, actor.id, [{ type: "status_changed", from, to: status }]);
+
+	// A merge that finishes the issue settles what was said on the way here, the
+	// same as closing it by hand does — swept before the move is announced, so
+	// that notification lands unread on a clean slate.
+	if (isClosedStatus(status)) await readNotificationsForClosedIssue(target.row.id);
 
 	const reference = `${repo.owner}/${repo.name}#${event.pull.number}`;
 	const message = `${reference} moved ${identifier} to ${STATUS_LABELS[status]}`;

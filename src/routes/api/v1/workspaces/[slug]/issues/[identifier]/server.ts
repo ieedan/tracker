@@ -1,7 +1,7 @@
 import { error } from "@implementjs/kit/server";
 import { and, eq } from "drizzle-orm";
 import * as v from "valibot";
-import { parseIdentifier, STATUS_LABELS } from "@/lib/domain/issues";
+import { isClosedStatus, parseIdentifier, STATUS_LABELS } from "@/lib/domain/issues";
 import { IssueSchema, UpdateIssueBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
@@ -15,7 +15,11 @@ import {
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
-import { issueAudience, notify } from "@/lib/server/notifications.server";
+import {
+	issueAudience,
+	notify,
+	readNotificationsForClosedIssue,
+} from "@/lib/server/notifications.server";
 import { requireRepository } from "@/lib/server/repositories.server";
 import { recordActivity, type ActivityInput } from "@/lib/server/activity.server";
 import {
@@ -201,6 +205,11 @@ export const PATCH = handler({
 		// assignee named in this same request is not one of them yet if the
 		// subscribe above is what put them there, so read the audience after it.
 		if (body.status !== undefined && body.status !== before.status) {
+			// Closing settles everything that was said on the way here, so the
+			// chatter behind the decision is marked read before the decision
+			// itself is announced on top of it.
+			if (isClosedStatus(body.status)) await readNotificationsForClosedIssue(before.id);
+
 			const message = `${user.name} moved ${identifier} to ${STATUS_LABELS[body.status]}`;
 			for (const userId of await issueAudience(before.id)) {
 				await notify({
