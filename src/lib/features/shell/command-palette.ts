@@ -22,7 +22,7 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/lib/components/ui/command";
-import { Dialog, DialogContent } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import { StatusIcon } from "@/lib/components/glyphs";
 import type { Issue } from "@/lib/domain/schemas";
 import { mode } from "@/lib/mode";
@@ -73,13 +73,14 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 			},
 		}),
 
-		Dialog(
+		ResponsiveDialog(
 			{ open },
 			ImplementEffect([open], (isOpen) => {
 				if (!isOpen) search.set("");
 			}),
-			DialogContent(
-				{ class: "max-w-lg p-0", showCloseButton: false },
+			ResponsiveDialogContent(
+				// No max-width override: the default keeps a phone's 1rem margins.
+				{ class: "p-0", showCloseButton: false },
 				Command(
 					{ label: "Command palette", search },
 					CommandInput({ placeholder: "Search issues or run a command…" }),

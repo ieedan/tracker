@@ -21,7 +21,8 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { HarnessLogo, McpLogo } from "@/lib/components/harness-logo";
 import { Button } from "@/lib/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import { describeScopes } from "@/lib/domain/agents";
 import type { ConnectedAgent } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
@@ -225,13 +226,13 @@ function ConnectDialog(open: Signal<boolean>, copy: (value: string) => Promise<v
 			),
 		);
 
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
 		// The origin is only known in the browser, and every snippet is useless
 		// without it — an agent cannot guess where this app lives.
 		ImplementLifecycle({ onMount: () => origin.set(window.location.origin) }),
-		DialogContent(
-			{ class: "max-w-lg gap-0 p-0" },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-lg" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				Div(

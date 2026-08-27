@@ -24,16 +24,19 @@ import {
 	Div,
 	Dynamic,
 	ForEach,
+	Fragment,
 	If,
 	ImplementEffect,
 	ImplementLifecycle,
 	Span,
 	derived,
+	mediaQuery,
 	signal,
 	type Child,
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
+import { DrawerCtx } from "@implementjs/primitives";
 import {
 	Check,
 	ChevronRight,
@@ -60,6 +63,8 @@ import {
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/lib/components/ui/popover";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/lib/components/ui/drawer";
+import { RESPONSIVE_DIALOG_QUERY } from "@/lib/components/ui/responsive-dialog";
 import { Button } from "@/lib/components/ui/button";
 import { MenuCheckbox } from "@/lib/components/ui/menu-checkbox";
 import {
@@ -358,26 +363,57 @@ function FilterChip(
 			),
 		),
 
-		Popover(
-			{ open: valueMenuOpen },
-			PopoverTrigger(
-				{
-					variant: "ghost",
-					size: "sm",
-					class: "h-6 gap-1 rounded-none px-2 text-[11px] font-normal",
-				},
-				// Rebuilt whenever the values change — the icons are real nodes, so
-				// they cannot simply be bound to.
-				Dynamic([filter, context], (current, ctx) =>
-					Div({ class: "flex items-center gap-0.5" }, ...iconsFor(current, ctx)),
+		// The values reopen as an anchored panel beside the chip, or as a bottom
+		// drawer where there is no room to anchor one.
+		If(mediaQuery(RESPONSIVE_DIALOG_QUERY))
+			.Then(
+				Div(
+					{ class: "contents" },
+					Button(
+						{
+							variant: "ghost",
+							size: "sm",
+							class: "h-6 gap-1 rounded-none px-2 text-[11px] font-normal",
+							onClick: () => valueMenuOpen.set(true),
+						},
+						Dynamic([filter, context], (current, ctx) =>
+							Div({ class: "flex items-center gap-0.5" }, ...iconsFor(current, ctx)),
+						),
+						summary,
+					),
+					Drawer(
+						{ open: valueMenuOpen },
+						DrawerContent(
+							KeepKeyboardDown(),
+							DrawerTitle({ class: "sr-only" }, FILTER_FIELD_LABELS[field]),
+							DrawerDescription({ class: "sr-only" }, "Pick the values to filter by."),
+							ValueStep(valueField, filters, context, onChange, valueMenuOpen),
+						),
+					),
 				),
-				summary,
+			)
+			.Else(
+				Popover(
+					{ open: valueMenuOpen },
+					PopoverTrigger(
+						{
+							variant: "ghost",
+							size: "sm",
+							class: "h-6 gap-1 rounded-none px-2 text-[11px] font-normal",
+						},
+						// Rebuilt whenever the values change — the icons are real nodes, so
+						// they cannot simply be bound to.
+						Dynamic([filter, context], (current, ctx) =>
+							Div({ class: "flex items-center gap-0.5" }, ...iconsFor(current, ctx)),
+						),
+						summary,
+					),
+					PopoverContent(
+						{ class: "w-64 p-0", align: "start" },
+						ValueStep(valueField, filters, context, onChange, valueMenuOpen),
+					),
+				),
 			),
-			PopoverContent(
-				{ class: "w-64 p-0", align: "start" },
-				ValueStep(valueField, filters, context, onChange, valueMenuOpen),
-			),
-		),
 
 		Button(
 			{
@@ -395,6 +431,126 @@ function FilterChip(
 /** Distinguishes the panels when two filter menus share a page. */
 let panelCount = 0;
 
+/** The Filter / Add filter trigger, in its two sizes. */
+const addTriggerClass = (variant: "primary" | "subtle") =>
+	variant === "primary"
+		? "h-7 gap-1.5 border border-border px-2 text-[12px]"
+		: "h-6 gap-1 px-2 text-[11px] text-muted-foreground";
+
+/**
+ * Add a filter. A hover-driven dropdown-plus-side-panel where there is a
+ * pointer to hover with, and a pair of nested bottom drawers where there is a
+ * thumb instead — an anchored panel has nowhere to anchor on a phone.
+ */
+export function AddFilterButton(
+	filters: Readable<Filter[]>,
+	context: Readable<FilterContext>,
+	onChange: (next: Filter[]) => void,
+	open: Signal<boolean>,
+	variant: "primary" | "subtle" = "primary",
+) {
+	const isMobile = mediaQuery(RESPONSIVE_DIALOG_QUERY);
+	return If(isMobile)
+		.Then(MobileAddFilter(filters, context, onChange, open, variant))
+		.Else(DesktopAddFilter(filters, context, onChange, open, variant));
+}
+
+/**
+ * Stops a just-opened values drawer from focusing its search box: the focus
+ * trap's default is the first tabbable, which is the search input — and a
+ * focused input pops the on-screen keyboard over the half-open sheet. The
+ * panel takes the initial focus instead; tapping the field still brings the
+ * keyboard up.
+ */
+function KeepKeyboardDown() {
+	return DrawerCtx.Use((state) => {
+		state.registerInitialFocus(state.contentElement);
+		return Fragment();
+	});
+}
+
+/**
+ * The drawer flow: the first drawer lists the dimensions, tapping one stacks a
+ * second drawer with that dimension's values — the same searchable multi-select
+ * the desktop panel uses. The values drawer is mounted inside the first one, so
+ * the modal layer treats it as nested and pushes the parent back behind it.
+ */
+function MobileAddFilter(
+	filters: Readable<Filter[]>,
+	context: Readable<FilterContext>,
+	onChange: (next: Filter[]) => void,
+	open: Signal<boolean>,
+	variant: "primary" | "subtle",
+) {
+	const activeField = signal<FilterField | null>(null);
+	const valuesOpen = signal(false);
+
+	return Div(
+		{ class: "contents" },
+		Button(
+			{
+				variant: "ghost",
+				size: "sm",
+				class: addTriggerClass(variant),
+				onClick: () => open.set(true),
+			},
+			ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
+			variant === "primary" ? "Filter" : "Add filter",
+		),
+		Drawer(
+			{ open },
+			// closing the dimension list takes the values drawer with it
+			ImplementEffect([open], (isOpen) => {
+				if (!isOpen) valuesOpen.set(false);
+			}),
+			DrawerContent(
+				DrawerTitle({ class: "sr-only" }, "Add filter"),
+				DrawerDescription({ class: "sr-only" }, "Pick what to filter the list by."),
+				Div(
+					{ class: "flex flex-col gap-0.5 px-2 pb-2" },
+					ForEach(
+						context.bind((ctx) => availableFields(ctx).map((field) => ({ field }))),
+						(entry) => entry.field,
+						(entry) =>
+							Button(
+								{
+									variant: "ghost",
+									class: "h-11 w-full justify-start gap-2.5 px-3 text-[14px] font-normal",
+									onClick: () => {
+										activeField.set(entry.get().field);
+										valuesOpen.set(true);
+									},
+								},
+								iconForField(entry.get().field),
+								Span(
+									{ class: "flex-1 truncate text-left" },
+									FILTER_FIELD_LABELS[entry.get().field],
+								),
+								ChevronRight({
+									class: "size-4 shrink-0 text-muted-foreground",
+									"aria-hidden": true,
+								}),
+							),
+					),
+				),
+
+				Drawer(
+					{ open: valuesOpen },
+					DrawerContent(
+						KeepKeyboardDown(),
+						DrawerTitle(
+							{ class: "sr-only" },
+							activeField.bind((field) => (field === null ? "Values" : FILTER_FIELD_LABELS[field])),
+						),
+						DrawerDescription({ class: "sr-only" }, "Pick the values to filter by."),
+						ValueStep(activeField, filters, context, onChange, valuesOpen),
+					),
+				),
+			),
+		),
+	);
+}
+
 /**
  * The add-filter dropdown: one values panel, one trigger per dimension.
  *
@@ -405,12 +561,12 @@ let panelCount = 0;
  * panel that is already open rather than opening another one. Hovering is still
  * all it takes to open one — see `FieldTrigger`.
  */
-export function AddFilterButton(
+function DesktopAddFilter(
 	filters: Readable<Filter[]>,
 	context: Readable<FilterContext>,
 	onChange: (next: Filter[]) => void,
 	open: Signal<boolean>,
-	variant: "primary" | "subtle" = "primary",
+	variant: "primary" | "subtle",
 ) {
 	// What the shared panel is showing. The popover tracks what it is anchored
 	// *to*; this is what it is anchored *for*.
@@ -448,10 +604,7 @@ export function AddFilterButton(
 				{
 					variant: "ghost",
 					size: "sm",
-					class:
-						variant === "primary"
-							? "h-7 gap-1.5 border border-border px-2 text-[12px]"
-							: "h-6 gap-1 px-2 text-[11px] text-muted-foreground",
+					class: addTriggerClass(variant),
 				},
 				ListFilter({ class: variant === "primary" ? "size-3.5" : "size-3" }),
 				variant === "primary" ? "Filter" : "Add filter",

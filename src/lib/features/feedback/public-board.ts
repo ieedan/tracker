@@ -78,7 +78,7 @@ export function PublicBoardPage({ data }: { data: Readable<BoardData> }) {
 		Div(
 			{ class: "border-b border-border" },
 			Div(
-				{ class: "mx-auto flex max-w-3xl flex-col gap-1 px-6 py-8" },
+				{ class: "mx-auto flex max-w-3xl flex-col gap-1 px-4 py-6 sm:px-6 sm:py-8" },
 				H1(
 					{ class: "text-2xl font-semibold tracking-tight" },
 					data.bind((value) => `${value.workspaceName} feedback`),
@@ -91,7 +91,7 @@ export function PublicBoardPage({ data }: { data: Readable<BoardData> }) {
 		),
 
 		Div(
-			{ class: "mx-auto flex max-w-3xl flex-col gap-4 px-6 py-6" },
+			{ class: "mx-auto flex max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6 sm:py-6" },
 
 			Div(
 				{ class: "flex flex-wrap items-center gap-2" },
@@ -264,7 +264,7 @@ export function PublicFeedbackPage({ data }: { data: Readable<DetailData> }) {
 		),
 
 		Div(
-			{ class: "mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8" },
+			{ class: "mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8" },
 
 			router.Link(
 				{

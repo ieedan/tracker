@@ -11,15 +11,18 @@ import {
 	Main,
 	Span,
 	derived,
+	mediaQuery,
 	signal,
 	type Child,
 	type Readable,
+	type Signal,
 } from "@implementjs/core";
 import {
 	ChevronDown,
 	Inbox as InboxIcon,
 	LayoutList,
 	LayoutTemplate,
+	Menu,
 	MessageSquareQuote,
 	LogOut,
 	Plus,
@@ -41,6 +44,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/lib/components/ui/dropdown-menu";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/lib/components/ui/drawer";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { WorkspaceAvatar } from "@/lib/components/workspace-avatar";
 import type { IssueTemplate, Team, Workspace } from "@/lib/domain/schemas";
@@ -64,6 +68,9 @@ export interface ShellData {
 /** How often the inbox badge re-checks. Cheap query, and 15s reads as live. */
 const POLL_MS = 15_000;
 
+/** Above this the sidebar is docked; below it lives in a drawer. */
+const DESKTOP_QUERY = "(min-width: 768px)";
+
 export function AppShell(
 	data: Readable<ShellData>,
 	activeSlug: Readable<string>,
@@ -71,6 +78,8 @@ export function AppShell(
 	children: Child,
 ) {
 	const unread = signal(data.get().unread);
+	const mobileNavOpen = signal(false);
+	const isDesktop = mediaQuery(DESKTOP_QUERY);
 
 	// The badge is the one number on screen that must not go stale, so it polls
 	// rather than waiting for the next navigation to reseed it.
@@ -104,8 +113,21 @@ export function AppShell(
 				};
 			},
 		}),
+		// a drawer left open on a phone must not linger once the layout goes
+		// back to a docked sidebar — and a navigation is a destination reached,
+		// so the drawer's job is done
+		ImplementEffect([isDesktop], (desktop) => {
+			if (desktop) mobileNavOpen.set(false);
+		}),
+		ImplementEffect([url], () => mobileNavOpen.set(false), { immediate: false }),
+
 		Sidebar(data, activeSlug, url, unread),
-		Main({ class: "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background" }, children),
+		MobileSidebar(data, activeSlug, url, unread, mobileNavOpen),
+		Main(
+			{ class: "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background" },
+			MobileHeader(data, activeSlug, url, mobileNavOpen),
+			children,
+		),
 
 		ImplementDocument({
 			onKeydown: (event) => {
@@ -124,17 +146,18 @@ export function AppShell(
 	);
 }
 
-function Sidebar(
+/**
+ * Everything inside the sidebar. A factory rather than a shared node, because
+ * it is mounted twice — in the docked aside and in the mobile drawer — and a
+ * mountable can only live in one place.
+ */
+function SidebarBody(
 	data: Readable<ShellData>,
 	activeSlug: Readable<string>,
 	url: Readable<{ path: string }>,
 	unread: Readable<number>,
-) {
-	return Aside(
-		{
-			class:
-				"flex h-full min-h-0 w-[232px] shrink-0 flex-col gap-1 overflow-clip border-r border-sidebar-border bg-sidebar px-3 py-3",
-		},
+): Child[] {
+	return [
 		WorkspaceSwitcher(data, activeSlug),
 
 		NewIssueControl(activeSlug, url),
@@ -160,6 +183,89 @@ function Sidebar(
 			Span({ class: "ml-auto text-[11px]" }, "⌘K"),
 		),
 		UserMenu(data),
+	];
+}
+
+function Sidebar(
+	data: Readable<ShellData>,
+	activeSlug: Readable<string>,
+	url: Readable<{ path: string }>,
+	unread: Readable<number>,
+) {
+	return Aside(
+		{
+			class:
+				"hidden h-full min-h-0 w-[232px] shrink-0 flex-col gap-1 overflow-clip border-r border-sidebar-border bg-sidebar px-3 py-3 md:flex",
+		},
+		...SidebarBody(data, activeSlug, url, unread),
+	);
+}
+
+/** The same sidebar as an off-canvas drawer, for viewports without the room. */
+function MobileSidebar(
+	data: Readable<ShellData>,
+	activeSlug: Readable<string>,
+	url: Readable<{ path: string }>,
+	unread: Readable<number>,
+	open: Signal<boolean>,
+) {
+	return Drawer(
+		{ open, direction: "left" },
+		DrawerContent(
+			{
+				// no grab bar: a bar floating over the nav items reads as part of
+				// the menu. The whole panel is the drag surface.
+				showHandle: false,
+				class: "w-72 max-w-[85vw] bg-sidebar p-0 text-sidebar-foreground",
+			},
+			// the drawer is a dialog, and a dialog needs a name
+			DrawerTitle({ class: "sr-only" }, "Navigation"),
+			DrawerDescription({ class: "sr-only" }, "Displays the workspace navigation."),
+			Div(
+				{ class: "flex h-full min-h-0 w-full flex-col gap-1 px-3 py-3" },
+				...SidebarBody(data, activeSlug, url, unread),
+			),
+		),
+	);
+}
+
+/** The bar that stands in for the sidebar on small screens. */
+function MobileHeader(
+	data: Readable<ShellData>,
+	activeSlug: Readable<string>,
+	url: Readable<{ path: string }>,
+	open: Signal<boolean>,
+) {
+	const current = derived([data, activeSlug], (shell, slug) =>
+		shell.workspaces.find((workspace) => workspace.slug === slug),
+	);
+
+	return Div(
+		{ class: "flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 md:hidden" },
+		Button(
+			{
+				variant: "ghost",
+				size: "icon-sm",
+				"aria-label": "Open navigation",
+				onClick: () => open.set(true),
+			},
+			Menu({ class: "size-4" }),
+		),
+		WorkspaceTile(current),
+		Span(
+			{ class: "min-w-0 truncate text-[13px] font-medium" },
+			current.bind((workspace) => workspace?.name ?? "No workspace"),
+		),
+		Button(
+			{
+				variant: "ghost",
+				size: "icon-sm",
+				class: "ml-auto",
+				"aria-label": "New issue",
+				onClick: () => openCreateIssue(activeSlug.get(), teamKeyFromPath(url.get().path)),
+			},
+			Plus({ class: "size-4" }),
+		),
 	);
 }
 

@@ -25,7 +25,8 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -177,13 +178,15 @@ export function MembersSection(
 			Div(
 				{ class: "flex flex-col gap-3" },
 				Div(
-					{ class: "flex gap-2" },
+					// The input's intrinsic minimum is wider than a phone leaves it, so
+					// the row wraps rather than pushing the page sideways.
+					{ class: "flex flex-wrap gap-2" },
 					Input({
 						value: email,
 						type: "email",
 						placeholder: "teammate@example.com",
 						class:
-							"h-8 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
+							"h-8 min-w-40 flex-1 rounded-md border border-input bg-background px-3 text-[13px] outline-none focus:border-ring",
 						onKeydown: (event) => {
 							if (event.key === "Enter") void addByEmail();
 						},
@@ -357,10 +360,10 @@ function RemoveDialog(
 	removing: Readable<boolean>,
 	confirm: () => Promise<void>,
 ) {
-	return Dialog(
+	return ResponsiveDialog(
 		{ open },
-		DialogContent(
-			{ class: "max-w-md gap-0 p-0" },
+		ResponsiveDialogContent(
+			{ class: "gap-0 p-0 md:max-w-md" },
 			Div(
 				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Remove from workspace"),
