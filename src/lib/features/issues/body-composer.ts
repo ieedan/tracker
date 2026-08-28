@@ -309,7 +309,9 @@ export function BodyComposer(options: BodyComposerOptions) {
 					}
 					if (event.key === "Backspace") {
 						const current = read();
-						const undone = current === null ? null : unmark(current);
+						// A mention first: it is the more specific reading, and the two
+						// cannot both answer the same caret anyway.
+						const undone = current === null ? null : (unmention(current) ?? unmark(current));
 						if (undone === null) return;
 						event.preventDefault();
 						apply(undone);
@@ -556,6 +558,42 @@ function leaveFence(state: SelectionState, line: Line): SelectionState {
 	const after = closed ? value.slice(closing.end) : value.slice(line.end);
 	const caret = before.length + rail.length + 2;
 	return { value: `${before}${rail}\n\n${after}`, start: caret, end: caret };
+}
+
+/**
+ * The whole of a `@` reference, where one ends exactly at the caret.
+ *
+ * Both kinds are the same construct — `[@src/lib/foo.ts](url)` and
+ * `[@Ada Lovelace](/app/…)` — and the `@` on the label is what separates either
+ * from an ordinary link somebody wrote out by hand.
+ */
+const MENTION_END = /\[@[^\]\n]+\]\([^()\s]*\)$/;
+
+/**
+ * Backspace with the caret just after a mention, which takes the reference off
+ * whole rather than a character out of the middle of a URL.
+ *
+ * A pill is one thing and is not editable text, so there is no last character
+ * for Backspace to take. Left to the browser it spends the first press on the
+ * zero-width character the caret was standing on — which serializes to nothing,
+ * so the body does not change and the screen does not either — and only removes
+ * the pill on the press after that. A mention that needs two presses before
+ * anything happens is a mention that cannot be deleted, as far as the person
+ * pressing is concerned.
+ *
+ * Inside a fenced block the same characters are a code sample rather than a
+ * reference, and there Backspace is a character like it is anywhere else.
+ */
+function unmention(state: SelectionState): SelectionState | null {
+	const { value, start, end } = state;
+	if (start < 0 || start !== end) return null;
+	if (fenced(value, start)) return null;
+
+	const mention = MENTION_END.exec(value.slice(0, start));
+	if (mention === null) return null;
+
+	const at = start - mention[0].length;
+	return { value: value.slice(0, at) + value.slice(start), start: at, end: at };
 }
 
 /**
