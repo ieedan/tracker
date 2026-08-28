@@ -17,8 +17,8 @@ import type {
 	WebhookDeliveryDetail,
 	Workspace,
 } from "@/lib/domain/schemas";
-import { feedbackIdentifier } from "@/lib/domain/feedback";
-import type { WorkspaceRole } from "@/lib/domain/issues";
+import { feedbackIdentifier, feedbackStatusForIssue } from "@/lib/domain/feedback";
+import type { IssueStatus, WorkspaceRole } from "@/lib/domain/issues";
 import type * as schema from "./schema.server";
 
 type UserRow = typeof schema.user.$inferSelect;
@@ -236,15 +236,27 @@ type FeedbackCommentRow = typeof schema.feedbackComment.$inferSelect;
  * The converted issue goes too: that it was accepted is on the status, and the
  * issue's own title and id are the team's internal wording, not the
  * submitter's.
+ *
+ * The assignee goes the same way, for the same reason: who on the team picked a
+ * request up is the team's business, and the board naming a member is the sort
+ * of thing nobody consented to. The priority stays — it says the same thing the
+ * status does, in the other axis, and that is what the board is for.
  */
 export function toFeedback(
 	row: FeedbackRow,
 	context: {
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;
 		submitter: UserFields | null;
+		assignee: UserFields | null;
 		commentCount: number;
 		subscriberCount: number;
 		issue: { id: string; identifier: string; title: string } | null;
+		/**
+		 * The linked issue's status, kept apart from `issue` above because that
+		 * one is redacted for the public board and this one must not be: where a
+		 * request has got to is exactly what the board exists to say.
+		 */
+		issueStatus: IssueStatus | null;
 		audience: "member" | "public";
 	},
 ): Feedback {
@@ -255,7 +267,13 @@ export function toFeedback(
 		identifier: feedbackIdentifier(row.number),
 		title: row.title,
 		description: row.description,
-		status: row.status,
+		// Derived once there is an issue, and only then. The stored column is the
+		// triage a person did on the way here; after conversion the work itself is
+		// the better answer, and nobody has to remember to keep the two in step
+		// (ENG-77).
+		status: context.issueStatus === null ? row.status : feedbackStatusForIssue(context.issueStatus),
+		priority: row.priority,
+		assignee: isPublic || context.assignee === null ? null : toUser(context.assignee),
 		visibility: row.visibility,
 		labels: context.labels.map(toLabel),
 		submitter: isPublic

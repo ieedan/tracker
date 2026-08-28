@@ -308,7 +308,7 @@ export function PublicFeedbackPage({ data }: { data: Readable<DetailData> }) {
 			FeedbackThread({
 				comments,
 				slug: data.bind((value) => value.slug),
-				feedbackId: entry.bind((value) => value.id),
+				feedback: entry,
 				canPost: data.bind((value) => value.signedIn),
 				signInPrompt: "Sign in to reply. An account keeps the board free of spam.",
 			}),

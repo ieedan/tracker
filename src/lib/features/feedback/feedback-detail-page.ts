@@ -13,8 +13,15 @@ import {
 } from "@implementjs/core";
 import { ArrowRight, ChevronLeft, ExternalLink, Mail } from "@implementjs/lucide";
 import { Button } from "@/lib/components/ui/button";
-import { LabelChips } from "@/lib/features/issues/pickers";
-import type { Feedback, FeedbackComment, Label, Team, Workspace } from "@/lib/domain/schemas";
+import { AssigneePicker, LabelChips, PriorityPicker } from "@/lib/features/issues/pickers";
+import type {
+	Feedback,
+	FeedbackComment,
+	Label,
+	Member,
+	Team,
+	Workspace,
+} from "@/lib/domain/schemas";
 import { fullTime } from "@/lib/format";
 import { ConvertButton } from "./convert";
 import { patchFeedback } from "./feedback-store";
@@ -26,6 +33,7 @@ interface PageData {
 	comments: FeedbackComment[];
 	workspace: Workspace;
 	teams: Team[];
+	members: Member[];
 	labels: Label[];
 }
 
@@ -71,6 +79,34 @@ export function FeedbackDetailPage({
 			FeedbackStatusPicker(
 				entry.bind("status"),
 				(status) => update({ status }, (value) => ({ ...value, status })),
+				{ showLabel: true, follows: entry.bind((value) => value.issue?.identifier ?? null) },
+			),
+		),
+		// Priority and assignee are the issue pickers themselves, not lookalikes:
+		// a request is ranked and owned exactly the way the work it becomes is,
+		// and one control cannot drift from itself (ENG-77).
+		PropertyRow(
+			"Priority",
+			PriorityPicker(
+				entry.bind("priority"),
+				(priority) => update({ priority }, (value) => ({ ...value, priority })),
+				{ showLabel: true },
+			),
+		),
+		PropertyRow(
+			"Assignee",
+			AssigneePicker(
+				entry.bind("assignee"),
+				data.bind((value) => value.members),
+				(assigneeId) =>
+					update({ assigneeId }, (value) => ({
+						...value,
+						assignee:
+							assigneeId === null
+								? null
+								: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
+									value.assignee),
+					})),
 				{ showLabel: true },
 			),
 		),
@@ -248,7 +284,7 @@ export function FeedbackDetailPage({
 					FeedbackThread({
 						comments,
 						slug: params.slug,
-						feedbackId: entry.bind((value) => value.id),
+						feedback: entry,
 						canPost: signal(true),
 						canNote: signal(true),
 					}),

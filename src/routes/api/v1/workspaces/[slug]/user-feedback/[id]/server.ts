@@ -6,13 +6,14 @@ import { FeedbackSchema, UpdateFeedbackBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { emitFeedbackDeleted, emitFeedbackEvent } from "@/lib/server/events.server";
 import {
+	convertedIssue,
 	findFeedbackRow,
 	getFeedbackById,
 	labelIdsFor,
 	setFeedbackLabels,
 } from "@/lib/server/feedback.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
-import { validLabelIds } from "@/lib/server/issues.server";
+import { assertMember, validLabelIds } from "@/lib/server/issues.server";
 import { feedback } from "@/lib/server/schema.server";
 import { handler } from "./$types";
 
@@ -34,7 +35,9 @@ export const GET = handler({
 });
 
 /**
- * Triage: status, labels, visibility, and light edits to the text.
+ * Triage: status, priority, assignee, labels, visibility, and light edits to
+ * the text — the same properties an issue is triaged by, because feedback is
+ * the same thing seen earlier (ENG-77).
  *
  * A status move emits its own event as well as `feedback.updated`, because
  * "it moved to Planned" is the thing an integration actually wants to react to
@@ -67,9 +70,36 @@ export const PATCH = handler({
 			changes.description = { from: before.description, to: body.description };
 			patch.description = body.description;
 		}
-		if (body.status !== undefined && body.status !== before.status) {
-			changes.status = { from: before.status, to: body.status };
-			patch.status = body.status;
+		// Once feedback has become an issue its status is the issue's, derived on
+		// the way out. Accepting a write here would put a value in the column that
+		// nothing ever reads and no screen ever shows — which is how a piece of
+		// feedback ends up claiming to be New three weeks after it shipped
+		// (ENG-77). Refused rather than ignored: there is a person to tell.
+		if (body.status !== undefined) {
+			const linked = await convertedIssue(before.id);
+			if (linked !== null) {
+				error(409, `${feedbackIdentifier(before.number)} follows ${linked.identifier} now`);
+			}
+			if (body.status !== before.status) {
+				changes.status = { from: before.status, to: body.status };
+				patch.status = body.status;
+			}
+		}
+		if (body.priority !== undefined && body.priority !== before.priority) {
+			changes.priority = { from: before.priority, to: body.priority };
+			patch.priority = body.priority;
+		}
+		if (body.assigneeId !== undefined) {
+			// The same check the issue endpoint makes: you cannot hand work to
+			// somebody who is not in the workspace.
+			if (body.assigneeId !== null && body.assigneeId !== "") {
+				await assertMember(workspace.id, body.assigneeId);
+			}
+			const next = body.assigneeId === "" ? null : body.assigneeId;
+			if (next !== before.assigneeId) {
+				changes.assigneeId = { from: before.assigneeId, to: next };
+				patch.assigneeId = next;
+			}
 		}
 		if (body.visibility !== undefined && body.visibility !== before.visibility) {
 			changes.visibility = { from: before.visibility, to: body.visibility };
@@ -108,6 +138,16 @@ export const PATCH = handler({
 					actor: user,
 					feedback: after,
 					changes: { status: changes.status },
+				});
+			}
+			// Same reasoning as the status event, and as `issue.assigned`: "it is
+			// mine now" is what a receiver wants to key off.
+			if (changes.assigneeId !== undefined) {
+				await emitFeedbackEvent("feedback.assigned", {
+					workspace,
+					actor: user,
+					feedback: after,
+					changes: { assigneeId: changes.assigneeId },
 				});
 			}
 		}

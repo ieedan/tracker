@@ -5,7 +5,12 @@ import * as v from "valibot";
 import { ACTIVITY_TYPES } from "./activity";
 import { AGENT_HARNESSES, USER_TYPES } from "./agents";
 import { API_KEY_ACTIONS } from "./api-keys";
-import { FEEDBACK_BOARD_MODES, FEEDBACK_INTAKE_MODES, FEEDBACK_STATUSES } from "./feedback";
+import {
+	FEEDBACK_BOARD_MODES,
+	FEEDBACK_INTAKE_MODES,
+	FEEDBACK_STATUSES,
+	FEEDBACK_TRIAGE_STATUSES,
+} from "./feedback";
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, NOTIFICATION_TYPES, WORKSPACE_ROLES } from "./issues";
 import { GIT_PROVIDERS, INDEX_STATES, PULL_REQUEST_STATES } from "./providers";
 import {
@@ -54,6 +59,13 @@ export type Label = v.InferOutput<typeof LabelSchema>;
 export const FeedbackIntakeSchema = v.picklist(FEEDBACK_INTAKE_MODES);
 export const FeedbackBoardSchema = v.picklist(FEEDBACK_BOARD_MODES);
 export const FeedbackStatusSchema = v.picklist(FEEDBACK_STATUSES);
+/**
+ * What a caller may *set*. The rest of `FEEDBACK_STATUSES` describes work
+ * rather than triage, and is derived from the issue rather than written
+ * (ENG-77) — offering it here would be offering a value the response would
+ * then contradict.
+ */
+export const FeedbackTriageStatusSchema = v.picklist(FEEDBACK_TRIAGE_STATUSES);
 
 export const WorkspaceSchema = v.object({
 	id: v.string(),
@@ -577,6 +589,10 @@ export const FeedbackSchema = v.object({
 	title: v.string(),
 	description: v.string(),
 	status: FeedbackStatusSchema,
+	/** The same scale as an issue — feedback is ranked the same way work is. */
+	priority: IssuePrioritySchema,
+	/** Whose triage this is. Members only: the board does not name your staff. */
+	assignee: v.nullable(UserSummary),
 	visibility: v.picklist(["private", "public"]),
 	labels: v.array(LabelSchema),
 	submitter: FeedbackSubmitterSchema,
@@ -623,7 +639,11 @@ export const UpdateFeedbackBody = v.partial(
 	v.object({
 		title: trimmed(1, 200),
 		description: v.pipe(v.string(), v.maxLength(20_000)),
-		status: FeedbackStatusSchema,
+		/** Refused once the feedback has an issue: its status follows that. */
+		status: FeedbackTriageStatusSchema,
+		priority: IssuePrioritySchema,
+		/** A workspace member, or null to unassign. */
+		assigneeId: v.nullable(v.string()),
 		visibility: v.picklist(["private", "public"]),
 		labelIds: v.array(v.string()),
 	}),
@@ -634,10 +654,16 @@ export const ConvertFeedbackBody = v.object({
 	teamKey: v.optional(v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6))),
 	/** Defaults to the feedback's own title and description. */
 	title: v.optional(trimmed(1, 200)),
-	priority: v.optional(IssuePrioritySchema, "none"),
+	/** Both default to the feedback's own — triage already done comes with it. */
+	priority: v.optional(IssuePrioritySchema),
 	assigneeId: v.optional(v.nullable(v.string())),
-	/** The feedback status to leave behind. Defaults to `accepted`. */
-	status: v.optional(FeedbackStatusSchema, "accepted"),
+	/**
+	 * The feedback status to leave behind. Defaults to `accepted`.
+	 *
+	 * Only read if the issue is later deleted — from here on the feedback shows
+	 * the issue's progress instead.
+	 */
+	status: v.optional(FeedbackTriageStatusSchema, "accepted"),
 });
 
 export const CreateFeedbackCommentBody = v.object({

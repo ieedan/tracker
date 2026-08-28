@@ -137,10 +137,12 @@ export const label = sqliteTable(
 /**
  * A piece of user feedback.
  *
- * Same shape as an issue in the ways that matter — title, description, labels,
- * a number you can quote — but a separate table, because feedback is a request
- * for work rather than the work itself. Its statuses reflect triage, not
- * progress, and converting is what turns one into the other.
+ * The same properties as an issue — title, description, labels, priority, an
+ * assignee, a number you can quote — but a separate table, because feedback is
+ * a request for work rather than the work itself. What actually separates the
+ * two is where a row comes from (`submitter*`, `source`) and who may read it
+ * (`visibility`); its statuses reflect triage, not progress, and converting is
+ * what turns one into the other (ENG-77).
  */
 export const feedback = sqliteTable(
 	"feedback",
@@ -154,6 +156,10 @@ export const feedback = sqliteTable(
 		title: text("title").notNull(),
 		description: text("description").notNull().default(""),
 		status: text("status").$type<FeedbackStatus>().notNull().default("new"),
+		/** The same scale an issue is ranked on — triage sorts both the same way. */
+		priority: text("priority").$type<IssuePriority>().notNull().default("none"),
+		/** Whose triage this is. A member, exactly as on an issue. */
+		assigneeId: text("assigneeId").references(() => user.id, { onDelete: "set null" }),
 		visibility: text("visibility").$type<FeedbackVisibility>().notNull().default("private"),
 		/**
 		 * Who sent it. All three are optional and independent: an anonymous public
@@ -173,6 +179,7 @@ export const feedback = sqliteTable(
 	(table) => [
 		uniqueIndex("feedback_number_unique").on(table.workspaceId, table.number),
 		index("feedback_workspace_status").on(table.workspaceId, table.status),
+		index("feedback_assignee").on(table.assigneeId),
 		// The public board's query: this workspace, public only, newest first.
 		index("feedback_public").on(table.workspaceId, table.visibility, table.createdAt),
 	],
@@ -689,6 +696,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
 export const feedbackRelations = relations(feedback, ({ one, many }) => ({
 	workspace: one(workspace, { fields: [feedback.workspaceId], references: [workspace.id] }),
 	submitter: one(user, { fields: [feedback.submitterUserId], references: [user.id] }),
+	assignee: one(user, { fields: [feedback.assigneeId], references: [user.id] }),
 	labels: many(feedbackLabel),
 	comments: many(feedbackComment),
 	subscribers: many(feedbackSubscriber),

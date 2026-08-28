@@ -5,9 +5,10 @@ import { Fragment, If, Span, derived, signal, type Readable } from "@implementjs
 import { Eye, EyeOff, Tag } from "@implementjs/lucide";
 import { ResponsiveMenu, type MenuOption } from "@/lib/components/ui/responsive-menu";
 import {
-	FEEDBACK_STATUSES,
 	FEEDBACK_STATUS_LABELS,
+	FEEDBACK_TRIAGE_STATUSES,
 	type FeedbackStatus,
+	type FeedbackTriageStatus,
 	type FeedbackVisibility,
 } from "@/lib/domain/feedback";
 import type { Label } from "@/lib/domain/schemas";
@@ -17,34 +18,75 @@ import { FeedbackStatusIcon } from "./glyphs";
 const triggerClass =
 	"inline-flex h-6 items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 text-[12px] text-muted-foreground hover:bg-accent";
 
+/**
+ * Status, which stops being a control the moment there is an issue.
+ *
+ * `follows` carries that issue's identifier when there is one. A converted
+ * piece of feedback shows its status the same way it always did and simply
+ * cannot be clicked, because there is nothing here to decide any more — the
+ * value is the issue's, derived on the server (ENG-77). Leaving the menu up and
+ * having the endpoint refuse the write would be offering a choice that is not
+ * one; the same shape as `VisibilityPicker` with the board closed, for the same
+ * reason.
+ */
 export function FeedbackStatusPicker(
 	current: Readable<FeedbackStatus>,
-	onPick: (status: FeedbackStatus) => void,
-	options: { showLabel?: boolean; class?: string } = {},
+	// Narrower than what it displays, and deliberately: the menu only ever
+	// offers the four a person decides, so the endpoint's refusal of the rest
+	// is something no call site can reach in the first place.
+	onPick: (status: FeedbackTriageStatus) => void,
+	options: {
+		showLabel?: boolean;
+		class?: string;
+		follows?: Readable<string | null>;
+	} = {},
 ) {
-	return ResponsiveMenu({
+	const face = () =>
+		Fragment(
+			FeedbackStatusIcon(current),
+			options.showLabel === true
+				? Span(
+						{},
+						current.bind((status) => FEEDBACK_STATUS_LABELS[status]),
+					)
+				: null,
+		);
+
+	const menu = ResponsiveMenu({
 		heading: "Status",
 		search: "Change status…",
 		options: STATUS_OPTIONS,
 		selected: derived([current], (status) => [status]),
-		onSelect: (status) => onPick(status as FeedbackStatus),
+		onSelect: (status) => onPick(status as FeedbackTriageStatus),
 		trigger: { class: cn(triggerClass, options.class), title: "Status" },
-		face: () =>
-			Fragment(
-				FeedbackStatusIcon(current),
-				options.showLabel === true
-					? Span(
-							{},
-							current.bind((status) => FEEDBACK_STATUS_LABELS[status]),
-						)
-					: null,
-			),
+		face,
 	});
+
+	if (options.follows === undefined) return menu;
+
+	return If(options.follows.bind((identifier) => identifier === null))
+		.Then(menu)
+		.Else(
+			Span(
+				{
+					class: cn(triggerClass, "cursor-default", options.class),
+					title: options.follows.bind(
+						(identifier) => `Follows ${identifier ?? "the issue"} — set the status there`,
+					),
+				},
+				face(),
+			),
+		);
 }
 
-/** Built once: the rows are constants and the icon factories are pure. */
+/**
+ * Built once: the rows are constants and the icon factories are pure.
+ *
+ * Triage statuses only. The rest describe an issue's progress and are never
+ * something a person picks here.
+ */
 const STATUS_OPTIONS: Readable<MenuOption[]> = signal(
-	FEEDBACK_STATUSES.map((status): MenuOption => ({
+	FEEDBACK_TRIAGE_STATUSES.map((status): MenuOption => ({
 		value: status,
 		label: FEEDBACK_STATUS_LABELS[status],
 		icon: () => FeedbackStatusIcon(status),

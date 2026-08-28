@@ -16,6 +16,7 @@ import {
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
+import { announceIssueStatusOnFeedback } from "@/lib/server/feedback.server";
 import {
 	issueAudience,
 	notify,
@@ -339,6 +340,16 @@ export const PATCH = handler({
 				actor: user,
 				issue: updated,
 				changes: diff,
+			});
+			// A converted request shows this issue's progress, so moving the issue
+			// is what moves the feedback — and the board's subscribers hear about
+			// it from here rather than not at all (ENG-77).
+			await announceIssueStatusOnFeedback({
+				workspace,
+				actor: user,
+				feedbackId: before.feedbackId,
+				from: before.status,
+				to: updated.status,
 			});
 		}
 

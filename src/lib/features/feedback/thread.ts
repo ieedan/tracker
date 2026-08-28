@@ -5,28 +5,30 @@
  * what differs is `canPost` (signed in or not) and `canNote` (a member, who may
  * leave an internal note). Building two would guarantee they drifted.
  */
-import { Div, ForEach, If, Span, Textarea, signal, type Readable } from "@implementjs/core";
-import { Lock, MessageSquare } from "@implementjs/lucide";
+import {
+	Div,
+	Dynamic,
+	ForEach,
+	If,
+	Span,
+	Textarea,
+	signal,
+	type Readable,
+} from "@implementjs/core";
+import { Lock, MessageSquareQuote } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { UserAvatar } from "@/lib/components/glyphs";
 import { Markdown } from "@/lib/components/markdown";
 import { Button } from "@/lib/components/ui/button";
 import { KEY_HINT_CLASS } from "@/lib/components/ui/kbd";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/lib/components/ui/empty";
-import type { FeedbackComment } from "@/lib/domain/schemas";
+import type { Feedback, FeedbackComment } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
 
 export function FeedbackThread(options: {
 	comments: ReturnType<typeof signal<FeedbackComment[]>>;
 	slug: Readable<string>;
-	feedbackId: Readable<string>;
+	feedback: Readable<Feedback>;
 	/** False for a signed-out visitor: they read, they do not write. */
 	canPost: Readable<boolean>;
 	/** Members only — the internal-note toggle is hidden for everyone else. */
@@ -46,7 +48,7 @@ export function FeedbackThread(options: {
 		const { data, error } = await api.POST(
 			"/api/v1/workspaces/[slug]/user-feedback/[id]/comments",
 			{
-				params: { slug: options.slug.get(), id: options.feedbackId.get() },
+				params: { slug: options.slug.get(), id: options.feedback.get().id },
 				body: { body, internal: internal.get() },
 			},
 		);
@@ -65,17 +67,7 @@ export function FeedbackThread(options: {
 		{ class: "flex flex-col gap-4 border-t border-border pt-6" },
 		Span({ class: "text-[13px] font-medium" }, "Replies"),
 
-		If(
-			options.comments.bind((list) => list.length === 0),
-			Empty(
-				{ class: "border p-4 md:p-6" },
-				EmptyHeader(
-					EmptyMedia({ variant: "icon" }, MessageSquare({ "aria-hidden": true })),
-					EmptyTitle("No replies yet"),
-					EmptyDescription("Be the first to reply."),
-				),
-			),
-		),
+		OriginRow(options.feedback),
 
 		ForEach(
 			options.comments,
@@ -185,5 +177,52 @@ export function FeedbackThread(options: {
 					options.signInPrompt ?? "Sign in to reply.",
 				),
 			),
+	);
+}
+
+/**
+ * Where this came from, as the thread's first entry.
+ *
+ * A thread with nothing in it used to draw a bordered panel saying "No replies
+ * yet" — a box the size of a conversation announcing that there isn't one, on
+ * the majority of feedback, which nobody has replied to and nobody needs to
+ * (ENG-77). The issue timeline never has that problem: it opens with the
+ * creation it synthesises from the issue row, so there is always a first entry
+ * and never an empty state. This is the same entry, said about a submission —
+ * and it earns its line, because who sent this and where it came in through is
+ * the one thing feedback has that an issue does not.
+ */
+function OriginRow(feedback: Readable<Feedback>) {
+	// Null on the public board, where the submitter is dropped in full rather
+	// than named on a page anyone can read.
+	const submitter = feedback.bind((value) => value.submitter.user);
+
+	return Div(
+		{ class: "flex items-center gap-3 text-[12px] text-muted-foreground" },
+		Span(
+			{ class: "flex size-5 shrink-0 items-center justify-center" },
+			Dynamic([submitter], (user) =>
+				user === null ? MessageSquareQuote({ class: "size-3.5" }) : UserAvatar(user, "size-5"),
+			),
+		),
+		Div(
+			{ class: "flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5" },
+			Span(
+				{ class: "font-medium text-foreground" },
+				feedback.bind((value) => value.submitter.name ?? value.submitter.email ?? "Someone"),
+			),
+			Span({}, "sent this"),
+			If(
+				feedback.bind((value) => value.source !== null),
+				Span(
+					{ class: "rounded border border-border px-1 font-mono text-[10px]" },
+					feedback.bind((value) => value.source ?? ""),
+				),
+			),
+			Span(
+				{ class: "text-[11px] whitespace-nowrap" },
+				feedback.bind((value) => relativeTime(value.createdAt)),
+			),
+		),
 	);
 }
