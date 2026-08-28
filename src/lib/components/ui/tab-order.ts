@@ -25,15 +25,30 @@ const TAB_STOP = [
 	"input:not([disabled])",
 	"select:not([disabled])",
 	"textarea:not([disabled])",
+	// ENG-78: an editing host is a field you type in like any other — the body
+	// composer is one — and it carries no `tabindex` of its own to be found by.
+	"[contenteditable]:not([contenteditable='false'])",
 	"[tabindex]",
 ].join(",");
+
+/**
+ * Whether Tab can land on this element, given that it matched `TAB_STOP`.
+ *
+ * `tabIndex` is the resolved value, so `-1` takes an element out however it was
+ * set — except on an editing host, which browsers disagree about: some report
+ * the `-1` of an element with no `tabindex` attribute even though the box takes
+ * focus and Tab perfectly well. There, only an explicit attribute counts.
+ */
+function tabbable(element: HTMLElement): boolean {
+	if (element.isContentEditable && !element.hasAttribute("tabindex")) return true;
+	return element.tabIndex >= 0;
+}
 
 /** What Tab can land on inside `root`, in the order Tab visits it. */
 function tabStops(root: HTMLElement): HTMLElement[] {
 	return Array.from(root.querySelectorAll<HTMLElement>(TAB_STOP)).filter(
-		// `tabIndex` is the resolved value, so `-1` is excluded however it was
-		// set, and a box with no layout is one nothing can put focus in.
-		(element) => element.tabIndex >= 0 && element.getClientRects().length > 0,
+		// A box with no layout is one nothing can put focus in.
+		(element) => tabbable(element) && element.getClientRects().length > 0,
 	);
 }
 
