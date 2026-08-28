@@ -122,6 +122,17 @@ const identifier = v.pipe(
 
 const webhookId = v.pipe(v.string(), v.description("Webhook id, from list_webhooks."));
 
+/**
+ * How to write an `@` mention by hand.
+ *
+ * The `@` menu in the app builds this link for you; over MCP there is no menu,
+ * so the shape has to be said out loud or an agent asking somebody a question
+ * writes a name that reaches nobody.
+ */
+const MENTION_HINT =
+	"To pull somebody in, mention them: write `[@Their Name](/app/<workspace>?assignee=<userId>)`, " +
+	"with an id from list_members. That lands in their inbox and subscribes them to the issue.";
+
 /** `?a=1&a=2` for arrays, and omitting anything blank. */
 function queryString(params: Record<string, unknown>): string {
 	const search = new URLSearchParams();
@@ -458,7 +469,8 @@ export const MCP_TOOLS: McpTool[] = [
 		name: "comment_on_issue",
 		title: "Comment on an issue",
 		description:
-			"Add a comment to an issue. It appears under your own name and notifies the issue's assignee and author.",
+			"Add a comment to an issue. It appears under your own name and notifies the issue's assignee and author. " +
+			MENTION_HINT,
 		readOnly: false,
 		input: v.object({ identifier, ...CreateCommentBody.entries, ...workspaceArg }),
 		handle: async ({ input, event, slug }) =>
@@ -537,7 +549,7 @@ export const MCP_TOOLS: McpTool[] = [
 		name: "list_members",
 		title: "List members",
 		description:
-			"List who is in the workspace, with their user ids — needed to assign an issue. Agents appear here too.",
+			"List who is in the workspace, with their user ids — needed to assign an issue, and to mention somebody in a body. Agents appear here too.",
 		readOnly: true,
 		input: v.object({ ...workspaceArg }),
 		handle: async ({ event, slug }) =>

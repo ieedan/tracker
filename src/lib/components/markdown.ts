@@ -35,9 +35,9 @@
  * lib/components/highlight.ts when the info string names a language it
  * knows), bulleted and numbered lists (nested, and with block content inside
  * an item), blockquotes,
- * horizontal rules, `[links](url)`, `<autolinks>`, and bare URLs. `@file`
- * references keep the pill they already had — they are markdown links, so they
- * come through the same path rather than a second one.
+ * horizontal rules, `[links](url)`, `<autolinks>`, and bare URLs. `@file` and
+ * `@someone` references keep the pill they already had — they are markdown
+ * links, so they come through the same path rather than a second one.
  */
 import {
 	A,
@@ -67,6 +67,7 @@ import {
 	type Readable,
 } from "@implementjs/core";
 import { highlightCode } from "@/lib/components/highlight";
+import { parseUserMentionHref } from "@/lib/domain/user-mentions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -135,6 +136,30 @@ export function MentionLink(path: string, url: string): Child {
 			"data-mention-path": path,
 		},
 		`@${path.slice(path.lastIndexOf("/") + 1)}`,
+	);
+}
+
+/**
+ * A `@someone` reference — a workspace member, named in a body.
+ *
+ * Deliberately unlike the file pill: a person is not a path, so this is drawn
+ * in the body's own typeface and tinted rather than boxed in monospace. It is
+ * the same weight as a highlighted word, which is what an `@you` is supposed to
+ * feel like when you scan a comment for your name.
+ *
+ * The name is kept on the element for the same reason a file pill keeps its
+ * path — the composer reads the body back out of the rendered DOM, and the
+ * mention has to serialize to the label it was written with.
+ */
+export function UserMentionLink(name: string, url: string): Child {
+	return A(
+		{
+			href: url,
+			class: "rounded bg-primary/10 px-0.5 font-medium text-primary hover:bg-primary/20",
+			title: `@${name}`,
+			"data-mention-user": name,
+		},
+		`@${name}`,
 	);
 }
 
@@ -805,12 +830,18 @@ function linkAt(text: string, start: number): LinkMatch | null {
 }
 
 function renderLink(link: LinkMatch, context: InlineContext): Child {
-	// `[@src/lib/foo.ts](url)` is what the `@` menu inserts. Recognised here so
-	// a mention keeps its pill wherever a body is rendered, rather than the
-	// mention overlay and this being two ways to draw the same thing.
+	// `[@src/lib/foo.ts](url)` and `[@Aidan Bleser](/app/tracker?assignee=…)` are
+	// what the `@` menu inserts. Recognised here so a mention keeps its pill
+	// wherever a body is rendered, rather than the mention overlay and this being
+	// two ways to draw the same thing. Which pill it gets is decided by the
+	// target, since a person and a file are told apart by where they point.
 	if (!link.image && link.label.startsWith("@") && link.label.length > 1) {
 		const url = safeUrl(link.target);
-		if (url !== null) return MentionLink(link.label.slice(1), url);
+		if (url !== null) {
+			return parseUserMentionHref(url) === null
+				? MentionLink(link.label.slice(1), url)
+				: UserMentionLink(link.label.slice(1), url);
+		}
 	}
 
 	// Images are deliberately not `<img>`: a body that can load an arbitrary

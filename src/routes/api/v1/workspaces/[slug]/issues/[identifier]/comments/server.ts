@@ -9,7 +9,7 @@ import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import { emitCommentEvent } from "@/lib/server/events.server";
 import { getIssueById, subscribeToIssue } from "@/lib/server/issues.server";
-import { issueAudience, notify } from "@/lib/server/notifications.server";
+import { issueAudience, notify, notifyMentions } from "@/lib/server/notifications.server";
 import { comment, issue, team, user } from "@/lib/server/schema.server";
 import { identifierFor, toComment } from "@/lib/server/serialize.server";
 import { handler, json } from "./$types";
@@ -106,7 +106,26 @@ export const POST = handler({
 		await subscribeToIssue(target.issue.id, locals.agent?.installedByUserId);
 
 		const identifier = identifierFor(target.team.key, target.issue.number);
-		for (const userId of await issueAudience(target.issue.id)) {
+
+		// Whoever the comment names hears that it named them, which is the more
+		// specific version of the same news — so they are taken out of the
+		// broadcast rather than getting both for one comment. Read before, because
+		// being mentioned subscribes you and would otherwise widen the audience
+		// this same loop is about to address.
+		const audience = await issueAudience(target.issue.id);
+		const mentioned = new Set(
+			await notifyMentions({
+				body: row.body,
+				slug: params.slug,
+				workspaceId: workspace.id,
+				issueId: target.issue.id,
+				identifier,
+				actor: author,
+			}),
+		);
+
+		for (const userId of audience) {
+			if (mentioned.has(userId)) continue;
 			await notify({
 				userId,
 				actorId: author.id,

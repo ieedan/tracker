@@ -32,6 +32,7 @@ import {
 } from "@implementjs/core";
 import {
 	ArrowUpDown,
+	AtSign,
 	CheckCheck,
 	ExternalLink,
 	Inbox,
@@ -98,6 +99,7 @@ const TYPE_LABELS: Record<NotificationType, string> = {
 	issue_unassigned: "Unassigned",
 	issue_status_changed: "Status changed",
 	issue_commented: "Comment",
+	issue_mentioned: "Mention",
 	workspace_invited: "Invite",
 };
 
@@ -119,6 +121,8 @@ function TypeIcon(type: NotificationType, className = "size-3.5") {
 			return RefreshCw({ class: className, "aria-hidden": true });
 		case "issue_commented":
 			return MessageSquare({ class: className, "aria-hidden": true });
+		case "issue_mentioned":
+			return AtSign({ class: className, "aria-hidden": true });
 		case "workspace_invited":
 			return Users({ class: className, "aria-hidden": true });
 	}

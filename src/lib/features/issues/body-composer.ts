@@ -20,7 +20,7 @@
  *   markdown the caret is standing in;
  * - ⌘B, ⌘I, ⌘E and ⌘K, which run the same commands the box has always had;
  * - a paste, which is markdown the moment it lands;
- * - a file picked from the `@` menu.
+ * - a person or a file picked from the `@` menu.
  *
  * There is no formatting toolbar. Markdown typed into the box turns into
  * formatting as it is written, which is the whole point of the thing — a row
@@ -42,7 +42,8 @@ import {
 import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
 import { BODY_TEXT_CLASS, renderMarkdown } from "@/lib/components/markdown";
 import { cn } from "@/lib/utils";
-import { MentionMenu, fileMentions } from "./file-mentions";
+import { warmMembers } from "./member-cache";
+import { MentionMenu, bodyMentions } from "./mentions";
 import { insertLink, toggleWrap, type SelectionState } from "./markdown-commands";
 import { isBlank, paint, render, serialize, type SourceSelection } from "./markdown-dom";
 
@@ -67,7 +68,7 @@ export interface BodyComposerOptions {
 	/** The body being written, as markdown. Two-way: editing writes into it. */
 	value: Signal<string>;
 	slug: () => string;
-	/** Which repository `@` searches, when the issue has one. */
+	/** Which repository `@`'s file half searches, when the issue has one. */
 	repository: () => string | undefined;
 	placeholder?: string;
 	/** The box's minimum height, in lines. */
@@ -89,7 +90,7 @@ export interface BodyComposerOptions {
 	element?: Signal<HTMLElement | null>;
 	/** ⌘⏎. */
 	onSubmit?: () => void;
-	/** Not called while the mention menu is open — picking a file blurs. */
+	/** Not called while the mention menu is open — picking from it blurs. */
 	onBlur?: () => void;
 	onEscape?: () => void;
 }
@@ -165,7 +166,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 		apply(transform(current));
 	};
 
-	const mentions = fileMentions({
+	const mentions = bodyMentions({
 		slug: options.slug,
 		repository: options.repository,
 		insert: (start, markdown) => {
@@ -192,6 +193,11 @@ export function BodyComposer(options: BodyComposerOptions) {
 
 		ImplementLifecycle({
 			onMount: () => {
+				// The people half of the `@` menu is ranked in the browser, so all it
+				// needs is the list — asked for when the box appears rather than when
+				// the `@` is typed, which is a round trip later than a menu opening
+				// on a keystroke has to answer in.
+				void warmMembers(options.slug());
 				const node = host.get();
 				if (node === null) return;
 				paint(node, options.value.get());
@@ -387,7 +393,13 @@ export function BodyComposer(options: BodyComposerOptions) {
 					// instead, so the link's own words can be edited like any others.
 					const anchor = (event.target as HTMLElement).closest("a");
 					// A mention is not editable text, so the browser already follows it.
-					if (anchor === null || anchor.hasAttribute("data-mention-path")) return;
+					if (
+						anchor === null ||
+						anchor.hasAttribute("data-mention-path") ||
+						anchor.hasAttribute("data-mention-user")
+					) {
+						return;
+					}
 					const href = anchor.getAttribute("href");
 					if (href === null) return;
 					event.preventDefault();

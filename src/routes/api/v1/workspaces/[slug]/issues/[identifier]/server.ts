@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as v from "valibot";
 import { isClosedStatus, parseIdentifier, STATUS_LABELS } from "@/lib/domain/issues";
 import { IssueSchema, UpdateIssueBody } from "@/lib/domain/schemas";
+import { findUserMentions } from "@/lib/domain/user-mentions";
 import { db } from "@/lib/server/db.server";
 import { requireMembership, requirePermission } from "@/lib/server/guards.server";
 import {
@@ -18,6 +19,7 @@ import { emitIssueDeleted, emitIssueEvent } from "@/lib/server/events.server";
 import {
 	issueAudience,
 	notify,
+	notifyMentions,
 	readNotificationsForClosedIssue,
 } from "@/lib/server/notifications.server";
 import { requireRepository } from "@/lib/server/repositories.server";
@@ -198,6 +200,25 @@ export const PATCH = handler({
 				issueId: before.id,
 				type: "issue_unassigned",
 				body: `${user.name} unassigned you from ${identifier}`,
+			});
+		}
+
+		// A rewritten description that names somebody new is asking for them. Only
+		// the names it did not already carry: an edit to a typo three paragraphs
+		// away is not a second request for everyone the issue has ever mentioned.
+		if (body.description !== undefined && body.description !== before.description) {
+			await notifyMentions({
+				body: body.description,
+				slug: params.slug,
+				workspaceId: workspace.id,
+				issueId: before.id,
+				identifier,
+				actor: user,
+				already: [
+					...findUserMentions(before.description, params.slug),
+					// Told in the same request, in the way that says more.
+					body.assigneeId === before.assigneeId ? undefined : body.assigneeId,
+				],
 			});
 		}
 
