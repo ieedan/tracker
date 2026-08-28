@@ -6,6 +6,7 @@ import { FeedbackSchema, UpdateFeedbackBody } from "@/lib/domain/schemas";
 import { db } from "@/lib/server/db.server";
 import { emitFeedbackDeleted, emitFeedbackEvent } from "@/lib/server/events.server";
 import {
+	convertedIssue,
 	findFeedbackRow,
 	getFeedbackById,
 	labelIdsFor,
@@ -69,9 +70,20 @@ export const PATCH = handler({
 			changes.description = { from: before.description, to: body.description };
 			patch.description = body.description;
 		}
-		if (body.status !== undefined && body.status !== before.status) {
-			changes.status = { from: before.status, to: body.status };
-			patch.status = body.status;
+		// Once feedback has become an issue its status is the issue's, derived on
+		// the way out. Accepting a write here would put a value in the column that
+		// nothing ever reads and no screen ever shows — which is how a piece of
+		// feedback ends up claiming to be New three weeks after it shipped
+		// (ENG-77). Refused rather than ignored: there is a person to tell.
+		if (body.status !== undefined) {
+			const linked = await convertedIssue(before.id);
+			if (linked !== null) {
+				error(409, `${feedbackIdentifier(before.number)} follows ${linked.identifier} now`);
+			}
+			if (body.status !== before.status) {
+				changes.status = { from: before.status, to: body.status };
+				patch.status = body.status;
+			}
 		}
 		if (body.priority !== undefined && body.priority !== before.priority) {
 			changes.priority = { from: before.priority, to: body.priority };

@@ -94,20 +94,30 @@ export function FeedbackListPage({
 
 		Div(
 			{
+				// One row only where a row can actually hold all of it. Seven status
+				// tabs plus a search no longer fit at 1024px — they did at five — and
+				// a strip that scrolls three filters out of sight is worse than a
+				// header two lines tall, so below 2xl the tabs take a row of their own.
 				class:
-					"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0",
+					"flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2 2xl:h-12 2xl:flex-nowrap 2xl:py-0",
 			},
-			H1({ class: "text-[15px] font-semibold tracking-tight" }, "User feedback"),
+			// `shrink-0`, because there are seven status tabs beside this now and
+			// the flex row would otherwise take the space out of the heading and
+			// wrap it onto two lines.
+			H1(
+				{ class: "shrink-0 text-[15px] font-semibold tracking-tight whitespace-nowrap" },
+				"User feedback",
+			),
 			Span(
-				{ class: "rounded bg-secondary px-1.5 text-[11px] text-muted-foreground" },
+				{ class: "shrink-0 rounded bg-secondary px-1.5 text-[11px] text-muted-foreground" },
 				visible.bind((list) => `${list.length}`),
 			),
 
 			StatusTabs(statusFilter, feedback),
 
-			// The search takes a full row of its own where the tabs already fill one.
+			// Stays on the title's row from `sm` up; it is the tabs that drop below.
 			Div(
-				{ class: "relative order-last w-full lg:order-none lg:ml-auto lg:w-auto" },
+				{ class: "relative w-full sm:ml-auto sm:w-auto" },
 				Search({
 					class:
 						"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
@@ -116,7 +126,7 @@ export function FeedbackListPage({
 					value: query,
 					placeholder: "Search feedback…",
 					class:
-						"h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring lg:w-56",
+						"h-7 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring sm:w-56",
 				}),
 			),
 
@@ -200,8 +210,14 @@ function StatusTabs(
 	};
 
 	return Div(
-		// Six tabs outgrow a phone row, so the strip scrolls sideways on its own.
-		{ class: "flex max-w-full items-center gap-0.5 overflow-x-auto" },
+		// `order-last w-full` up to 2xl: eight tabs outgrow every row narrower than
+		// that, and a whole row to themselves is what keeps all eight reachable
+		// without scrolling. On a phone the strip still scrolls sideways, because
+		// no arrangement fits eight of these in 390px.
+		{
+			class:
+				"order-last flex w-full min-w-0 max-w-full items-center gap-0.5 overflow-x-auto 2xl:order-none 2xl:w-auto",
+		},
 		tab(null, "All"),
 		...FEEDBACK_STATUSES.map((status) => tab(status, FEEDBACK_STATUS_LABELS[status])),
 	);
@@ -243,6 +259,7 @@ function FeedbackRow(
 			entry.bind("status"),
 			(status) =>
 				void patchFeedback(feedback, slug.get(), id, { status }, (value) => ({ ...value, status })),
+			{ follows: entry.bind((value) => value.issue?.identifier ?? null) },
 		),
 
 		router.Link(

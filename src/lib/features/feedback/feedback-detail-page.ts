@@ -79,7 +79,7 @@ export function FeedbackDetailPage({
 			FeedbackStatusPicker(
 				entry.bind("status"),
 				(status) => update({ status }, (value) => ({ ...value, status })),
-				{ showLabel: true },
+				{ showLabel: true, follows: entry.bind((value) => value.issue?.identifier ?? null) },
 			),
 		),
 		// Priority and assignee are the issue pickers themselves, not lookalikes:

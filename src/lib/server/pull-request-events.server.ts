@@ -22,6 +22,7 @@ import type { GitProviderId } from "@/lib/domain/providers";
 import { recordActivity } from "./activity.server";
 import { db } from "./db.server";
 import { emitIssueEvent } from "./events.server";
+import { announceIssueStatusOnFeedback } from "./feedback.server";
 import { getIssueById } from "./issues.server";
 import { issueAudience, notify, readNotificationsForClosedIssue } from "./notifications.server";
 import type { RemotePullRequestEvent } from "./providers/types.server";
@@ -410,6 +411,16 @@ async function moveIssue(
 	};
 	await emitIssueEvent("issue.updated", context);
 	await emitIssueEvent("issue.status_changed", context);
+
+	// A pull request opening or merging moves the issue, which moves the request
+	// it came from — the same announcement as an edit made by hand (ENG-77).
+	await announceIssueStatusOnFeedback({
+		workspace: context.workspace,
+		actor: context.actor,
+		feedbackId: target.row.feedbackId,
+		from,
+		to: status,
+	});
 }
 
 // --- who did it -------------------------------------------------------------

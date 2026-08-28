@@ -14,11 +14,14 @@ import { nanoid } from "nanoid";
 import {
 	FEEDBACK_LABEL_COLOR,
 	FEEDBACK_LABEL_NAME,
+	feedbackStatusForIssue,
 	type FeedbackStatus,
 	type FeedbackVisibility,
 } from "@/lib/domain/feedback";
+import type { IssueStatus } from "@/lib/domain/issues";
 import type { Feedback, FeedbackComment } from "@/lib/domain/schemas";
 import { db } from "./db.server";
+import { emitFeedbackEvent, type EventActor, type EventWorkspace } from "./events.server";
 import {
 	feedback,
 	feedbackComment,
@@ -107,12 +110,14 @@ async function hydrate(
 				id: row.issue.id,
 				identifier: identifierFor(row.team.key, row.issue.number),
 				title: row.issue.title,
+				status: row.issue.status,
 			},
 		]),
 	);
 
-	return rows.map((row) =>
-		toFeedback(row.feedback, {
+	return rows.map((row) => {
+		const converted = issues.get(row.feedback.id) ?? null;
+		return toFeedback(row.feedback, {
 			labels: (labelsByFeedback.get(row.feedback.id) ?? []).toSorted((a, b) =>
 				a.name.localeCompare(b.name),
 			),
@@ -120,10 +125,14 @@ async function hydrate(
 			assignee: row.assignee,
 			commentCount: comments.get(row.feedback.id) ?? 0,
 			subscriberCount: subscribers.get(row.feedback.id) ?? 0,
-			issue: issues.get(row.feedback.id) ?? null,
+			issue:
+				converted === null
+					? null
+					: { id: converted.id, identifier: converted.identifier, title: converted.title },
+			issueStatus: converted?.status ?? null,
 			audience,
-		}),
-	);
+		});
+	});
 }
 
 /**
@@ -156,9 +165,6 @@ export async function listFeedback(
 		conditions.push(eq(feedback.visibility, filters.visibility));
 	}
 
-	if (filters.status !== undefined && filters.status.length > 0) {
-		conditions.push(inArray(feedback.status, filters.status));
-	}
 	if (filters.search !== undefined && filters.search.trim() !== "") {
 		const term = `%${filters.search.trim().toLowerCase()}%`;
 		const match = or(like(feedback.title, term), like(feedback.description, term));
@@ -169,9 +175,21 @@ export async function listFeedback(
 		.where(and(...conditions))
 		.orderBy(desc(feedback.createdAt));
 
+	// Status is filtered here rather than in the query above, because a converted
+	// row's status is not in the row: it is derived from the issue it became
+	// (ENG-77), and `WHERE feedback.status IN (…)` would match the triage value
+	// the column still holds instead of the one the caller can see. The set is
+	// one workspace's feedback and was fully materialized for `converted`
+	// already, so this costs a pass rather than a query.
 	const hydrated = await hydrate(rows, options.audience);
-	if (filters.converted === undefined) return hydrated;
-	return hydrated.filter((entry) => (entry.issue !== null) === filters.converted);
+	const wanted = filters.status;
+	const byStatus =
+		wanted === undefined || wanted.length === 0
+			? hydrated
+			: hydrated.filter((entry) => wanted.includes(entry.status));
+
+	if (filters.converted === undefined) return byStatus;
+	return byStatus.filter((entry) => (entry.issue !== null) === filters.converted);
 }
 
 /** One piece of feedback by its number — the `12` in `FB-12`. */
@@ -390,6 +408,41 @@ export async function convertedIssue(
 		identifier: identifierFor(row.team.key, row.issue.number),
 		title: row.issue.title,
 	};
+}
+
+/**
+ * Tells the world that a piece of feedback moved because its issue did.
+ *
+ * A derived status that never announces itself is half a feature: a receiver
+ * subscribed to `feedback.status_changed` so it could mail the people waiting
+ * on a request would have gone quiet the moment the request became an issue,
+ * which is precisely when there is something to say (ENG-77).
+ *
+ * Nothing is emitted when the derived value did not move. Most issue statuses
+ * map onto the same feedback status — in progress, in review and rework are one
+ * thing to whoever asked — and "your request is still being worked on" is not
+ * news worth a delivery.
+ */
+export async function announceIssueStatusOnFeedback(context: {
+	workspace: EventWorkspace;
+	actor: EventActor;
+	feedbackId: string | null;
+	from: IssueStatus;
+	to: IssueStatus;
+}): Promise<void> {
+	if (context.feedbackId === null) return;
+
+	const from = feedbackStatusForIssue(context.from);
+	const to = feedbackStatusForIssue(context.to);
+	if (from === to) return;
+
+	const entry = await getFeedbackById(context.feedbackId);
+	if (entry === undefined) return;
+
+	const changes = { status: { from, to } };
+	const payload = { workspace: context.workspace, actor: context.actor, feedback: entry, changes };
+	await emitFeedbackEvent("feedback.updated", payload);
+	await emitFeedbackEvent("feedback.status_changed", payload);
 }
 
 export async function touchFeedback(id: string): Promise<void> {
