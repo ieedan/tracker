@@ -577,6 +577,10 @@ export const FeedbackSchema = v.object({
 	title: v.string(),
 	description: v.string(),
 	status: FeedbackStatusSchema,
+	/** The same scale as an issue — feedback is ranked the same way work is. */
+	priority: IssuePrioritySchema,
+	/** Whose triage this is. Members only: the board does not name your staff. */
+	assignee: v.nullable(UserSummary),
 	visibility: v.picklist(["private", "public"]),
 	labels: v.array(LabelSchema),
 	submitter: FeedbackSubmitterSchema,
@@ -624,6 +628,9 @@ export const UpdateFeedbackBody = v.partial(
 		title: trimmed(1, 200),
 		description: v.pipe(v.string(), v.maxLength(20_000)),
 		status: FeedbackStatusSchema,
+		priority: IssuePrioritySchema,
+		/** A workspace member, or null to unassign. */
+		assigneeId: v.nullable(v.string()),
 		visibility: v.picklist(["private", "public"]),
 		labelIds: v.array(v.string()),
 	}),
@@ -634,7 +641,8 @@ export const ConvertFeedbackBody = v.object({
 	teamKey: v.optional(v.pipe(v.string(), v.trim(), v.toUpperCase(), v.maxLength(6))),
 	/** Defaults to the feedback's own title and description. */
 	title: v.optional(trimmed(1, 200)),
-	priority: v.optional(IssuePrioritySchema, "none"),
+	/** Both default to the feedback's own — triage already done comes with it. */
+	priority: v.optional(IssuePrioritySchema),
 	assigneeId: v.optional(v.nullable(v.string())),
 	/** The feedback status to leave behind. Defaults to `accepted`. */
 	status: v.optional(FeedbackStatusSchema, "accepted"),

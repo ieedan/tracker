@@ -9,6 +9,7 @@
  */
 import { error } from "@implementjs/kit/server";
 import { and, asc, count, desc, eq, inArray, like, max, or, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { nanoid } from "nanoid";
 import {
 	FEEDBACK_LABEL_COLOR,
@@ -49,7 +50,11 @@ export interface FeedbackFilters {
  * inline multiplies the rows and makes every count wrong.
  */
 async function hydrate(
-	rows: Array<{ feedback: Row; submitter: typeof user.$inferSelect | null }>,
+	rows: Array<{
+		feedback: Row;
+		submitter: typeof user.$inferSelect | null;
+		assignee: typeof user.$inferSelect | null;
+	}>,
 	audience: Audience,
 ): Promise<Feedback[]> {
 	if (rows.length === 0) return [];
@@ -112,6 +117,7 @@ async function hydrate(
 				a.name.localeCompare(b.name),
 			),
 			submitter: row.submitter,
+			assignee: row.assignee,
 			commentCount: comments.get(row.feedback.id) ?? 0,
 			subscriberCount: subscribers.get(row.feedback.id) ?? 0,
 			issue: issues.get(row.feedback.id) ?? null,
@@ -120,11 +126,20 @@ async function hydrate(
 	);
 }
 
-const withSubmitter = () =>
+/**
+ * Two joins onto the same table, so both need an alias — the submitter is who
+ * sent it, the assignee is who is dealing with it, and they are rarely the
+ * same person.
+ */
+const submitterUser = alias(user, "submitter_user");
+const assigneeUser = alias(user, "assignee_user");
+
+const withPeople = () =>
 	db
-		.select({ feedback, submitter: user })
+		.select({ feedback, submitter: submitterUser, assignee: assigneeUser })
 		.from(feedback)
-		.leftJoin(user, eq(user.id, feedback.submitterUserId));
+		.leftJoin(submitterUser, eq(submitterUser.id, feedback.submitterUserId))
+		.leftJoin(assigneeUser, eq(assigneeUser.id, feedback.assigneeId));
 
 export async function listFeedback(
 	workspaceId: string,
@@ -150,7 +165,7 @@ export async function listFeedback(
 		if (match !== undefined) conditions.push(match);
 	}
 
-	const rows = await withSubmitter()
+	const rows = await withPeople()
 		.where(and(...conditions))
 		.orderBy(desc(feedback.createdAt));
 
@@ -165,7 +180,7 @@ export async function getFeedbackByNumber(
 	number: number,
 	audience: Audience,
 ): Promise<Feedback | undefined> {
-	const rows = await withSubmitter()
+	const rows = await withPeople()
 		.where(and(eq(feedback.workspaceId, workspaceId), eq(feedback.number, number)))
 		.limit(1);
 
@@ -183,7 +198,7 @@ export async function getFeedbackById(
 	id: string,
 	audience: Audience = "member",
 ): Promise<Feedback | undefined> {
-	const rows = await withSubmitter().where(eq(feedback.id, id)).limit(1);
+	const rows = await withPeople().where(eq(feedback.id, id)).limit(1);
 	const found = rows[0];
 	if (found === undefined) return undefined;
 	const hydrated = await hydrate([found], audience);
@@ -234,6 +249,10 @@ export async function insertFeedback(values: {
 			title: values.title,
 			description: values.description,
 			status: "new" as const,
+			// Ranked and assigned by triage, never by the person submitting it —
+			// nobody files their own request as Urgent and means it.
+			priority: "none" as const,
+			assigneeId: null,
 			visibility: values.visibility,
 			submitterName: values.submitterName,
 			submitterEmail: values.submitterEmail,

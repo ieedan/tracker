@@ -397,11 +397,19 @@ retries, and the same event arriving twice must not write two timeline entries.
 
 ## User feedback
 
-Feedback is a separate thing from an issue on purpose. An issue is work; a piece
-of feedback is a _request_ for work, which may be duplicated, declined, or one
-of thirty people asking for the same thing. So it has its own table, its own
-`FB-12` numbering and its own statuses — New, Reviewing, Planned, Accepted,
-Declined — none of which claim anything about progress.
+Feedback carries the same properties an issue does — title, description,
+labels, priority, an assignee, a number you can quote. What is genuinely
+different about it is only two things: **where it comes from** (a submitter and
+a source, rather than a member filing work) and **who can read it** (a
+visibility, and a public board). Everything else is triage, and triage is the
+same job on both sides, so it is the same controls in the same places.
+
+It still has its own table and its own `FB-12` numbering, because an issue is
+work while a piece of feedback is a _request_ for work — which may be
+duplicated, declined, or one of thirty people asking for the same thing. That is
+also why its statuses are its own — New, Reviewing, Planned, Accepted, Declined
+— none of which claim anything about progress. Converting is what turns a
+request into work.
 
 ### Taking it in
 
@@ -444,14 +452,18 @@ simultaneous requests cannot both read "4 of 5" and both be allowed.
 ### Triaging it
 
 The **User feedback** tab lists what has arrived, newest first, with tabs across
-the statuses. Status and labels are edited inline. **Convert** files an issue
-from it in one click — the default team, or pick one from the split button.
+the statuses. Priority, status, assignee and labels are edited inline, with the
+same pickers the issue list uses — literally the same components, so the two
+screens cannot drift apart. **Convert** files an issue from it in one click —
+the default team, or pick one from the split button.
 
 Converting:
 
 - copies the submitter's description across **verbatim** — rewriting what
   somebody told you and then quoting it back is how the record stops meaning
   anything;
+- carries the triage already done: the feedback's priority and assignee become
+  the issue's, unless the request names its own;
 - carries over the feedback's labels and adds a `user feedback` label, created
   on demand, so months later you can filter the backlog by it and see which of
   your work came from someone actually asking;
@@ -466,7 +478,8 @@ With **Public board** set to _Anyone with the link_, feedback marked public
 appears at `/<workspace-slug>/public/feedback`. It is a separate page, not the
 tab with things hidden — different audience, different job:
 
-- no triage controls, no internal notes, no submitter names or addresses;
+- no triage controls, no internal notes, no submitter names or addresses, and
+  no assignee — who on the team picked something up is the team's business;
 - anyone can read it and subscribe by email with no account at all;
 - replying needs a signed-in account, which is the anti-spam measure, and is
   rate limited to 10/min per account for non-members;
@@ -481,9 +494,9 @@ not republish — each item has to be made public again deliberately.
 
 ### Webhooks
 
-`feedback.created`, `feedback.updated`, `feedback.status_changed`,
-`feedback.converted`, `feedback.comment_created` and `feedback.deleted`, on the
-same signed delivery pipeline as the issue events. `feedback.converted` carries
+`feedback.created`, `feedback.updated`, `feedback.assigned`,
+`feedback.status_changed`, `feedback.converted`, `feedback.comment_created` and
+`feedback.deleted`, on the same signed delivery pipeline as the issue events. `feedback.converted` carries
 both the feedback and the issue it became. These payloads go to an endpoint the
 workspace registered, so they are the _member_ view — submitter address and all.
 
@@ -491,7 +504,7 @@ workspace registered, so they are the _member_ view — submitter address and al
 
 Add one under **Settings → Webhooks**, choose the events, and the signing secret
 is shown once. Events: `issue.created`, `issue.updated`, `issue.assigned`,
-`issue.status_changed`, `issue.deleted`, `comment.created`, and the six
+`issue.status_changed`, `issue.deleted`, `comment.created`, and the seven
 `feedback.*` events above. A webhook can also carry [custom
 headers](#custom-headers) and [conditions](#conditions) that narrow what it
 actually receives. Everything but the URL is editable afterwards — the URL is

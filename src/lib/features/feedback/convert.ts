@@ -1,10 +1,11 @@
 /**
  * One click from feedback to issue.
  *
- * The click itself does the whole thing — team defaults to Engineering,
- * priority to none — because the point of the button is that triage does
- * not stall on a form. The dropdown beside it is there for the times you
- * already know which team it belongs to.
+ * The click itself does the whole thing — team defaults to Engineering, and
+ * the priority and assignee come across from the feedback's own — because the
+ * point of the button is that triage does not stall on a form, and the triage
+ * already done should not have to be done twice (ENG-77). The dropdown beside
+ * it is there for the times you already know which team it belongs to.
  */
 import { navigateTo } from "@implementjs/core";
 import { Div, Dynamic, ForEach, Span, signal, type Readable, type Signal } from "@implementjs/core";

@@ -19,6 +19,7 @@ import {
 	assertMember,
 	getIssueById,
 	insertWithNumber,
+	isMember,
 	setIssueLabels,
 	subscribeToIssue,
 } from "@/lib/server/issues.server";
@@ -67,6 +68,22 @@ export const POST = handler({
 			await assertMember(workspace.id, body.assigneeId);
 		}
 
+		// The triage already done comes with it. Feedback carries a priority and
+		// an assignee of its own now (ENG-77), so ranking a request Urgent and
+		// picking it up is not work the convert button throws away — the form
+		// overrides either when it names one.
+		const priority = body.priority ?? row.priority;
+		const assigneeId =
+			body.assigneeId !== undefined
+				? body.assigneeId === ""
+					? null
+					: body.assigneeId
+				: // Carried rather than asserted: somebody who has since left the
+					// workspace should leave the issue unassigned, not fail the convert.
+					row.assigneeId !== null && (await isMember(workspace.id, row.assigneeId))
+					? row.assigneeId
+					: null;
+
 		const issueId = nanoid();
 		await insertWithNumber(owningTeam.id, async (candidate) => {
 			await db.insert(issue).values({
@@ -78,8 +95,8 @@ export const POST = handler({
 				// throw away the only record of what was actually asked for.
 				description: row.description,
 				status: "backlog",
-				priority: body.priority,
-				assigneeId: body.assigneeId ?? null,
+				priority,
+				assigneeId,
 				creatorId: user.id,
 				feedbackId: row.id,
 				createdAt: new Date(),
@@ -96,7 +113,7 @@ export const POST = handler({
 		// Converting files the issue on the converter's behalf, so they — and an
 		// assignee named on the form — follow it from the start.
 		await subscribeToIssue(issueId, user.id);
-		await subscribeToIssue(issueId, body.assigneeId);
+		await subscribeToIssue(issueId, assigneeId);
 		// An agent converting on someone's behalf follows for them too.
 		await subscribeToIssue(issueId, locals.agent?.installedByUserId);
 

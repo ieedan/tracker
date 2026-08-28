@@ -22,6 +22,7 @@ import {
 	CreateIssueBody,
 	CreateLabelBody,
 	CreateWebhookBody,
+	FeedbackStatusSchema,
 	IssueStatusSchema,
 	LinkPullRequestBody,
 	TransferIssueBody,
@@ -642,9 +643,10 @@ export const MCP_TOOLS: McpTool[] = [
 			"List incoming user feedback awaiting triage. Filter by status, or search with `q`.",
 		readOnly: true,
 		input: v.object({
-			status: v.optional(
-				v.array(v.picklist(["new", "planned", "in_progress", "done", "declined"])),
-			),
+			// The workspace's own triage statuses. This used to name issue statuses
+			// that no feedback has ever had, so every filter it offered matched
+			// nothing.
+			status: v.optional(v.array(FeedbackStatusSchema)),
 			q: v.optional(v.string()),
 			...workspaceArg,
 		}),
@@ -664,7 +666,7 @@ export const MCP_TOOLS: McpTool[] = [
 		name: "update_feedback",
 		title: "Triage feedback",
 		description:
-			"Change a piece of feedback — its status, labels, or whether it is visible on the public board.",
+			"Change a piece of feedback — its status, priority, assignee, labels, or whether it is visible on the public board. The same properties an issue is triaged by; what stays different is who can read it and where it came from.",
 		readOnly: false,
 		input: v.object({ id: v.string(), changes: UpdateFeedbackBody, ...workspaceArg }),
 		handle: async ({ input, event, slug }) =>

@@ -236,12 +236,18 @@ type FeedbackCommentRow = typeof schema.feedbackComment.$inferSelect;
  * The converted issue goes too: that it was accepted is on the status, and the
  * issue's own title and id are the team's internal wording, not the
  * submitter's.
+ *
+ * The assignee goes the same way, for the same reason: who on the team picked a
+ * request up is the team's business, and the board naming a member is the sort
+ * of thing nobody consented to. The priority stays — it says the same thing the
+ * status does, in the other axis, and that is what the board is for.
  */
 export function toFeedback(
 	row: FeedbackRow,
 	context: {
 		labels: Array<Pick<LabelRow, "id" | "name" | "color">>;
 		submitter: UserFields | null;
+		assignee: UserFields | null;
 		commentCount: number;
 		subscriberCount: number;
 		issue: { id: string; identifier: string; title: string } | null;
@@ -256,6 +262,8 @@ export function toFeedback(
 		title: row.title,
 		description: row.description,
 		status: row.status,
+		priority: row.priority,
+		assignee: isPublic || context.assignee === null ? null : toUser(context.assignee),
 		visibility: row.visibility,
 		labels: context.labels.map(toLabel),
 		submitter: isPublic

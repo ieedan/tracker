@@ -33,9 +33,9 @@ import {
 	type FeedbackIntake,
 	type FeedbackStatus,
 } from "@/lib/domain/feedback";
-import type { Feedback, Label, Team, Workspace } from "@/lib/domain/schemas";
+import type { Feedback, Label, Member, Team, Workspace } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
-import { LabelChips } from "@/lib/features/issues/pickers";
+import { AssigneePicker, LabelChips, PriorityPicker } from "@/lib/features/issues/pickers";
 import { FeedbackStatusIcon } from "./glyphs";
 import { patchFeedback } from "./feedback-store";
 import { FeedbackLabelPicker, FeedbackStatusPicker, VisibilityIcon } from "./pickers";
@@ -46,6 +46,7 @@ interface PageData {
 	feedback: Feedback[];
 	workspace: Workspace;
 	teams: Team[];
+	members: Member[];
 	labels: Label[];
 }
 
@@ -221,15 +222,27 @@ function FeedbackRow(
 				"row-hover group flex min-h-11 items-center gap-2 border-b border-border/40 px-4 text-[13px]",
 		},
 
-		FeedbackStatusPicker(
-			entry.bind("status"),
-			(status) =>
-				void patchFeedback(feedback, slug.get(), id, { status }, (value) => ({ ...value, status })),
+		// The same three controls in the same order as an issue row — priority,
+		// identifier, status — because a member triaging both screens in one
+		// afternoon should not have to re-learn where anything is (ENG-77).
+		PriorityPicker(
+			entry.bind("priority"),
+			(priority) =>
+				void patchFeedback(feedback, slug.get(), id, { priority }, (value) => ({
+					...value,
+					priority,
+				})),
 		),
 
 		Span(
 			{ class: "hidden w-12 shrink-0 font-mono text-[12px] text-muted-foreground sm:block" },
 			entry.bind("identifier"),
+		),
+
+		FeedbackStatusPicker(
+			entry.bind("status"),
+			(status) =>
+				void patchFeedback(feedback, slug.get(), id, { status }, (value) => ({ ...value, status })),
 		),
 
 		router.Link(
@@ -305,6 +318,20 @@ function FeedbackRow(
 		Span(
 			{ class: "hidden w-10 shrink-0 text-right text-[12px] text-muted-foreground sm:block" },
 			entry.bind((value) => relativeTime(value.createdAt)),
+		),
+
+		AssigneePicker(
+			entry.bind("assignee"),
+			data.bind((value) => value.members),
+			(assigneeId) =>
+				void patchFeedback(feedback, slug.get(), id, { assigneeId }, (value) => ({
+					...value,
+					assignee:
+						assigneeId === null
+							? null
+							: (data.get().members.find((member) => member.user.id === assigneeId)?.user ??
+								value.assignee),
+				})),
 		),
 
 		// Converted feedback shows where it went; the rest offers the one click.

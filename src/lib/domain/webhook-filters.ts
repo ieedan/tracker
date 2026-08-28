@@ -148,6 +148,7 @@ const ISSUE_EVENTS_ANY = [...ISSUE_EVENTS_FULL, "issue.deleted"] as const;
 const FEEDBACK_EVENTS_FULL = [
 	"feedback.created",
 	"feedback.updated",
+	"feedback.assigned",
 	"feedback.status_changed",
 	"feedback.converted",
 	"feedback.comment_created",
@@ -161,6 +162,7 @@ const CHANGE_EVENTS = [
 	"issue.assigned",
 	"issue.status_changed",
 	"feedback.updated",
+	"feedback.assigned",
 	"feedback.status_changed",
 ] as const satisfies readonly WebhookEvent[];
 
@@ -432,6 +434,36 @@ export const FILTER_FIELDS: readonly FilterField[] = [
 			label: FEEDBACK_STATUS_LABELS[status],
 		})),
 		path: "feedback.status",
+	},
+	{
+		key: "feedback.priority",
+		label: "Feedback priority",
+		group: "Feedback",
+		kind: "enum",
+		events: FEEDBACK_EVENTS_FULL,
+		options: ISSUE_PRIORITIES.map((priority) => ({
+			value: priority,
+			label: PRIORITY_LABELS[priority as IssuePriority],
+		})),
+		path: "feedback.priority",
+	},
+	{
+		key: "feedback.assignee.name",
+		label: "Feedback assignee",
+		group: "Feedback",
+		kind: "text",
+		events: FEEDBACK_EVENTS_FULL,
+		source: "members",
+		path: "feedback.assignee.name",
+	},
+	{
+		key: "feedback.assignee.type",
+		label: "Feedback assignee is",
+		group: "Feedback",
+		kind: "enum",
+		events: FEEDBACK_EVENTS_FULL,
+		options: USER_TYPE_OPTIONS,
+		path: "feedback.assignee.type",
 	},
 	{
 		key: "feedback.visibility",

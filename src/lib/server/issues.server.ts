@@ -346,7 +346,7 @@ export async function validLabelIds(workspaceId: string, ids: string[]): Promise
 }
 
 /** True when `userId` is already in the workspace — unlike `assertMember`, a miss is not an error. */
-async function isMember(workspaceId: string, userId: string): Promise<boolean> {
+export async function isMember(workspaceId: string, userId: string): Promise<boolean> {
 	const rows = await db
 		.select({ id: workspaceMember.id })
 		.from(workspaceMember)

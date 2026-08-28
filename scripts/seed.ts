@@ -304,6 +304,8 @@ async function main(): Promise<void> {
 			description:
 				"The sidebar border is almost white in dark mode. On an OLED screen at night it is the only thing you can see.",
 			status: "reviewing" as const,
+			priority: "low" as const,
+			assignee: grace,
 			visibility: "public" as const,
 			submitterName: "Rae Okafor",
 			submitterEmail: "rae@example.com",
@@ -315,6 +317,8 @@ async function main(): Promise<void> {
 			title: "Let me filter issues by the person who reported them",
 			description: "I triage what my team filed. Right now I can only filter by assignee.",
 			status: "new" as const,
+			priority: "none" as const,
+			assignee: null,
 			visibility: "public" as const,
 			submitterName: "Jules Bennet",
 			submitterEmail: "jules@example.com",
@@ -327,6 +331,8 @@ async function main(): Promise<void> {
 			description:
 				"When we escalate a ticket the customer's original wording is gone by the time it reaches engineering.",
 			status: "new" as const,
+			priority: "high" as const,
+			assignee: ada,
 			// Named customers and account details: exactly what a private item is for.
 			visibility: "private" as const,
 			submitterName: "Priya Raman",
@@ -347,6 +353,8 @@ async function main(): Promise<void> {
 			title: row.title,
 			description: row.description,
 			status: row.status,
+			priority: row.priority,
+			assigneeId: row.assignee,
 			visibility: row.visibility,
 			submitterName: row.submitterName,
 			submitterEmail: row.submitterEmail,
