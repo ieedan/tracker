@@ -926,10 +926,11 @@ export function CreateIssueDialog(
 					BodyComposer({
 						value: description,
 						element: descriptionRef,
-						// `@` in the description searches the linked repositories' file index.
+						// `@` in the description offers the workspace's members, then the
+						// linked repositories' file index.
 						slug: () => issueSlug.get(),
 						repository: () => chosenRepository.get()?.id,
-						placeholder: "Add description… @ to reference a file",
+						placeholder: "Add description… @ to mention someone or a file",
 						rows: 4,
 						// Expanded, `rows` stops deciding: the box takes whatever height
 						// the panel has left and scrolls inside it.

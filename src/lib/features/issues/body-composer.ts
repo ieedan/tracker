@@ -20,7 +20,7 @@
  *   markdown the caret is standing in;
  * - ⌘B, ⌘I, ⌘E and ⌘K, which run the same commands the box has always had;
  * - a paste, which is markdown the moment it lands;
- * - a file picked from the `@` menu.
+ * - a person or a file picked from the `@` menu.
  *
  * There is no formatting toolbar. Markdown typed into the box turns into
  * formatting as it is written, which is the whole point of the thing — a row
@@ -42,7 +42,8 @@ import {
 import { filesFromClipboard } from "@/lib/features/attachments/file-drop";
 import { BODY_TEXT_CLASS, renderMarkdown } from "@/lib/components/markdown";
 import { cn } from "@/lib/utils";
-import { MentionMenu, fileMentions } from "./file-mentions";
+import { warmMembers } from "./member-cache";
+import { MentionMenu, bodyMentions } from "./mentions";
 import { insertLink, toggleWrap, type SelectionState } from "./markdown-commands";
 import { isBlank, paint, render, serialize, type SourceSelection } from "./markdown-dom";
 
@@ -67,7 +68,7 @@ export interface BodyComposerOptions {
 	/** The body being written, as markdown. Two-way: editing writes into it. */
 	value: Signal<string>;
 	slug: () => string;
-	/** Which repository `@` searches, when the issue has one. */
+	/** Which repository `@`'s file half searches, when the issue has one. */
 	repository: () => string | undefined;
 	placeholder?: string;
 	/** The box's minimum height, in lines. */
@@ -89,7 +90,7 @@ export interface BodyComposerOptions {
 	element?: Signal<HTMLElement | null>;
 	/** ⌘⏎. */
 	onSubmit?: () => void;
-	/** Not called while the mention menu is open — picking a file blurs. */
+	/** Not called while the mention menu is open — picking from it blurs. */
 	onBlur?: () => void;
 	onEscape?: () => void;
 }
@@ -165,7 +166,7 @@ export function BodyComposer(options: BodyComposerOptions) {
 		apply(transform(current));
 	};
 
-	const mentions = fileMentions({
+	const mentions = bodyMentions({
 		slug: options.slug,
 		repository: options.repository,
 		insert: (start, markdown) => {
@@ -192,6 +193,11 @@ export function BodyComposer(options: BodyComposerOptions) {
 
 		ImplementLifecycle({
 			onMount: () => {
+				// The people half of the `@` menu is ranked in the browser, so all it
+				// needs is the list — asked for when the box appears rather than when
+				// the `@` is typed, which is a round trip later than a menu opening
+				// on a keystroke has to answer in.
+				void warmMembers(options.slug());
 				const node = host.get();
 				if (node === null) return;
 				paint(node, options.value.get());
@@ -303,7 +309,9 @@ export function BodyComposer(options: BodyComposerOptions) {
 					}
 					if (event.key === "Backspace") {
 						const current = read();
-						const undone = current === null ? null : unmark(current);
+						// A mention first: it is the more specific reading, and the two
+						// cannot both answer the same caret anyway.
+						const undone = current === null ? null : (unmention(current) ?? unmark(current));
 						if (undone === null) return;
 						event.preventDefault();
 						apply(undone);
@@ -387,7 +395,13 @@ export function BodyComposer(options: BodyComposerOptions) {
 					// instead, so the link's own words can be edited like any others.
 					const anchor = (event.target as HTMLElement).closest("a");
 					// A mention is not editable text, so the browser already follows it.
-					if (anchor === null || anchor.hasAttribute("data-mention-path")) return;
+					if (
+						anchor === null ||
+						anchor.hasAttribute("data-mention-path") ||
+						anchor.hasAttribute("data-mention-user")
+					) {
+						return;
+					}
 					const href = anchor.getAttribute("href");
 					if (href === null) return;
 					event.preventDefault();
@@ -544,6 +558,42 @@ function leaveFence(state: SelectionState, line: Line): SelectionState {
 	const after = closed ? value.slice(closing.end) : value.slice(line.end);
 	const caret = before.length + rail.length + 2;
 	return { value: `${before}${rail}\n\n${after}`, start: caret, end: caret };
+}
+
+/**
+ * The whole of a `@` reference, where one ends exactly at the caret.
+ *
+ * Both kinds are the same construct — `[@src/lib/foo.ts](url)` and
+ * `[@Ada Lovelace](/app/…)` — and the `@` on the label is what separates either
+ * from an ordinary link somebody wrote out by hand.
+ */
+const MENTION_END = /\[@[^\]\n]+\]\([^()\s]*\)$/;
+
+/**
+ * Backspace with the caret just after a mention, which takes the reference off
+ * whole rather than a character out of the middle of a URL.
+ *
+ * A pill is one thing and is not editable text, so there is no last character
+ * for Backspace to take. Left to the browser it spends the first press on the
+ * zero-width character the caret was standing on — which serializes to nothing,
+ * so the body does not change and the screen does not either — and only removes
+ * the pill on the press after that. A mention that needs two presses before
+ * anything happens is a mention that cannot be deleted, as far as the person
+ * pressing is concerned.
+ *
+ * Inside a fenced block the same characters are a code sample rather than a
+ * reference, and there Backspace is a character like it is anywhere else.
+ */
+function unmention(state: SelectionState): SelectionState | null {
+	const { value, start, end } = state;
+	if (start < 0 || start !== end) return null;
+	if (fenced(value, start)) return null;
+
+	const mention = MENTION_END.exec(value.slice(0, start));
+	if (mention === null) return null;
+
+	const at = start - mention[0].length;
+	return { value: value.slice(0, at) + value.slice(start), start: at, end: at };
 }
 
 /**

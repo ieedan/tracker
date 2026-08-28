@@ -596,7 +596,7 @@ function EditableTitle(
 }
 
 /** The same words in the box and in its place, so the two cannot drift apart. */
-const DESCRIPTION_PLACEHOLDER = "Add description… @ to reference a file";
+const DESCRIPTION_PLACEHOLDER = "Add description… @ to mention someone or a file";
 
 /**
  * The issue body, which is always the editor.
@@ -743,7 +743,7 @@ function CommentThread(
 				element: draftRef,
 				slug: () => params.slug.get(),
 				repository: () => repositoryId.get(),
-				placeholder: "Leave a comment… @ to reference a file",
+				placeholder: "Leave a comment… @ to mention someone or a file",
 				rows: 3,
 				autoGrow: true,
 				onSubmit: () => void post(),

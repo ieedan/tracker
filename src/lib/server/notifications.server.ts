@@ -2,8 +2,18 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray } from "driz
 import { nanoid } from "nanoid";
 import type { NotificationType } from "@/lib/domain/issues";
 import type { Notification, NotificationOrder } from "@/lib/domain/schemas";
+import { findUserMentions } from "@/lib/domain/user-mentions";
 import { db } from "./db.server";
-import { issue, issueSubscriber, notification, team, user, workspace } from "./schema.server";
+import { subscribeToIssue } from "./issues.server";
+import {
+	issue,
+	issueSubscriber,
+	notification,
+	team,
+	user,
+	workspace,
+	workspaceMember,
+} from "./schema.server";
 import { identifierFor, toUser } from "./serialize.server";
 
 interface NotifyInput {
@@ -68,6 +78,68 @@ export async function issueAudience(issueId: string): Promise<string[]> {
 }
 
 /**
+ * Tells everyone a body names that it named them.
+ *
+ * Only ids that belong to the workspace get through. The body is written by
+ * anyone with an account and by agents, and the mention is a link they could
+ * have typed by hand, so "this id was in the text" is not on its own a reason to
+ * write into somebody's inbox — the membership check is what makes it one.
+ *
+ * `already` is who has just been told about this same edit by another route: the
+ * assignee who was named in a description they were being assigned in the same
+ * breath does not need both. Notifying yourself is already a no-op, so an author
+ * writing their own name costs nothing.
+ *
+ * Being mentioned also subscribes you, the way commenting does. Somebody asked
+ * you a question in a thread you were not following, and an answer you never see
+ * is the whole reason to have asked.
+ *
+ * Returns who was told, so a caller announcing the same edit to the issue's
+ * followers can leave them out: "mentioned you in ENG-1" and "commented on
+ * ENG-1" are one comment, and the first is the one that says why it matters.
+ */
+export async function notifyMentions(input: {
+	body: string;
+	slug: string;
+	workspaceId: string;
+	issueId: string;
+	identifier: string;
+	actor: { id: string; name: string };
+	already?: readonly (string | null | undefined)[];
+}): Promise<string[]> {
+	const mentioned = findUserMentions(input.body, input.slug);
+	if (mentioned.length === 0) return [];
+
+	const told = new Set(input.already ?? []);
+	const rows = await db
+		.select({ userId: workspaceMember.userId })
+		.from(workspaceMember)
+		.where(
+			and(
+				eq(workspaceMember.workspaceId, input.workspaceId),
+				inArray(workspaceMember.userId, mentioned),
+			),
+		);
+
+	const notified: string[] = [];
+	for (const row of rows) {
+		if (told.has(row.userId)) continue;
+		await subscribeToIssue(input.issueId, row.userId);
+		await notify({
+			userId: row.userId,
+			actorId: input.actor.id,
+			workspaceId: input.workspaceId,
+			issueId: input.issueId,
+			type: "issue_mentioned",
+			body: `${input.actor.name} mentioned you in ${input.identifier}`,
+		});
+		notified.push(row.userId);
+	}
+
+	return notified;
+}
+
+/**
  * Notification types that name you rather than the issue.
  *
  * "Aidan assigned ENG-1 to you" is addressed at one person and is still worth
@@ -76,10 +148,15 @@ export async function issueAudience(issueId: string): Promise<string[]> {
  * are broadcasts to everyone following, and a broadcast about an issue that has
  * since been settled is exactly the backlog nobody reads.
  *
- * An `@you` in a comment body belongs here too, once comment bodies are scanned
- * for one — there is no such notification type yet.
+ * An `@you` is the same kind of thing: somebody wrote your name, and that they
+ * wrote it stays worth knowing after the issue is settled — often *because* it
+ * settled without you answering.
  */
-const ADDRESSED_TYPES: NotificationType[] = ["issue_assigned", "issue_unassigned"];
+const ADDRESSED_TYPES: NotificationType[] = [
+	"issue_assigned",
+	"issue_unassigned",
+	"issue_mentioned",
+];
 
 /**
  * Clears the inbox chatter an issue accumulated on its way to being closed.

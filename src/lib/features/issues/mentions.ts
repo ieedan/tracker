@@ -1,5 +1,6 @@
 /**
- * `@` file references in the body composer.
+ * `@` references in the body composer — the people in the workspace, and the
+ * files in its repositories.
  *
  * The rule for when the menu is open is the one people already know from every
  * other `@`: an `@` that starts a word, followed by no whitespace, with the
@@ -10,6 +11,11 @@
  * is where the insertion has to land. Only the menu's position comes from the
  * document, since where the `@` is on screen is a question only the screen can
  * answer.
+ *
+ * People sort above files, and are the first thing a bare `@` offers. `@` means
+ * a person almost everywhere else it appears, so the menu that opens on it has
+ * to be able to answer that reading first; a path is what you get once you have
+ * typed enough of one to say you meant it.
  */
 import {
 	Div,
@@ -25,14 +31,30 @@ import {
 } from "@implementjs/core";
 import { FileCode2 } from "@implementjs/lucide";
 import { api } from "@/lib/client/api";
-import { rankPath } from "@/lib/domain/fuzzy";
+import { UserAvatar } from "@/lib/components/glyphs";
+import { fuzzyScore, rankPath } from "@/lib/domain/fuzzy";
+import type { Member } from "@/lib/domain/schemas";
+import { userMentionMarkdown } from "@/lib/domain/user-mentions";
 import { cn } from "@/lib/utils";
+import { cachedMembers, warmMembers } from "./member-cache";
 
 export interface FileMatch {
 	repositoryId: string;
 	fullName: string;
 	path: string;
 	url: string;
+}
+
+/** One row of the menu: somebody in the workspace, or a file in one of its repos. */
+export type MentionMatch =
+	| { kind: "member"; member: Member; positions: number[] }
+	| { kind: "file"; file: FileMatch };
+
+/** Stable across a re-query, so a row that keeps its place keeps its identity. */
+function matchKey(match: MentionMatch): string {
+	return match.kind === "member"
+		? `member:${match.member.user.id}`
+		: `file:${match.file.repositoryId}:${match.file.path}`;
 }
 
 /** The `@run` the caret currently sits in, or null. */
@@ -49,7 +71,9 @@ export function activeMention(
 	if (before !== "" && !/\s|[([{]/.test(before)) return null;
 
 	const query = upto.slice(at + 1);
-	// A space ends the run. So does a newline.
+	// A space ends the run. So does a newline. Names have spaces in them and
+	// this does not admit one, which is what the fuzzy ranking is for: `@ab`
+	// finds "Aidan Bleser" without the run having to survive the gap.
 	if (/\s/.test(query)) return null;
 	// Paths get long, but not this long — past here it is not a mention any more.
 	if (query.length > 120) return null;
@@ -58,8 +82,10 @@ export function activeMention(
 }
 
 /** Markdown, so the reference survives as a link wherever the body is rendered. */
-export function mentionMarkdown(match: FileMatch): string {
-	return `[@${match.path}](${match.url})`;
+export function mentionMarkdown(match: MentionMatch, slug: string): string {
+	return match.kind === "member"
+		? userMentionMarkdown(slug, match.member.user)
+		: `[@${match.file.path}](${match.file.url})`;
 }
 
 export interface CaretPoint {
@@ -107,7 +133,7 @@ export function mentionPoint(host: HTMLElement): CaretPoint | null {
 
 export interface MentionState {
 	open: Readable<boolean>;
-	matches: Readable<FileMatch[]>;
+	matches: Readable<MentionMatch[]>;
 	/** What has been typed after the `@`, so the menu can show what it matched. */
 	term: Readable<string>;
 	highlighted: Signal<number>;
@@ -118,17 +144,58 @@ export interface MentionState {
 	/** True when the menu answered the key, so the composer should not. */
 	onKeydown: (event: KeyboardEvent) => boolean;
 	close: () => void;
-	choose: (match: FileMatch) => void;
+	choose: (match: MentionMatch) => void;
 }
 
 /**
- * How many files the menu asks for. More than fits without scrolling, because
- * a fuzzy query that matches broadly should still let the tenth-best answer be
+ * How many rows the menu holds. More than fits without scrolling, because a
+ * fuzzy query that matches broadly should still let the tenth-best answer be
  * reached with the arrow keys rather than by typing more.
  */
 const MENU_ROWS = 12;
+/**
+ * How much of that people may take.
+ *
+ * A bare `@` in a big workspace would otherwise be a list of names with the
+ * files pushed off the bottom, and `@` has meant "a file here" for as long as
+ * the box has existed. Past the cap, typing another character is what surfaces
+ * the rest — which is what typing a name is for anyway.
+ */
+const MEMBER_ROWS = 5;
 /** Long enough to coalesce a fast typist's keystrokes, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 60;
+
+/**
+ * The people a query names, best first.
+ *
+ * Ranked against the name and against the address's local part, because both
+ * are things somebody reaches for: `@aidan` should find Aidan Bleser whether
+ * that is how they are named or only how they are addressed. The name's score
+ * wins ties, so the positions drawn in the row are the ones on screen.
+ */
+export function rankMembers(query: string, members: Member[], limit = MEMBER_ROWS): MentionMatch[] {
+	const scored: { match: MentionMatch; score: number }[] = [];
+
+	for (const member of members) {
+		const byName = fuzzyScore(query, member.user.name);
+		const local = member.user.email.split("@")[0] ?? "";
+		const byEmail = local === "" ? null : fuzzyScore(query, local);
+		if (byName === null && byEmail === null) continue;
+
+		// An address match is a weaker signal than a name match, so it never
+		// outranks one; within each, the fuzzy score decides.
+		const score = byName !== null ? byName.score + 1000 : byEmail!.score;
+		scored.push({
+			match: { kind: "member", member, positions: byName?.positions ?? [] },
+			score,
+		});
+	}
+
+	return scored
+		.toSorted((left, right) => right.score - left.score)
+		.slice(0, limit)
+		.map((entry) => entry.match);
+}
 
 /**
  * Wires up `@` handling for one composer.
@@ -138,14 +205,14 @@ const SEARCH_DEBOUNCE_MS = 60;
  * `insert` belongs to the composer, since replacing the run is an edit to the
  * body like any other and has to go through the same round trip.
  */
-export function fileMentions(options: {
+export function bodyMentions(options: {
 	slug: () => string;
-	/** Narrow results to the issue's repository, when it has one. */
+	/** Narrow file results to the issue's repository, when it has one. */
 	repository: () => string | undefined;
 	/** Replace the `@run` at `start` with the mention's markdown. */
 	insert: (start: number, markdown: string) => void;
 }): MentionState {
-	const matches = signal<FileMatch[]>([]);
+	const matches = signal<MentionMatch[]>([]);
 	const query = signal<{ query: string; start: number } | null>(null);
 	const highlighted = signal(0);
 	const anchor = signal<CaretPoint | null>(null);
@@ -155,15 +222,30 @@ export function fileMentions(options: {
 	let sequence = 0;
 	let pending: ReturnType<typeof setTimeout> | null = null;
 
+	/**
+	 * People are ranked from the cached list, which is why they can be drawn
+	 * before the file request has been sent — a menu that waited for the network
+	 * to show a name it already had would flicker on every keystroke.
+	 */
+	const showMembers = (typed: string): MentionMatch[] => {
+		const people = rankMembers(typed, cachedMembers(options.slug()));
+		matches.set([...people, ...matches.get().filter((match) => match.kind === "file")]);
+		highlighted.set(0);
+		return people;
+	};
+
 	const search = async (typed: string) => {
 		const mine = ++sequence;
+		const people = rankMembers(typed, cachedMembers(options.slug()));
 		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/files", {
 			params: { slug: options.slug() },
-			query: { q: typed, repository: options.repository(), limit: MENU_ROWS },
+			query: { q: typed, repository: options.repository(), limit: MENU_ROWS - people.length },
 		});
 		// A slower earlier request must not overwrite a faster later one.
 		if (mine !== sequence) return;
-		matches.set(error === undefined ? data : []);
+		const files: MentionMatch[] =
+			error === undefined ? data.map((file) => ({ kind: "file", file })) : [];
+		matches.set([...people, ...files]);
 		highlighted.set(0);
 	};
 
@@ -197,11 +279,12 @@ export function fileMentions(options: {
 		anchor.set(null);
 	};
 
-	const choose = (match: FileMatch) => {
+	const choose = (match: MentionMatch) => {
 		const current = query.get();
 		if (current === null) return;
+		const slug = options.slug();
 		close();
-		options.insert(current.start, mentionMarkdown(match));
+		options.insert(current.start, mentionMarkdown(match, slug));
 	};
 
 	return {
@@ -218,6 +301,17 @@ export function fileMentions(options: {
 				return;
 			}
 			anchor.set(host === null ? null : mentionPoint(host));
+			// Cheap and local, so the people half of the menu is on screen for the
+			// keystroke that asked for it rather than a round trip later. The first
+			// `@` in a tab is the one that pays for the list; it is warmed rather
+			// than awaited, and the search below redraws once it lands.
+			showMembers(found.query);
+			void warmMembers(options.slug()).then((people) => {
+				// Still the same run, still the same query — otherwise this is an
+				// answer to a menu that has since closed or moved on.
+				if (people.length === 0 || query.get() !== found) return;
+				showMembers(found.query);
+			});
 			scheduleSearch(found.query);
 		},
 		onKeydown: (event) => {
@@ -233,7 +327,7 @@ export function fileMentions(options: {
 				highlighted.update((index) => (index - 1 + matches.get().length) % matches.get().length);
 				return true;
 			}
-			// Tab completes the highlighted file rather than leaving the box. A
+			// Tab completes the highlighted row rather than leaving the box. A
 			// menu that is showing a choice is what Tab is for; the composer only
 			// hands Tab on to the next control when there is no menu to answer it.
 			if (event.key === "Enter" || event.key === "Tab") {
@@ -304,6 +398,35 @@ function Emphasised(text: string, positions: number[], slice = 0): Child {
 	return Span({ class: "contents" }, ...parts);
 }
 
+/** A person: their picture, their name, and the address that tells two apart. */
+function MemberRow(member: Member, positions: number[]): Child[] {
+	return [
+		UserAvatar(member.user, "size-4"),
+		Span({ class: "min-w-0 flex-1 truncate" }, Emphasised(member.user.name, positions)),
+		Span(
+			{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
+			member.user.email,
+		),
+	];
+}
+
+/** A file: its name, and the path that says which of the three it is. */
+function FileRow(file: FileMatch, typed: string): Child[] {
+	const positions = rankPath(typed, file.path)?.positions ?? [];
+	const start = file.path.lastIndexOf("/") + 1;
+	return [
+		FileCode2({ class: "size-3.5 shrink-0 text-muted-foreground" }),
+		Span(
+			{ class: "min-w-0 flex-1 truncate" },
+			Emphasised(file.path.slice(start), positions, start),
+		),
+		Span(
+			{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
+			Emphasised(file.path, positions),
+		),
+	];
+}
+
 export function MentionMenu(state: MentionState, options: { class?: string } = {}) {
 	/** True when there is no room below the line but there is room above it. */
 	const flipped = derived([state.anchor, state.matches], (point, matches) => {
@@ -342,7 +465,7 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 			},
 			ForEach(
 				state.matches,
-				(match) => `${match.repositoryId}:${match.path}`,
+				matchKey,
 				// `index` comes from the list rather than being looked up, so a row
 				// that keeps its place across a re-query knows which place that is.
 				(match, index) =>
@@ -361,19 +484,12 @@ export function MentionMenu(state: MentionState, options: { class?: string } = {
 								state.choose(match.get());
 							},
 						},
-						FileCode2({ class: "size-3.5 shrink-0 text-muted-foreground" }),
-						Span(
-							{ class: "min-w-0 flex-1 truncate" },
-							Dynamic([match, state.term], (value, typed) => {
-								const positions = rankPath(typed, value.path)?.positions ?? [];
-								const start = value.path.lastIndexOf("/") + 1;
-								return Emphasised(value.path.slice(start), positions, start);
-							}),
-						),
-						Span(
-							{ class: "max-w-[11rem] shrink-0 truncate text-[11px] text-muted-foreground" },
-							Dynamic([match, state.term], (value, typed) =>
-								Emphasised(value.path, rankPath(typed, value.path)?.positions ?? []),
+						Dynamic([match, state.term], (value, typed) =>
+							Span(
+								{ class: "contents" },
+								...(value.kind === "member"
+									? MemberRow(value.member, value.positions)
+									: FileRow(value.file, typed)),
 							),
 						),
 					),

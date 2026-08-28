@@ -81,8 +81,9 @@ export function paint(host: HTMLElement, source: string): void {
 			block.append(document.createElement("br"));
 	}
 
-	// A mention is one thing, not a word to be edited letter by letter.
-	for (const pill of host.querySelectorAll("[data-mention-path]")) {
+	// A mention is one thing, not a word to be edited letter by letter — whether
+	// it names a file or a person.
+	for (const pill of host.querySelectorAll("[data-mention-path], [data-mention-user]")) {
 		(pill as HTMLElement).contentEditable = "false";
 	}
 }
@@ -532,6 +533,12 @@ function link(element: HTMLElement): string {
 	// on screen is drawn from; the path it shows is only the file's name.
 	const path = element.getAttribute("data-mention-path");
 	if (path !== null) return `[@${path}](${href})`;
+
+	// A person's pill shows the whole label, but it is read off the element for
+	// the same reason: what is drawn is `@name`, and the `@` belongs to the
+	// syntax rather than to the name.
+	const mentioned = element.getAttribute("data-mention-user");
+	if (mentioned !== null) return `[@${mentioned}](${href})`;
 
 	// A pasted URL renders as itself, so writing it back with brackets around
 	// it would add punctuation the author never typed.

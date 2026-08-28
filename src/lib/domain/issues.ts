@@ -75,6 +75,7 @@ export const NOTIFICATION_TYPES = [
 	"issue_unassigned",
 	"issue_status_changed",
 	"issue_commented",
+	"issue_mentioned",
 	"workspace_invited",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

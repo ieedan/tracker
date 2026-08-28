@@ -22,7 +22,7 @@ import {
 	validLabelIds,
 } from "@/lib/server/issues.server";
 import { requireRepository } from "@/lib/server/repositories.server";
-import { notify } from "@/lib/server/notifications.server";
+import { notify, notifyMentions } from "@/lib/server/notifications.server";
 import { issue } from "@/lib/server/schema.server";
 import { identifierFor } from "@/lib/server/serialize.server";
 import { requireTeam } from "@/lib/server/teams.server";
@@ -123,13 +123,27 @@ export const POST = handler({
 			userId: user.id,
 		});
 
+		const identifier = identifierFor(owningTeam.key, number);
 		await notify({
 			userId: body.assigneeId,
 			actorId: user.id,
 			workspaceId: workspace.id,
 			issueId: id,
 			type: "issue_assigned",
-			body: `${user.name} assigned ${identifierFor(owningTeam.key, number)} to you`,
+			body: `${user.name} assigned ${identifier} to you`,
+		});
+
+		// A description that names somebody is asking for them, whether or not the
+		// issue landed on them. The assignee is left out: they have just been told
+		// about this issue in the more useful way.
+		await notifyMentions({
+			body: body.description,
+			slug: params.slug,
+			workspaceId: workspace.id,
+			issueId: id,
+			identifier,
+			actor: user,
+			already: [body.assigneeId],
 		});
 
 		const created = await getIssueById(id);
