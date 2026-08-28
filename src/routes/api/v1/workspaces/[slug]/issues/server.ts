@@ -126,7 +126,6 @@ export const POST = handler({
 		await notify({
 			userId: body.assigneeId,
 			actorId: user.id,
-			onBehalfOfId: locals.agent?.installedByUserId,
 			workspaceId: workspace.id,
 			issueId: id,
 			type: "issue_assigned",

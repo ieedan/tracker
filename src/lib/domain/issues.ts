@@ -17,6 +17,19 @@ export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 export const ISSUE_PRIORITIES = ["none", "urgent", "high", "medium", "low"] as const;
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
 
+/**
+ * The statuses that mean an issue is finished with, however it got there.
+ *
+ * Terminal in both directions that matter: a pull request reopening never drags
+ * an issue back out of one, and the inbox stops carrying the chatter that
+ * happened on the way in.
+ */
+export const CLOSED_STATUSES = ["done", "canceled", "duplicate"] as const;
+
+export function isClosedStatus(status: IssueStatus): boolean {
+	return (CLOSED_STATUSES as readonly IssueStatus[]).includes(status);
+}
+
 export const STATUS_LABELS: Record<IssueStatus, string> = {
 	backlog: "Backlog",
 	todo: "Todo",
