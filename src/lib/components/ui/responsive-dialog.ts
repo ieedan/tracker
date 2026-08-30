@@ -1,13 +1,18 @@
 import {
+	Div,
 	Fragment,
 	If,
 	ImplementLifecycle,
+	Span,
 	context,
 	signal,
 	type Child,
 	type ComponentProps,
+	type ElementProps,
+	type Mountable,
 	type Signal,
 } from "@implementjs/core";
+import { XIcon } from "@implementjs/lucide";
 import { createComponent } from "@implementjs/primitives";
 import {
 	Dialog,
@@ -18,6 +23,7 @@ import {
 	DialogTrigger,
 } from "./dialog";
 import { Drawer, DrawerContent } from "./drawer";
+import { cn } from "@/lib/utils";
 
 /**
  * One modal, two shapes: a centered dialog where there is room for one, and a
@@ -134,4 +140,144 @@ export const ResponsiveDialogClose = createComponent(function ResponsiveDialogCl
 	...children: Child[]
 ) {
 	return DialogClose(props, ...children);
+});
+
+/**
+ * Branch a layout on the shape the surrounding root took. For the few places
+ * where the two are not the same arrangement of the same parts — a phone puts
+ * the panel's action in a corner where the footer holding it does not exist.
+ */
+export function ResponsiveDialogShape(render: (shape: "drawer" | "dialog") => Child): Mountable {
+	return ResponsiveDialogCtx.Use(render);
+}
+
+/**
+ * The panel a header/body/footer is built into: a column with a ceiling, so the
+ * body can take what is left of it and scroll inside that rather than running
+ * the rest of the form off the bottom edge.
+ *
+ * The ceiling is only set above the breakpoint. Below it the panel is a drawer,
+ * which caps its own height against the on-screen keyboard, and a second
+ * `max-height` here would be the one tailwind-merge kept.
+ *
+ * `data-[state=open]:flex` because the dialog sets `grid` on its own open
+ * state, and that is the more specific of the two rules.
+ */
+export const RESPONSIVE_DIALOG_PANEL =
+	"flex flex-col data-[state=open]:flex md:max-h-[min(85dvh,44rem)] md:overflow-hidden";
+
+export type ResponsiveDialogHeaderProps = {
+	class?: string;
+	/**
+	 * The panel's primary action, in the drawer's top-right corner — a submit,
+	 * normally. Only built when the panel took that shape, so a dialog (which
+	 * keeps its action in the footer) never constructs a button it will not show.
+	 */
+	action?: () => Child;
+	/** Accessible name for the drawer's close control. Defaults to "Close". */
+	closeLabel?: string;
+};
+
+/**
+ * The panel's top bar, holding the title and description it is given.
+ *
+ * On a drawer it is also the whole of the chrome: close in the top-left corner
+ * and the action in the top-right, both under a thumb, and neither of them
+ * below a form that has to be scrolled past to reach them. On a dialog it is
+ * the header it has always been — the title over its description — and the
+ * action stays in the footer with the rest of the buttons.
+ */
+export const ResponsiveDialogHeader = createComponent(function ResponsiveDialogHeader(
+	{ class: className, action, closeLabel = "Close" }: ResponsiveDialogHeaderProps,
+	...children: Child[]
+) {
+	return ResponsiveDialogCtx.Use((shape) =>
+		shape === "drawer"
+			? Div(
+					{
+						"data-slot": "responsive-dialog-header",
+						class: cn(
+							"flex shrink-0 items-center gap-2 border-b border-border px-2 py-2",
+							className,
+						),
+					},
+					DialogClose(
+						{ variant: "ghost", size: "icon", class: "rounded-full" },
+						XIcon({ class: "size-5", "aria-hidden": true }),
+						Span({ class: "sr-only" }, closeLabel),
+					),
+					Div(
+						{
+							// The description reads as a subtitle here rather than the
+							// paragraph it is in a dialog — smaller, centered under the
+							// title, and free to wrap. Cutting it off instead would hold
+							// the bar to one line at the price of the sentence that says
+							// what the panel is about to do.
+							class:
+								"flex min-w-0 flex-1 flex-col items-center gap-0.5 text-center [&_[data-slot='dialog-description']]:text-[11px] [&_[data-slot='dialog-title']]:truncate [&_[data-slot='dialog-title']]:text-[15px] [&_[data-slot='dialog-title']]:leading-tight",
+						},
+						...children,
+					),
+					// Keeps the title off the left edge when there is no action to
+					// balance the close against.
+					action === undefined ? Div({ class: "size-9 shrink-0", "aria-hidden": true }) : action(),
+				)
+			: Div(
+					{
+						"data-slot": "responsive-dialog-header",
+						class: cn("flex flex-col gap-1 border-b border-border px-4 py-3", className),
+					},
+					...children,
+				),
+	);
+});
+
+export type ResponsiveDialogBodyProps = ElementProps<"div">;
+
+/**
+ * The one region of the panel that scrolls. It takes whatever the header and
+ * footer leave and keeps its overflow to itself, which is what holds the
+ * corners — and the action in one of them — on screen.
+ */
+export const ResponsiveDialogBody = createComponent(function ResponsiveDialogBody(
+	{ class: className, ...props }: ResponsiveDialogBodyProps,
+	...children: Child[]
+) {
+	return Div(
+		{
+			...props,
+			"data-slot": "responsive-dialog-body",
+			class: cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", className),
+		},
+		...children,
+	);
+});
+
+export type ResponsiveDialogFooterProps = {
+	class?: string;
+};
+
+/**
+ * The dialog's button row. A drawer renders nothing: its action moved to the
+ * header, and what is left of a footer there — a Cancel next to a close button
+ * that already cancels — is a row of chrome charging rent on a phone screen.
+ */
+export const ResponsiveDialogFooter = createComponent(function ResponsiveDialogFooter(
+	{ class: className }: ResponsiveDialogFooterProps,
+	...children: Child[]
+) {
+	return ResponsiveDialogCtx.Use((shape) =>
+		shape === "drawer"
+			? null
+			: Div(
+					{
+						"data-slot": "responsive-dialog-footer",
+						class: cn(
+							"flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-2.5",
+							className,
+						),
+					},
+					...children,
+				),
+	);
 });

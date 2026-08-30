@@ -26,7 +26,13 @@ import { toastError, toastSuccess } from "@/lib/client/toast";
 import { AgentBadge, UserAvatar } from "@/lib/components/glyphs";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -37,6 +43,7 @@ import {
 } from "@/lib/components/ui/dropdown-menu";
 import type { WorkspaceRole } from "@/lib/domain/issues";
 import type { Member, Workspace } from "@/lib/domain/schemas";
+import { cn } from "@/lib/utils";
 
 interface MembersData {
 	workspace: Workspace;
@@ -360,12 +367,27 @@ function RemoveDialog(
 	removing: Readable<boolean>,
 	confirm: () => Promise<void>,
 ) {
+	/**
+	 * The confirm, in whichever corner the panel has for it — the drawer's
+	 * top-right or the dialog's footer. Only one of the two is ever mounted.
+	 */
+	const RemoveButton = () =>
+		Button(
+			{
+				size: "sm",
+				variant: "destructive",
+				loading: removing,
+				onClick: () => void confirm(),
+			},
+			"Remove",
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-md" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-md", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{ action: RemoveButton },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Remove from workspace"),
 				DialogDescription(
 					{ class: "text-[12px]" },
@@ -376,18 +398,10 @@ function RemoveDialog(
 					),
 				),
 			),
-			Div(
-				{ class: "flex justify-end gap-2 px-4 py-3" },
+			ResponsiveDialogFooter(
+				{ class: "border-t-0 py-3" },
 				Button({ size: "sm", variant: "secondary", onClick: () => open.set(false) }, "Cancel"),
-				Button(
-					{
-						size: "sm",
-						variant: "destructive",
-						loading: removing,
-						onClick: () => void confirm(),
-					},
-					"Remove",
-				),
+				RemoveButton(),
 			),
 		),
 	);

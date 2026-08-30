@@ -14,7 +14,14 @@ import { api } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -27,6 +34,7 @@ import { Label } from "@/lib/components/ui/label";
 import { preferDefaultTeam } from "@/lib/domain/issues";
 import type { Issue, Team, TeamRef, Workspace } from "@/lib/domain/schemas";
 import { TeamPicker } from "./pickers";
+import { cn } from "@/lib/utils";
 
 const triggerClass =
 	"inline-flex h-6 items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 text-[12px] text-muted-foreground hover:bg-accent";
@@ -205,6 +213,25 @@ export function TransferIssueDialog({
 		onTransferred?.(moved, workspace.slug);
 	};
 
+	/**
+	 * The panel's one action, built into whichever corner it has for it — the
+	 * drawer's top-right or the dialog's footer. Only one of the two is ever
+	 * mounted, and both read the same signals.
+	 */
+	const TransferButton = () =>
+		Button(
+			{
+				size: "sm",
+				loading: submitting,
+				disabled: derived(
+					[dest, chosenTeam],
+					(workspace, team) => workspace === null || team === null,
+				),
+				onClick: () => void submit(),
+			},
+			"Transfer",
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
@@ -223,9 +250,9 @@ export function TransferIssueDialog({
 			void loadTeams(workspace.slug);
 		}),
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-md" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-md", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{ action: TransferButton },
 				DialogTitle(
 					{ class: "text-[15px] font-semibold" },
 					count.bind((n) => (n === 1 ? "Transfer issue" : `Transfer ${n} issues`)),
@@ -240,7 +267,7 @@ export function TransferIssueDialog({
 				),
 			),
 
-			Div(
+			ResponsiveDialogBody(
 				{ class: "flex flex-col gap-4 px-4 py-4" },
 				Div(
 					{ class: "flex flex-col gap-1.5" },
@@ -304,21 +331,9 @@ export function TransferIssueDialog({
 				),
 			),
 
-			Div(
-				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
+			ResponsiveDialogFooter(
 				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
-				Button(
-					{
-						size: "sm",
-						loading: submitting,
-						disabled: derived(
-							[dest, chosenTeam],
-							(workspace, team) => workspace === null || team === null,
-						),
-						onClick: () => void submit(),
-					},
-					"Transfer",
-				),
+				TransferButton(),
 			),
 		),
 	);

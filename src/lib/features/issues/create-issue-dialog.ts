@@ -9,6 +9,7 @@ import {
 	ImplementEffect,
 	ImplementLifecycle,
 	Input,
+	type Child,
 	type Readable,
 	Span,
 	signal,
@@ -27,7 +28,14 @@ import {
 	BreadcrumbSeparator,
 } from "@/lib/components/ui/breadcrumb";
 import { DialogClose, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_QUERY,
+	ResponsiveDialog,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+	ResponsiveDialogShape,
+} from "@/lib/components/ui/responsive-dialog";
 // Aliased: `Label` is already the issue label type in this module.
 import { Label as ControlLabel } from "@/lib/components/ui/label";
 import { Switch } from "@/lib/components/ui/switch";
@@ -672,7 +680,14 @@ export function CreateIssueDialog(
 		clearIssueDraft(slug.get());
 		hasDraft.set(false);
 
-		if (createMore.get()) {
+		// The drawer does not offer "create more", so it must not silently obey a
+		// switch left on at a desk: a panel that stayed up after a create, with
+		// nothing on it saying why, only reads as a create that did not happen.
+		const staysUp =
+			createMore.get() &&
+			(typeof window === "undefined" || !window.matchMedia(RESPONSIVE_DIALOG_QUERY).matches);
+
+		if (staysUp) {
 			// Stay up, but as a fresh composer rather than a copy of what was just
 			// filed: every field back to its default, cursor in the title.
 			resetToDefaults();
@@ -697,6 +712,64 @@ export function CreateIssueDialog(
 			},
 		});
 	};
+
+	const pickTeam = (key: string) => {
+		const picked = teams.get().find((team) => team.key === key);
+		if (picked !== undefined) {
+			chosenTeam.set({
+				id: picked.id,
+				name: picked.name,
+				key: picked.key,
+				icon: picked.icon,
+				color: picked.color,
+			});
+		}
+	};
+
+	/**
+	 * Where the issue is being filed: the workspace, then the team that will
+	 * give it its identifier. Built per shape rather than shared, because only
+	 * one of the two headers below is ever mounted — and a picker that is
+	 * mounted twice, or moved between them, is a picker that stops opening
+	 * (implementjs ENG-28).
+	 */
+	const Crumbs = (...trailing: Child[]) =>
+		Breadcrumb(
+			{ class: "min-w-0" },
+			BreadcrumbList(
+				{ class: "flex-nowrap items-center gap-1 leading-none sm:gap-1.5" },
+				BreadcrumbItem(
+					// ENG-58: file into any workspace you belong to, defaulting to the
+					// one the composer opened from.
+					WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, { open: workspaceOpen }),
+				),
+				BreadcrumbSeparator(),
+				BreadcrumbItem(TeamPicker(chosenTeam, teams, pickTeam, { crumb: true })),
+				...trailing,
+			),
+		);
+
+	/**
+	 * Built into whichever corner the panel has for it — the drawer's top-right,
+	 * or the dialog's footer — and only one of those is ever mounted. Both read
+	 * the same signals, so the shape cannot change what the button knows.
+	 */
+	const SubmitButton = (options: { compact: boolean } = { compact: false }) =>
+		Button(
+			{
+				size: "sm",
+				loading: submitting,
+				disabled: derived(
+					[title, chosenTeam],
+					(value, team) => value.trim() === "" || team === null,
+				),
+				onClick: () => void submit(),
+			},
+			"Create",
+			options.compact
+				? null
+				: Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
+		);
 
 	return Div(
 		{ class: "contents" },
@@ -829,85 +902,69 @@ export function CreateIssueDialog(
 						return () => root.removeEventListener("keydown", onKeydown, true);
 					},
 				}),
-				Div(
-					{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
-					Breadcrumb(
-						{ class: "min-w-0 flex-1" },
-						BreadcrumbList(
-							{ class: "items-center gap-1 leading-none sm:gap-1.5" },
-							BreadcrumbItem(
-								// ENG-58: file into any workspace you belong to, defaulting
-								// to the one the composer opened from.
-								WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, {
-									open: workspaceOpen,
-								}),
-							),
-							BreadcrumbSeparator(),
-							BreadcrumbItem(
-								TeamPicker(
-									chosenTeam,
-									teams,
-									(key) => {
-										const picked = teams.get().find((team) => team.key === key);
-										if (picked !== undefined) {
-											chosenTeam.set({
-												id: picked.id,
-												name: picked.name,
-												key: picked.key,
-												icon: picked.icon,
-												color: picked.color,
-											});
-										}
+				ResponsiveDialogShape((shape) =>
+					shape === "drawer"
+						? // On a phone the composer's chrome is the two top corners and
+							// nothing else: close on the left, Create on the right, and the
+							// crumb under the title where a subtitle goes. Nothing below the
+							// fold to scroll a half-written issue past.
+							ResponsiveDialogHeader(
+								{ action: () => SubmitButton({ compact: true }) },
+								DialogTitle({}, "New issue"),
+								Crumbs(),
+							)
+						: Div(
+								{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
+								Crumbs(
+									BreadcrumbSeparator(),
+									BreadcrumbItem(
+										DialogTitle(
+											{ class: "text-[13px] leading-none font-medium text-foreground" },
+											"New issue",
+										),
+									),
+								),
+								Div({ class: "flex-1" }),
+								// One button that relabels rather than two that swap:
+								// activating it must not move focus, and a remounted button
+								// loses it. Only the icon inside is exchanged.
+								Button(
+									{
+										variant: "ghost",
+										size: "icon-sm",
+										class: "size-7 shrink-0",
+										"aria-label": expanded.bind((on) => (on ? "Collapse" : "Expand")),
+										title: expanded.bind((on) => (on ? "Collapse" : "Expand")),
+										onClick: () => expanded.update((on) => !on),
 									},
-									{ crumb: true },
+									If(expanded)
+										.Then(Minimize2({ class: "size-4", "aria-hidden": true }))
+										.Else(Maximize2({ class: "size-4", "aria-hidden": true })),
+								),
+								DialogClose(
+									{
+										variant: "ghost",
+										size: "icon-sm",
+										class: "size-7 shrink-0",
+									},
+									X({ class: "size-4", "aria-hidden": true }),
+									Span({ class: "sr-only" }, "Close"),
 								),
 							),
-							BreadcrumbSeparator(),
-							BreadcrumbItem(
-								DialogTitle(
-									{ class: "text-[13px] leading-none font-medium text-foreground" },
-									"New issue",
-								),
-							),
-						),
-					),
-					// One button that relabels rather than two that swap: activating it
-					// must not move focus, and a remounted button loses it. Only the
-					// icon inside is exchanged.
-					//
-					// Hidden below the dialog/drawer breakpoint — the drawer shape is
-					// already as tall as the viewport lets it be, and `display: none`
-					// takes it out of the tab order with it.
-					Button(
-						{
-							variant: "ghost",
-							size: "icon-sm",
-							class: "hidden size-7 shrink-0 md:inline-flex",
-							"aria-label": expanded.bind((on) => (on ? "Collapse" : "Expand")),
-							title: expanded.bind((on) => (on ? "Collapse" : "Expand")),
-							onClick: () => expanded.update((on) => !on),
-						},
-						If(expanded)
-							.Then(Minimize2({ class: "size-4", "aria-hidden": true }))
-							.Else(Maximize2({ class: "size-4", "aria-hidden": true })),
-					),
-					DialogClose(
-						{
-							variant: "ghost",
-							size: "icon-sm",
-							class: "size-7 shrink-0",
-						},
-						X({ class: "size-4", "aria-hidden": true }),
-						Span({ class: "sr-only" }, "Close"),
-					),
 				),
 
 				Div(
 					{
 						// The one region that grows: `min-h-0` so it can also give the
 						// space back to a tall attachment grid rather than pushing the
-						// footer off the panel.
-						class: cn("flex flex-col gap-2 px-4 py-3", { "min-h-0 flex-1": expanded }),
+						// footer off the panel. On a drawer it always is that region —
+						// the pills row below it is the last thing on the panel now that
+						// the footer is gone, and it stays on screen.
+						class: cn(
+							"flex flex-col gap-2 px-4 py-3",
+							"max-md:min-h-0 max-md:flex-1 max-md:overflow-y-auto",
+							{ "min-h-0 flex-1": expanded },
+						),
 						onPaste: (event) => preventFilePaste(event, attach),
 					},
 					Input({
@@ -999,11 +1056,12 @@ export function CreateIssueDialog(
 
 				DialogDescription({ class: "sr-only" }, "Create a new issue in the selected workspace."),
 
-				Div(
-					{
-						class:
-							"flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-2.5",
-					},
+				// Drops out entirely on a drawer: Create has moved to the top-right
+				// corner, Cancel is the close button in the other one, and neither
+				// "create more" nor a draft's Discard is worth a row of a phone
+				// screen — the draft is still saved, and still restored on the next
+				// open, without a control saying so.
+				ResponsiveDialogFooter(
 					If(
 						hasDraft,
 						Div(
@@ -1034,19 +1092,7 @@ export function CreateIssueDialog(
 						"Create more",
 					),
 					Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
-					Button(
-						{
-							size: "sm",
-							loading: submitting,
-							disabled: derived(
-								[title, chosenTeam],
-								(value, team) => value.trim() === "" || team === null,
-							),
-							onClick: () => void submit(),
-						},
-						"Create",
-						Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
-					),
+					SubmitButton(),
 				),
 			),
 		),

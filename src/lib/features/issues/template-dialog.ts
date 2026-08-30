@@ -13,6 +13,7 @@ import {
 	Input,
 	P,
 	Span,
+	type Child,
 	derived,
 	signal,
 } from "@implementjs/core";
@@ -27,7 +28,14 @@ import {
 } from "@/lib/components/ui/breadcrumb";
 import { DialogClose, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import { Label as ControlLabel } from "@/lib/components/ui/label";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogHeader,
+	ResponsiveDialogShape,
+} from "@/lib/components/ui/responsive-dialog";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import type { IssuePriority, IssueStatus } from "@/lib/domain/issues";
 import type { IssueTemplate, Label, Member, Repository, Team, TeamRef } from "@/lib/domain/schemas";
@@ -196,6 +204,93 @@ export function TemplateDialog() {
 		open.set(false);
 	};
 
+	const pickTeam = (key: string) => {
+		const picked = teams.get().find((entry) => entry.key === key);
+		if (picked !== undefined) {
+			team.set({
+				id: picked.id,
+				name: picked.name,
+				key: picked.key,
+				icon: picked.icon,
+				color: picked.color,
+			});
+		}
+	};
+
+	/**
+	 * Which team a template belongs to. Only one of the two headers below is
+	 * ever mounted, so the picker inside is only ever built once — a dropdown
+	 * that is mounted twice, or moved between them, stops opening
+	 * (implementjs ENG-28).
+	 */
+	const TeamCrumb = () =>
+		Breadcrumb(
+			{ class: "min-w-0" },
+			BreadcrumbList(
+				{ class: "flex-nowrap items-center gap-1 leading-none" },
+				BreadcrumbItem(TeamPicker(team, teams, pickTeam, { crumb: true })),
+			),
+		);
+
+	/**
+	 * The save, in whichever corner the panel has for it. The drawer's copy is
+	 * the short one, without the shortcut hint: a corner between a close button
+	 * and a title has no room for "Create template ⌘⏎", and no keyboard to
+	 * press it on.
+	 */
+	const SaveButton = (options: { compact: boolean } = { compact: false }) =>
+		Button(
+			{
+				size: "sm",
+				loading: saving,
+				disabled: derived([name], (value) => value.trim() === ""),
+				onClick: () => void submit(),
+			},
+			options.compact
+				? editing.bind((value) => (value === null ? "Create" : "Save"))
+				: editing.bind((value) => (value === null ? "Create template" : "Save")),
+			options.compact
+				? null
+				: Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
+		);
+
+	const DeleteControls = () =>
+		Div(
+			{ class: "mr-auto flex items-center gap-2" },
+			// `variant` is not bindable, so the destructive look is painted on by
+			// class rather than by swapping the button for another one, which
+			// would also drop the focus the first press just took.
+			Button(
+				{
+					size: "sm",
+					variant: "ghost",
+					loading: deleting,
+					class: confirmingDelete.bind((asked) =>
+						asked
+							? "bg-destructive text-white hover:bg-destructive/90"
+							: "text-muted-foreground hover:text-destructive",
+					),
+					onClick: () => {
+						if (confirmingDelete.get()) void remove();
+						else confirmingDelete.set(true);
+					},
+				},
+				confirmingDelete.bind((asked) => (asked ? "Delete template" : "Delete")),
+			),
+			If(
+				confirmingDelete,
+				Button(
+					{
+						size: "sm",
+						variant: "ghost",
+						class: "text-[12px] text-muted-foreground",
+						onClick: () => confirmingDelete.set(false),
+					},
+					"Keep",
+				),
+			),
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
@@ -214,7 +309,7 @@ export function TemplateDialog() {
 			});
 		}),
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-3xl", showCloseButton: false },
+			{ class: cn("gap-0 p-0 md:max-w-3xl", RESPONSIVE_DIALOG_PANEL), showCloseButton: false },
 
 			// ⌘⏎ saves from anywhere in the dialog, the way it files an issue from
 			// the composer. Attached by hand because `onKeydownCapture` on an
@@ -236,49 +331,42 @@ export function TemplateDialog() {
 				},
 			}),
 
-			Div(
-				{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
-				Breadcrumb(
-					{ class: "min-w-0 flex-1" },
-					BreadcrumbList(
-						{ class: "items-center gap-1 leading-none sm:gap-1.5" },
-						BreadcrumbItem(
-							TeamPicker(
-								team,
-								teams,
-								(key) => {
-									const picked = teams.get().find((entry) => entry.key === key);
-									if (picked !== undefined) {
-										team.set({
-											id: picked.id,
-											name: picked.name,
-											key: picked.key,
-											icon: picked.icon,
-											color: picked.color,
-										});
-									}
-								},
-								{ crumb: true },
-							),
-						),
-						BreadcrumbSeparator(),
-						BreadcrumbItem(
+			ResponsiveDialogShape((shape) =>
+				shape === "drawer"
+					? ResponsiveDialogHeader(
+							{ action: () => SaveButton({ compact: true }) },
 							DialogTitle(
-								{ class: "text-[13px] leading-none font-medium text-foreground" },
+								{},
 								editing.bind((value) => (value === null ? "New template" : "Edit template")),
 							),
+							TeamCrumb(),
+						)
+					: Div(
+							{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
+							Breadcrumb(
+								{ class: "min-w-0 flex-1" },
+								BreadcrumbList(
+									{ class: "items-center gap-1 leading-none sm:gap-1.5" },
+									BreadcrumbItem(TeamPicker(team, teams, pickTeam, { crumb: true })),
+									BreadcrumbSeparator(),
+									BreadcrumbItem(
+										DialogTitle(
+											{ class: "text-[13px] leading-none font-medium text-foreground" },
+											editing.bind((value) => (value === null ? "New template" : "Edit template")),
+										),
+									),
+								),
+							),
+							DialogClose(
+								{ variant: "ghost", size: "icon-sm", class: "size-7 shrink-0" },
+								X({ class: "size-4", "aria-hidden": true }),
+								Span({ class: "sr-only" }, "Close"),
+							),
 						),
-					),
-				),
-				DialogClose(
-					{ variant: "ghost", size: "icon-sm", class: "size-7 shrink-0" },
-					X({ class: "size-4", "aria-hidden": true }),
-					Span({ class: "sr-only" }, "Close"),
-				),
 			),
 
-			Div(
-				{ class: "flex max-h-[70vh] flex-col overflow-y-auto" },
+			ResponsiveDialogBody(
+				{ class: "flex flex-col" },
 
 				// What the template is called, and when to reach for it. Neither
 				// ever lands on an issue, which is why they sit apart from the
@@ -408,60 +496,36 @@ export function TemplateDialog() {
 				"What a new issue starts out with when someone picks this template.",
 			),
 
-			Div(
-				{
-					class: "flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-2.5",
-				},
-				If(
-					editing.bind((value) => value !== null),
-					Div(
-						{ class: "mr-auto flex items-center gap-2" },
-						// `variant` is not bindable, so the destructive look is painted
-						// on by class rather than by swapping the button for another one,
-						// which would also drop the focus the first press just took.
-						Button(
-							{
-								size: "sm",
-								variant: "ghost",
-								loading: deleting,
-								class: confirmingDelete.bind((asked) =>
-									asked
-										? "bg-destructive text-white hover:bg-destructive/90"
-										: "text-muted-foreground hover:text-destructive",
-								),
-								onClick: () => {
-									if (confirmingDelete.get()) void remove();
-									else confirmingDelete.set(true);
-								},
-							},
-							confirmingDelete.bind((asked) => (asked ? "Delete template" : "Delete")),
-						),
-						If(
-							confirmingDelete,
-							Button(
-								{
-									size: "sm",
-									variant: "ghost",
-									class: "text-[12px] text-muted-foreground",
-									onClick: () => confirmingDelete.set(false),
-								},
-								"Keep",
+			// On a drawer, Save has moved to the top-right corner and Cancel is the
+			// close button in the other one. Delete has nowhere else to go, so the
+			// row stays for a template that exists and drops out entirely for one
+			// that does not.
+			ResponsiveDialogShape((shape) =>
+				shape === "drawer"
+					? If(
+							editing.bind((value) => value !== null),
+							FooterRow(DeleteControls()),
+						)
+					: FooterRow(
+							If(
+								editing.bind((value) => value !== null),
+								DeleteControls(),
 							),
+							Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
+							SaveButton(),
 						),
-					),
-				),
-				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
-				Button(
-					{
-						size: "sm",
-						loading: saving,
-						disabled: derived([name], (value) => value.trim() === ""),
-						onClick: () => void submit(),
-					},
-					editing.bind((value) => (value === null ? "Create template" : "Save")),
-					Span({ class: cn("text-[11px] font-normal opacity-70", KEY_HINT_CLASS) }, "⌘⏎"),
-				),
 			),
 		),
+	);
+}
+
+/** The panel's button row, under whatever the body left behind. */
+function FooterRow(...children: Child[]) {
+	return Div(
+		{
+			class:
+				"flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-2.5",
+		},
+		...children,
 	);
 }

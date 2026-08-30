@@ -25,7 +25,14 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import {
 	FEEDBACK_BOARD_MODES,
 	FEEDBACK_INTAKE_HINTS,
@@ -92,15 +99,17 @@ export function FeedbackSettingsDialog({ open, slug, intake, board }: FeedbackSe
 	return ResponsiveDialog(
 		{ open },
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-lg" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-lg", RESPONSIVE_DIALOG_PANEL) },
+			// Every choice saves as it is made, so there is nothing for the
+			// drawer's action corner to do that its close button does not.
+			ResponsiveDialogHeader(
+				{},
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Feedback settings"),
 				DialogDescription({ class: "text-[12px]" }, "Who can send feedback, and who can read it."),
 			),
 
-			Div(
-				{ class: "flex max-h-[70vh] flex-col gap-4 overflow-y-auto px-4 py-4" },
+			ResponsiveDialogBody(
+				{ class: "flex max-h-[70vh] flex-col gap-4 px-4 py-4 md:max-h-none" },
 
 				OptionGroup(
 					"Intake",
@@ -125,8 +134,8 @@ export function FeedbackSettingsDialog({ open, slug, intake, board }: FeedbackSe
 				EndpointCard(intake, slug),
 			),
 
-			Div(
-				{ class: "flex items-center justify-between gap-2 border-t border-border px-4 py-2.5" },
+			ResponsiveDialogFooter(
+				{ class: "justify-between" },
 				Button(
 					{
 						size: "sm",
