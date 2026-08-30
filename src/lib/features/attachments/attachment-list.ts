@@ -18,12 +18,14 @@ import {
 	type Readable,
 	type Signal,
 } from "@implementjs/core";
-import { Download, FileText, Paperclip, X } from "@implementjs/lucide";
+import { Download, FileText, Paperclip, Pencil, X } from "@implementjs/lucide";
 import { api, messageOf } from "@/lib/client/api";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { formatBytes, isAudio, isImage, isVideo } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
+import { beginUploads } from "./file-drop";
+import { ImageAnnotator } from "./image-annotator";
 import { ImageLightbox } from "./image-lightbox";
 import type { Upload } from "./uploader";
 
@@ -34,9 +36,17 @@ export function AttachmentGrid(options: {
 	slug: Readable<string>;
 	/** Omitted on read-only views such as the public feedback board. */
 	onRemove?: (attachment: Attachment) => void;
+	/**
+	 * ENG-84: marking up a picture. Given one, image cards offer a pencil that
+	 * opens the drawing tools; the caller is handed the PNG that comes out
+	 * alongside the attachment it was drawn on, and decides where it goes.
+	 */
+	onAnnotate?: (original: Attachment, file: File) => void;
 }) {
 	const viewerOpen = signal(false);
 	const viewerIndex = signal(0);
+	const editorOpen = signal(false);
+	const editing = signal<Attachment | null>(null);
 	const images = derived([options.attachments], (list) =>
 		list.filter((attachment) => isImage(attachment.contentType)),
 	);
@@ -46,6 +56,11 @@ export function AttachmentGrid(options: {
 		if (i < 0) return;
 		viewerIndex.set(i);
 		viewerOpen.set(true);
+	};
+
+	const annotate = (attachment: Attachment) => {
+		editing.set(attachment);
+		editorOpen.set(true);
 	};
 
 	return Div(
@@ -62,12 +77,21 @@ export function AttachmentGrid(options: {
 						AttachmentCard(attachment, {
 							onRemove: options.onRemove,
 							onOpenImage: openImage,
+							onAnnotate: options.onAnnotate === undefined ? undefined : annotate,
 						}),
 				),
 			),
 		),
 
 		ImageLightbox({ open: viewerOpen, index: viewerIndex, images }),
+
+		options.onAnnotate === undefined
+			? null
+			: ImageAnnotator({
+					open: editorOpen,
+					image: editing,
+					onSave: (original, file) => options.onAnnotate?.(original, file),
+				}),
 
 		options.uploads === undefined
 			? null
@@ -84,6 +108,7 @@ function AttachmentCard(
 	options: {
 		onRemove?: (attachment: Attachment) => void;
 		onOpenImage: (id: string) => void;
+		onAnnotate?: (attachment: Attachment) => void;
 	},
 ) {
 	const current = attachment.get();
@@ -107,9 +132,31 @@ function AttachmentCard(
 				);
 
 	if (isImage(current.contentType)) {
+		// SVG is a document, not a bitmap: drawing on one would hand back a PNG
+		// of it, which is not the file that was attached.
+		const annotateButton =
+			options.onAnnotate === undefined || current.contentType.startsWith("image/svg")
+				? null
+				: Button(
+						{
+							size: "icon-xs",
+							variant: "ghost",
+							class:
+								"absolute top-1 left-1 z-10 size-5 bg-background/80 opacity-0 backdrop-blur group-hover:opacity-100",
+							title: "Mark up this image",
+							"aria-label": "Mark up this image",
+							onClick: (event) => {
+								event.stopPropagation();
+								options.onAnnotate?.(attachment.get());
+							},
+						},
+						Pencil({ class: "size-3" }),
+					);
+
 		return Div(
 			{ class: "group relative overflow-hidden rounded-md border border-border" },
 			removeButton,
+			annotateButton,
 			Button(
 				{
 					type: "button",
@@ -201,6 +248,44 @@ function UploadRow(upload: Readable<Upload>) {
 			Span({ class: "text-[11px] leading-snug text-destructive" }, current.error),
 		),
 	);
+}
+
+/**
+ * Puts a marked-up copy in the place of the picture it was drawn on.
+ *
+ * The PNG goes up as an attachment of its own and takes the original's slot in
+ * the list; the original is deleted only once the replacement is stored, so an
+ * upload that fails leaves the picture exactly where it was.
+ */
+export function replaceWithAnnotated(options: {
+	slug: string;
+	original: Attachment;
+	file: File;
+	uploads: Signal<Upload[]>;
+	list: Signal<Attachment[]>;
+	/** Run once the list holds the copy — for a caller that persists a draft. */
+	onReplaced?: () => void;
+}): void {
+	beginUploads({
+		files: [options.file],
+		slug: options.slug,
+		uploads: options.uploads,
+		onUploaded: (saved) => {
+			const current = options.list.get();
+			// Removed while the upload was in flight: the markup is still wanted,
+			// there is just no slot left to take.
+			const held = current.some((entry) => entry.id === options.original.id);
+			options.list.set(
+				held
+					? current.map((entry) => (entry.id === options.original.id ? saved : entry))
+					: [...current, saved],
+			);
+			options.onReplaced?.();
+			void api.DELETE("/api/v1/workspaces/[slug]/attachments/[id]", {
+				params: { slug: options.slug, id: options.original.id },
+			});
+		},
+	});
 }
 
 /** Removes an attachment, rolling back if the server refuses. */
