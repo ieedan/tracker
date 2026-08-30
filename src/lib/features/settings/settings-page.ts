@@ -139,7 +139,6 @@ function WorkspaceSection(data: Readable<PageData>, params: { slug: Readable<str
 				choice: picture,
 				fallback: name,
 				seed: params.slug,
-				label: "Upload a picture",
 				// Saved on choose rather than behind a button: there is no other
 				// field on this control to batch it with.
 				onChange: (key) => void save({ imageKey: key }),
