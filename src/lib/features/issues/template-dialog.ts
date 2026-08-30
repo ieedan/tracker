@@ -218,21 +218,6 @@ export function TemplateDialog() {
 	};
 
 	/**
-	 * Which team a template belongs to. Only one of the two headers below is
-	 * ever mounted, so the picker inside is only ever built once — a dropdown
-	 * that is mounted twice, or moved between them, stops opening
-	 * (implementjs ENG-28).
-	 */
-	const TeamCrumb = () =>
-		Breadcrumb(
-			{ class: "min-w-0" },
-			BreadcrumbList(
-				{ class: "flex-nowrap items-center gap-1 leading-none" },
-				BreadcrumbItem(TeamPicker(team, teams, pickTeam, { crumb: true })),
-			),
-		);
-
-	/**
 	 * The save, in whichever corner the panel has for it. The drawer's copy is
 	 * the short one, without the shortcut hint: a corner between a close button
 	 * and a title has no room for "Create template ⌘⏎", and no keyboard to
@@ -333,13 +318,15 @@ export function TemplateDialog() {
 
 			ResponsiveDialogShape((shape) =>
 				shape === "drawer"
-					? ResponsiveDialogHeader(
+					? // One line of title between the two corners. The team is a menu,
+						// not a caption, so it goes down with the property pills rather
+						// than under the title where it read as decoration.
+						ResponsiveDialogHeader(
 							{ action: () => SaveButton({ compact: true }) },
 							DialogTitle(
 								{},
 								editing.bind((value) => (value === null ? "New template" : "Edit template")),
 							),
-							TeamCrumb(),
 						)
 					: Div(
 							{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
@@ -425,6 +412,16 @@ export function TemplateDialog() {
 
 				Div(
 					{ class: "flex flex-wrap items-center gap-1.5 px-4 pb-2" },
+					// The team leads the row on a phone, where the title bar has no
+					// space for it. The dialog keeps it in its breadcrumb instead, and
+					// the picker is built in one place or the other but never both.
+					ResponsiveDialogShape((shape) =>
+						shape === "drawer"
+							? TeamPicker(team, teams, pickTeam, {
+									class: "border border-border",
+								})
+							: null,
+					),
 					StatusPicker(status, (value) => status.set(value), {
 						showLabel: true,
 						class: "border border-border",

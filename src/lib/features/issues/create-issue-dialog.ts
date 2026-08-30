@@ -4,6 +4,7 @@
 import {
 	derived,
 	Div,
+	Fragment,
 	If,
 	ImplementDocument,
 	ImplementEffect,
@@ -728,9 +729,10 @@ export function CreateIssueDialog(
 
 	/**
 	 * Where the issue is being filed: the workspace, then the team that will
-	 * give it its identifier. Built per shape rather than shared, because only
-	 * one of the two headers below is ever mounted — and a picker that is
-	 * mounted twice, or moved between them, is a picker that stops opening
+	 * give it its identifier. The dialog's header only — the drawer builds the
+	 * same two pickers into its property row instead, and each is constructed
+	 * in one place or the other but never both. A picker that is mounted twice,
+	 * or moved between two mount points, is a picker that stops opening
 	 * (implementjs ENG-28).
 	 */
 	const Crumbs = (...trailing: Child[]) =>
@@ -905,13 +907,15 @@ export function CreateIssueDialog(
 				ResponsiveDialogShape((shape) =>
 					shape === "drawer"
 						? // On a phone the composer's chrome is the two top corners and
-							// nothing else: close on the left, Create on the right, and the
-							// crumb under the title where a subtitle goes. Nothing below the
-							// fold to scroll a half-written issue past.
+							// nothing else: close on the left, Create on the right, and one
+							// line of title between them. The crumb is not a subtitle — it
+							// is two menus, and stacking them under the title put a row of
+							// pills where a caption goes and read as decoration. They
+							// belong with the other property pills below, which is what
+							// they are.
 							ResponsiveDialogHeader(
 								{ action: () => SubmitButton({ compact: true }) },
 								DialogTitle({}, "New issue"),
-								Crumbs(),
 							)
 						: Div(
 								{ class: "flex items-center gap-2 border-b border-border px-3 py-2" },
@@ -1005,6 +1009,26 @@ export function CreateIssueDialog(
 
 				Div(
 					{ class: "flex flex-wrap items-center gap-1.5 px-4 pb-3" },
+					// Where the issue is filed leads the row on a phone, in the same
+					// pill shape as everything else in it — the drawer's title bar has
+					// no room for two menus, and these are the two that decide the
+					// issue's identifier. The dialog keeps them in its breadcrumb.
+					ResponsiveDialogShape((shape) =>
+						shape === "drawer"
+							? Fragment(
+									WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, {
+										open: workspaceOpen,
+										class: "border border-border",
+									}),
+									// The key alone, as the crumb shows it: every other pill in
+									// the row carries one label, and "ENG Engineering" carries
+									// two.
+									TeamPicker(chosenTeam, teams, pickTeam, {
+										class: "border border-border",
+									}),
+								)
+							: null,
+					),
 					AttachTrigger({ onFiles: attach }),
 					StatusPicker(status, (value) => status.set(value), {
 						showLabel: true,

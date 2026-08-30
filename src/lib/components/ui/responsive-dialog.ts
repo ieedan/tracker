@@ -197,12 +197,16 @@ export const ResponsiveDialogHeader = createComponent(function ResponsiveDialogH
 					{
 						"data-slot": "responsive-dialog-header",
 						class: cn(
-							"flex shrink-0 items-center gap-2 border-b border-border px-2 py-2",
+							// `1fr auto 1fr` rather than a flex row: grid sizes the two
+							// side columns equally, so the title sits at the middle of the
+							// bar rather than at the middle of what a wide action button
+							// left over.
+							"grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-border px-2 py-2",
 							className,
 						),
 					},
 					DialogClose(
-						{ variant: "ghost", size: "icon", class: "rounded-full" },
+						{ variant: "outline", size: "icon", class: "justify-self-start rounded-full" },
 						XIcon({ class: "size-5", "aria-hidden": true }),
 						Span({ class: "sr-only" }, closeLabel),
 					),
@@ -214,13 +218,22 @@ export const ResponsiveDialogHeader = createComponent(function ResponsiveDialogH
 							// the bar to one line at the price of the sentence that says
 							// what the panel is about to do.
 							class:
-								"flex min-w-0 flex-1 flex-col items-center gap-0.5 text-center [&_[data-slot='dialog-description']]:text-[11px] [&_[data-slot='dialog-title']]:truncate [&_[data-slot='dialog-title']]:text-[15px] [&_[data-slot='dialog-title']]:leading-tight",
+								"flex min-w-0 flex-col items-center gap-0.5 text-center [&_[data-slot='dialog-description']]:text-[11px] [&_[data-slot='dialog-title']]:truncate [&_[data-slot='dialog-title']]:text-[15px] [&_[data-slot='dialog-title']]:leading-tight",
 						},
 						...children,
 					),
-					// Keeps the title off the left edge when there is no action to
-					// balance the close against.
-					action === undefined ? Div({ class: "size-9 shrink-0", "aria-hidden": true }) : action(),
+					// The third column holds the bar's symmetry even when there is no
+					// action to fill it. Round, and the same height as the close in the
+					// other corner, whatever size the caller built its button at.
+					action === undefined
+						? Div({ "aria-hidden": true })
+						: Div(
+								{
+									class:
+										"justify-self-end [&>[data-slot='button']]:h-9 [&>[data-slot='button']]:rounded-full",
+								},
+								action(),
+							),
 				)
 			: Div(
 					{
