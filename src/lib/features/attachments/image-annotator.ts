@@ -497,8 +497,17 @@ export function ImageAnnotator(options: {
 			{
 				// Nested inside the composer, which scales its children down; a
 				// drawing surface wants the room instead.
-				class:
-					"flex w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,72rem)] data-[state=open]:flex data-[state=open]:scale-100",
+				//
+				// On a phone it takes the whole screen rather than a panel sized to
+				// its own content: the toolbar wraps to three rows there, and a
+				// content-sized panel came out taller than the viewport — with the
+				// title clipped off the top and Save off the bottom. Full-screen, the
+				// chrome always fits and the picture takes whatever is left.
+				class: cn(
+					"flex flex-col gap-0 overflow-hidden p-0 data-[state=open]:flex data-[state=open]:scale-100",
+					"max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0",
+					"md:w-[min(96vw,72rem)] md:max-w-[min(96vw,72rem)]",
+				),
 				showCloseButton: false,
 				overlay: { class: "bg-black/80 data-[nested]:bg-black/80" },
 			},
@@ -625,8 +634,14 @@ export function ImageAnnotator(options: {
 
 			Div(
 				{
-					class:
-						"flex h-[min(70dvh,calc(100dvh-14rem))] items-center justify-center overflow-auto bg-black p-2",
+					// Full-screen (below `md`) the panel owns the height, so the picture
+					// takes whatever the chrome does not; wider than that it asks for a
+					// slice of the viewport and the panel sizes itself to it.
+					class: cn(
+						"flex items-center justify-center overflow-auto bg-black p-2",
+						"max-md:min-h-0 max-md:flex-1",
+						"md:h-[min(70dvh,calc(100dvh-14rem))]",
+					),
 				},
 
 				If(failed)
@@ -673,7 +688,10 @@ export function ImageAnnotator(options: {
 												left: `${pending.left}px`,
 												top: `${pending.top}px`,
 												color: tint,
-												fontSize: `${Math.max(11, pending.size * pending.scale)}px`,
+												// The box shows the size the mark will be, but never below
+												// 16px: under that, tapping into a field zooms the whole
+												// page on iOS and the picture goes with it (ENG-67).
+												fontSize: `${Math.max(16, pending.size * pending.scale)}px`,
 												lineHeight: "1.2",
 											},
 											onKeydown: (event) => {
@@ -707,7 +725,9 @@ export function ImageAnnotator(options: {
 					class: "flex items-center justify-end gap-2 border-t border-border px-3 py-2.5",
 				},
 				Span(
-					{ class: "mr-auto text-[11px] text-muted-foreground" },
+					// Hidden on a phone, where it wraps to two lines and takes them
+					// off the picture — the buttons beside it say the same thing.
+					{ class: "mr-auto hidden text-[11px] text-muted-foreground md:block" },
 					"Saving replaces the picture with the marked-up copy.",
 				),
 				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),

@@ -24,6 +24,7 @@ import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { formatBytes, isAudio, isImage, isVideo } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
+import { cn } from "@/lib/utils";
 import { beginUploads } from "./file-drop";
 import { ImageAnnotator } from "./image-annotator";
 import { ImageLightbox } from "./image-lightbox";
@@ -103,6 +104,18 @@ export function AttachmentGrid(options: {
 	);
 }
 
+/**
+ * A card's actions: on the card, revealed by hovering it.
+ *
+ * Hover is the desktop affordance and nothing else, so a device that cannot
+ * hover — every phone and tablet — is shown them outright; left to
+ * `group-hover` alone they stay at `opacity: 0`, which is invisible but still
+ * hit-testable, so a tap near the corner would silently press a button nobody
+ * could see. Keyboard focus reveals them for the same reason.
+ */
+const CARD_ACTION_CLASS =
+	"absolute top-1 z-10 size-5 bg-background/80 opacity-0 backdrop-blur group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
+
 function AttachmentCard(
 	attachment: Readable<Attachment>,
 	options: {
@@ -120,8 +133,7 @@ function AttachmentCard(
 					{
 						size: "icon-xs",
 						variant: "ghost",
-						class:
-							"absolute top-1 right-1 z-10 size-5 bg-background/80 opacity-0 backdrop-blur group-hover:opacity-100",
+						class: cn(CARD_ACTION_CLASS, "right-1"),
 						title: "Remove attachment",
 						onClick: (event) => {
 							event.stopPropagation();
@@ -141,8 +153,7 @@ function AttachmentCard(
 						{
 							size: "icon-xs",
 							variant: "ghost",
-							class:
-								"absolute top-1 left-1 z-10 size-5 bg-background/80 opacity-0 backdrop-blur group-hover:opacity-100",
+							class: cn(CARD_ACTION_CLASS, "left-1"),
 							title: "Mark up this image",
 							"aria-label": "Mark up this image",
 							onClick: (event) => {
