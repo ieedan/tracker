@@ -175,7 +175,7 @@ export function AppShell(
 				// it just lands in the palette now.
 				if (key === "/") {
 					event.preventDefault();
-					openCommandPalette(activeSlug.get());
+					openCommandPalette();
 				}
 			},
 		}),
