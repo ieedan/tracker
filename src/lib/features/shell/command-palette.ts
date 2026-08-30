@@ -30,10 +30,8 @@ import { tryOpenBulkCommandPalette } from "@/lib/features/issues/bulk-actions";
 import { openCreateIssue } from "@/lib/features/issues/create-issue-dialog";
 
 const open = signal(false);
-const slug = signal("");
 
-export function openCommandPalette(workspaceSlug?: string): void {
-	if (workspaceSlug !== undefined && workspaceSlug !== "") slug.set(workspaceSlug);
+export function openCommandPalette(): void {
 	open.set(true);
 }
 
@@ -44,7 +42,6 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 	const load = async () => {
 		const workspaceSlug = activeSlug.get();
 		if (workspaceSlug === "") return;
-		slug.set(workspaceSlug);
 		const { data, error } = await api.GET("/api/v1/workspaces/[slug]/issues", {
 			params: { slug: workspaceSlug },
 		});
@@ -67,16 +64,23 @@ export function CommandPalette(activeSlug: { get: () => string }) {
 						open.set(false);
 						return;
 					}
-					void load();
-					open.set(true);
+					openCommandPalette();
 				}
 			},
 		}),
 
 		ResponsiveDialog(
 			{ open },
+			// The issues are loaded off `open` rather than off whatever opened the
+			// palette: ⌘K is only one of the ways in — `/` and the sidebar button
+			// are the others, and on a phone they are the only ones. Loading here
+			// means every entrance gets the same list.
 			ImplementEffect([open], (isOpen) => {
-				if (!isOpen) search.set("");
+				if (isOpen) {
+					void load();
+					return;
+				}
+				search.set("");
 			}),
 			ResponsiveDialogContent(
 				// No max-width override: the default keeps a phone's 1rem margins.
