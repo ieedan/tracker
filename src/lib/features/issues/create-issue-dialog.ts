@@ -52,7 +52,12 @@ import type {
 	TeamRef,
 	Workspace,
 } from "@/lib/domain/schemas";
-import { AttachmentGrid, removeAttachment } from "@/lib/features/attachments/attachment-list";
+import {
+	AttachmentGrid,
+	removeAttachment,
+	replaceWithAnnotated,
+} from "@/lib/features/attachments/attachment-list";
+import { annotatingImage } from "@/lib/features/attachments/image-annotator";
 import {
 	AttachTrigger,
 	FileDragOverlay,
@@ -714,6 +719,17 @@ export function CreateIssueDialog(
 		});
 	};
 
+	const annotate = (original: Attachment, file: File) => {
+		replaceWithAnnotated({
+			slug: issueSlug.get(),
+			original,
+			file,
+			uploads,
+			list: attachments,
+			onReplaced: persist,
+		});
+	};
+
 	const pickTeam = (key: string) => {
 		const picked = teams.get().find((team) => team.key === key);
 		if (picked !== undefined) {
@@ -778,10 +794,18 @@ export function CreateIssueDialog(
 
 	return Div(
 		{ class: "contents" },
-		FileDragOverlay({ enabled: open, onFiles: attach }),
+		// A file dropped while the markup editor is up belongs to neither: the
+		// editor is over the composer, and the drop would land behind it.
+		FileDragOverlay({
+			enabled: derived([open, annotatingImage], (isOpen, drawing) => isOpen && !drawing),
+			onFiles: attach,
+		}),
 		ImplementDocument({
 			onKeydownCapture: (event) => {
 				if (!open.get()) return;
+				// The property letters belong to the composer, not to the editor
+				// drawn on top of it — `p` is a pen up there.
+				if (annotatingImage.get()) return;
 				if (event.metaKey || event.ctrlKey || event.altKey) return;
 				// Typing is typing: the title keeps its letters even while it is empty,
 				// which is where `a` used to be stolen by the assignee menu. The
@@ -1007,6 +1031,7 @@ export function CreateIssueDialog(
 						slug: issueSlug,
 						onRemove: (attachment) =>
 							void removeAttachment(issueSlug.get(), attachment, attachments),
+						onAnnotate: annotate,
 					}),
 				),
 
