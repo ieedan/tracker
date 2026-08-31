@@ -743,7 +743,10 @@ export function CreateIssueDialog(
 				BreadcrumbItem(
 					// ENG-58: file into any workspace you belong to, defaulting to the
 					// one the composer opened from.
-					WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, { open: workspaceOpen }),
+					WorkspacePicker(chosenWorkspace, workspaces, pickWorkspace, {
+						open: workspaceOpen,
+						crumb: true,
+					}),
 				),
 				BreadcrumbSeparator(),
 				BreadcrumbItem(TeamPicker(chosenTeam, teams, pickTeam, { crumb: true })),
@@ -1009,10 +1012,11 @@ export function CreateIssueDialog(
 
 				Div(
 					{ class: "flex flex-wrap items-center gap-1.5 px-4 pb-3" },
-					// Where the issue is filed leads the row on a phone, in the same
-					// pill shape as everything else in it — the drawer's title bar has
-					// no room for two menus, and these are the two that decide the
-					// issue's identifier. The dialog keeps them in its breadcrumb.
+					AttachTrigger({ onFiles: attach }),
+					// Where the issue is filed, in the same pill shape as everything
+					// else in the row — the drawer's title bar has no room for two
+					// menus, and these are the two that decide the issue's identifier.
+					// The dialog keeps them in its breadcrumb instead.
 					ResponsiveDialogShape((shape) =>
 						shape === "drawer"
 							? Fragment(
@@ -1029,7 +1033,6 @@ export function CreateIssueDialog(
 								)
 							: null,
 					),
-					AttachTrigger({ onFiles: attach }),
 					StatusPicker(status, (value) => status.set(value), {
 						showLabel: true,
 						class: "border border-border",
