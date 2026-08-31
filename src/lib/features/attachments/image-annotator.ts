@@ -288,29 +288,62 @@ function boxBetween(a: Point, b: Point): Box {
 	};
 }
 
-/** The four corners a box is resized by, clockwise from the top left. */
-const CORNERS = ["nw", "ne", "se", "sw"] as const;
-type Corner = (typeof CORNERS)[number];
+/** The eight handles a box is resized by: four corners and four sides. */
+const BOX_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+type BoxHandle = (typeof BOX_HANDLES)[number];
 /** An arrow is resized by its ends instead — that is what an arrow is. */
 type Endpoint = "from" | "to";
-type Handle = Corner | Endpoint;
+type Handle = BoxHandle | Endpoint;
 
-function cornerOf(box: Box, corner: Corner): Point {
-	const left = corner === "nw" || corner === "sw";
-	const top = corner === "nw" || corner === "ne";
-	return { x: left ? box.left : box.right, y: top ? box.top : box.bottom };
+/**
+ * Which edges each handle pulls: -1 the near one, 1 the far one, 0 neither.
+ *
+ * A corner moves an edge on both axes, a side moves one and leaves the other
+ * where it was — which is the whole difference between the two gestures.
+ */
+const HANDLE_AXES: Record<BoxHandle, { x: -1 | 0 | 1; y: -1 | 0 | 1 }> = {
+	nw: { x: -1, y: -1 },
+	n: { x: 0, y: -1 },
+	ne: { x: 1, y: -1 },
+	e: { x: 1, y: 0 },
+	se: { x: 1, y: 1 },
+	s: { x: 0, y: 1 },
+	sw: { x: -1, y: 1 },
+	w: { x: -1, y: 0 },
+};
+
+/** Where a handle sits on its box: a corner, or the middle of a side. */
+function anchorOf(box: Box, handle: BoxHandle): Point {
+	const axes = HANDLE_AXES[handle];
+	return {
+		x: axes.x === 0 ? (box.left + box.right) / 2 : axes.x < 0 ? box.left : box.right,
+		y: axes.y === 0 ? (box.top + box.bottom) / 2 : axes.y < 0 ? box.top : box.bottom,
+	};
+}
+
+function padBox(box: Box, pad: number): Box {
+	return {
+		left: box.left - pad,
+		top: box.top - pad,
+		right: box.right + pad,
+		bottom: box.bottom + pad,
+	};
 }
 
 /** Where the handles of a selected mark sit, and what each one is called. */
-function handlesOf(context: CanvasRenderingContext2D, shape: Shape): Array<[Handle, Point]> {
+function handlesOf(
+	context: CanvasRenderingContext2D,
+	shape: Shape,
+	pad: number,
+): Array<[Handle, Point]> {
 	if (shape.kind === "arrow") {
 		return [
 			["from", shape.from],
 			["to", shape.to],
 		];
 	}
-	const box = boundsOf(context, shape);
-	return CORNERS.map((corner) => [corner, cornerOf(box, corner)]);
+	const box = padBox(boundsOf(context, shape), pad);
+	return BOX_HANDLES.map((handle) => [handle, anchorOf(box, handle)]);
 }
 
 /**
@@ -435,13 +468,11 @@ export function ImageAnnotator(options: {
 		if (shape.kind === "text") {
 			context.font = `600 ${shape.size}px ui-sans-serif, system-ui, sans-serif`;
 			context.textBaseline = "top";
-			// A light halo, so a mark on a busy screenshot is readable whatever it
-			// happens to land on.
-			context.lineWidth = Math.max(2, shape.size / 8);
-			context.strokeStyle = shape.color === "#111111" ? "#ffffff" : "#111111";
-			context.globalAlpha = 0.55;
-			context.strokeText(shape.text, shape.at.x, shape.at.y);
-			context.globalAlpha = 1;
+			// A soft shadow rather than an outline around every letter: enough to
+			// hold the words off a busy screenshot, and near enough to invisible
+			// against a plain one. An outline reads as a border somebody drew.
+			context.shadowColor = shape.color === "#111111" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.5)";
+			context.shadowBlur = Math.max(2, shape.size / 6);
 			context.fillText(shape.text, shape.at.x, shape.at.y);
 			context.restore();
 			return;
@@ -536,6 +567,8 @@ export function ImageAnnotator(options: {
 
 	/** How wide a handle is drawn, and how near counts as grabbing it. */
 	const handleSize = () => 9 * unit;
+	/** The gap between a mark and the box drawn around it. */
+	const selectionPad = () => 4 * unit;
 
 	/**
 	 * The dashed boxes, and the handles of a lone selection.
@@ -549,18 +582,35 @@ export function ImageAnnotator(options: {
 		const held = list.filter((shape) => ids.has(shape.id));
 		if (held.length === 0) return;
 
-		for (const shape of held) dashedBox(context, boundsOf(context, shape));
-
 		const only = held.length === 1 ? held[0] : undefined;
+		const pad = selectionPad();
+
+		for (const shape of held) {
+			// A lone arrow says it is selected with the handles on its ends; a box
+			// around it would only be a box around a diagonal line, which says
+			// nothing about a mark that has no corners to pull.
+			if (shape === only && shape.kind === "arrow") continue;
+			dashedBox(context, boundsOf(context, shape), pad);
+		}
+
 		if (only === undefined) return;
 
 		const size = handleSize();
+		const box = padBox(boundsOf(context, only), pad);
+		// A side handle wants room to sit in the middle of its edge; on a mark too
+		// small for that, the corners are the whole set. The edge is still there
+		// to grab, it just has nothing drawn on it.
+		const roomAcross = box.right - box.left > size * 3;
+		const roomDown = box.bottom - box.top > size * 3;
+
 		context.save();
 		context.lineWidth = Math.max(1, 1.5 * unit);
 		context.strokeStyle = SELECTION_COLOR;
 		context.fillStyle = "#ffffff";
-		for (const [, point] of handlesOf(context, only)) {
-			// Round for an arrow's ends, square for a corner — the shape of the
+		for (const [handle, point] of handlesOf(context, only, pad)) {
+			if ((handle === "n" || handle === "s") && !roomAcross) continue;
+			if ((handle === "e" || handle === "w") && !roomDown) continue;
+			// Round for an arrow's ends, square for a box's — the shape of the
 			// handle says which gesture it is.
 			context.beginPath();
 			if (only.kind === "arrow") {
@@ -612,17 +662,37 @@ export function ImageAnnotator(options: {
 		return shapes.get().find((shape) => shape.id === ids[0]) ?? null;
 	};
 
-	/** The handle under a point, if the pointer is on one. */
+	/**
+	 * The handle under a point, if the pointer is on one.
+	 *
+	 * The drawn handles are checked first, then the edges themselves: a side is
+	 * grabbable anywhere along its length, not only at the square in the middle
+	 * of it, which is what makes pulling one edge of a long thin mark bearable.
+	 */
 	const handleAt = (at: Point): { shape: Shape; handle: Handle } | null => {
 		const context = canvasRef.get()?.getContext("2d") ?? null;
 		const shape = lone();
 		if (context === null || shape === null) return null;
 		const reach = handleSize();
-		for (const [handle, point] of handlesOf(context, shape)) {
+
+		for (const [handle, point] of handlesOf(context, shape, selectionPad())) {
 			if (Math.abs(at.x - point.x) <= reach && Math.abs(at.y - point.y) <= reach) {
 				return { shape, handle };
 			}
 		}
+
+		if (shape.kind === "arrow") return null;
+
+		// The bands along the four edges, half as forgiving as a handle so that
+		// the mark underneath keeps the rest of the box to itself.
+		const box = padBox(boundsOf(context, shape), selectionPad());
+		const band = reach / 2;
+		const withinX = at.x >= box.left - band && at.x <= box.right + band;
+		const withinY = at.y >= box.top - band && at.y <= box.bottom + band;
+		if (withinX && Math.abs(at.y - box.top) <= band) return { shape, handle: "n" };
+		if (withinX && Math.abs(at.y - box.bottom) <= band) return { shape, handle: "s" };
+		if (withinY && Math.abs(at.x - box.left) <= band) return { shape, handle: "w" };
+		if (withinY && Math.abs(at.x - box.right) <= band) return { shape, handle: "e" };
 		return null;
 	};
 
@@ -632,6 +702,10 @@ export function ImageAnnotator(options: {
 		se: "cursor-nwse-resize",
 		ne: "cursor-nesw-resize",
 		sw: "cursor-nesw-resize",
+		n: "cursor-ns-resize",
+		s: "cursor-ns-resize",
+		e: "cursor-ew-resize",
+		w: "cursor-ew-resize",
 		from: "cursor-move",
 		to: "cursor-move",
 	};
@@ -658,20 +732,21 @@ export function ImageAnnotator(options: {
 		cursor.set(markAt(at) === null ? "cursor-default" : "cursor-move");
 	};
 
-	/** The box a pull of `handle` makes, with the opposite corner staying put. */
-	const boxFromHandle = (origin: Box, handle: Corner, at: Point): Box => {
-		const opposite = cornerOf(origin, CORNERS[(CORNERS.indexOf(handle) + 2) % 4]!);
-		const floor = 4 * unit;
-		// Kept from collapsing to nothing, which a mark could not come back from.
-		const x =
-			Math.abs(at.x - opposite.x) < floor
-				? opposite.x + Math.sign(at.x - opposite.x || 1) * floor
-				: at.x;
-		const y =
-			Math.abs(at.y - opposite.y) < floor
-				? opposite.y + Math.sign(at.y - opposite.y || 1) * floor
-				: at.y;
-		return boxBetween(opposite, { x, y });
+	/**
+	 * The box a pull of `handle` makes: the edges it owns follow the pointer and
+	 * the rest stay where they were, which is what makes a side drag one-way.
+	 */
+	const boxFromHandle = (origin: Box, handle: BoxHandle, at: Point): Box => {
+		const axes = HANDLE_AXES[handle];
+		// Never smaller than the padding it carries, or unpadding it would turn
+		// the box inside out — and a mark squashed to nothing cannot be got back.
+		const floor = selectionPad() * 2 + 2 * unit;
+		const box = { ...origin };
+		if (axes.x < 0) box.left = Math.min(at.x, box.right - floor);
+		else if (axes.x > 0) box.right = Math.max(at.x, box.left + floor);
+		if (axes.y < 0) box.top = Math.min(at.y, box.bottom - floor);
+		else if (axes.y > 0) box.bottom = Math.max(at.y, box.top + floor);
+		return box;
 	};
 
 	const load = (attachment: Attachment) => {
@@ -817,7 +892,13 @@ export function ImageAnnotator(options: {
 					id: grabbed.shape.id,
 					handle: grabbed.handle,
 					origin: grabbed.shape,
-					originBox: context === null ? boxBetween(at, at) : boundsOf(context, grabbed.shape),
+					// The padded box, so the handles line up with the dashed
+					// rectangle they sit on; the mapping below takes the padding
+					// back off, since the padding is not part of the mark.
+					originBox:
+						context === null
+							? boxBetween(at, at)
+							: padBox(boundsOf(context, grabbed.shape), selectionPad()),
 					before: shapes.get(),
 					moved: false,
 				};
@@ -893,7 +974,11 @@ export function ImageAnnotator(options: {
 						pull.origin.kind === "arrow"
 						? { ...pull.origin, [pull.handle]: at }
 						: pull.origin
-					: resized(pull.origin, pull.originBox, boxFromHandle(pull.originBox, pull.handle, at));
+					: resized(
+							pull.origin,
+							padBox(pull.originBox, -selectionPad()),
+							padBox(boxFromHandle(pull.originBox, pull.handle, at), -selectionPad()),
+						);
 			shapes.set(shapes.get().map((shape) => (shape.id === pull.id ? next : shape)));
 			redraw();
 			return;
