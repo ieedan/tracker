@@ -466,13 +466,12 @@ export function ImageAnnotator(options: {
 		context.fillStyle = shape.color;
 
 		if (shape.kind === "text") {
+			// Plain type in the chosen color. It carried a halo, and then a shadow,
+			// to hold it off a busy screenshot; both read as something drawn around
+			// the words rather than as the words. Somewhere it lands badly, the
+			// colors are right there to change.
 			context.font = `600 ${shape.size}px ui-sans-serif, system-ui, sans-serif`;
 			context.textBaseline = "top";
-			// A soft shadow rather than an outline around every letter: enough to
-			// hold the words off a busy screenshot, and near enough to invisible
-			// against a plain one. An outline reads as a border somebody drew.
-			context.shadowColor = shape.color === "#111111" ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.5)";
-			context.shadowBlur = Math.max(2, shape.size / 6);
 			context.fillText(shape.text, shape.at.x, shape.at.y);
 			context.restore();
 			return;
