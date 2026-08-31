@@ -4,6 +4,10 @@
  * Two steps, deliberately visible as two: granting access is somebody else's
  * decision (a GitHub org admin's), and picking repositories is yours. Collapsing
  * them into one button would hide which of the two failed.
+ *
+ * Neither step asks for a click it can answer itself: a lone grant this person
+ * already made is attached on sight, and the repositories it can see are
+ * fetched as soon as there is a connection to fetch them through.
  */
 import {
 	Div,
@@ -67,7 +71,6 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 			}),
 			api.GET("/api/v1/workspaces/[slug]/repositories", { params: { slug: params.slug.get() } }),
 		]);
-		loading.set(false);
 
 		if (state.error === undefined) {
 			providerReady.set(state.data.provider !== null);
@@ -78,6 +81,24 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 			reusable.set(state.data.reusable);
 		}
 		if (linked.error === undefined) repositories.set(linked.data);
+
+		// One grant, already made by this person, is not a choice — it is the only
+		// answer, and asking for it back is asking them to confirm the obvious.
+		// Two or more is a real fork, so that keeps its list. A failure here falls
+		// through to the card below with the toast saying why.
+		const sole =
+			connection.get() === null && reusable.get().length === 1 ? reusable.get()[0] : undefined;
+
+		if (sole !== undefined) {
+			// Attaching it also starts the repository fetch.
+			await reuse(sole);
+		} else if (connection.get() !== null) {
+			// Whatever the connection came from, the repositories behind it are what
+			// this section is for; fetch them now rather than behind a button.
+			void loadAvailable();
+		}
+
+		loading.set(false);
 	};
 
 	const loadAvailable = async () => {
@@ -295,20 +316,24 @@ export function RepositoriesSection(params: { slug: Readable<string> }) {
 								{ class: "text-[12px]" },
 								connection.bind((current) => `Connected to ${current?.account || "GitHub"}`),
 							),
+							// The list arrives on its own; this is only for when it changed
+							// on GitHub's side while the page sat here.
 							Button(
 								{
 									size: "sm",
 									variant: "ghost",
 									class: "ml-auto h-7 gap-1.5 text-[12px] text-muted-foreground",
 									loading: picking,
+									title: "Refresh the repository list",
 									onClick: () => void loadAvailable(),
 								},
-								"Add a repository",
+								RefreshCw({ class: "size-3.5" }),
+								"Refresh",
 							),
 						),
 
 						LinkedList(repositories, reindex, unlink),
-						Picker(matches, query, available, link),
+						Picker(matches, query, available, picking, link),
 					),
 				),
 			),
@@ -412,54 +437,75 @@ function indexSummary(repo: Repository): string {
 	}
 }
 
+/**
+ * The repositories the connection can see.
+ *
+ * Open by default — a list that is fetched anyway is not worth a click — so it
+ * has to say something while the fetch is in flight and something else when the
+ * app was installed against no repositories at all.
+ */
 function Picker(
 	matches: Readable<Available[]>,
 	query: ReturnType<typeof signal<string>>,
 	available: Readable<Available[]>,
+	picking: Readable<boolean>,
 	link: (entry: Available) => Promise<void>,
 ) {
-	return If(
-		available.bind((list) => list.length > 0),
-		Div(
-			{ class: "flex flex-col gap-2 rounded-md border border-border p-3" },
-			Div(
-				{ class: "relative" },
-				Search({
-					class:
-						"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
-				}),
-				Input({
-					value: query,
-					placeholder: "Filter repositories…",
-					class:
-						"h-8 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring",
-				}),
-			),
-			Div(
-				{ class: "flex max-h-64 flex-col gap-0.5 overflow-y-auto" },
-				ForEach(
-					matches,
-					(entry) => entry.externalId,
-					(entry) =>
-						Div(
-							{ class: "flex items-center gap-2 rounded px-1.5 py-1.5 hover:bg-accent/40" },
-							Span({ class: "min-w-0 flex-1 truncate text-[13px]" }, entry.bind("fullName")),
-							If(entry.bind((value) => value.linked))
-								.Then(Span({ class: "text-[11px] text-muted-foreground" }, "Linked"))
-								.Else(
-									Button(
-										{
-											size: "sm",
-											variant: "secondary",
-											class: "h-6 px-2 text-[11px]",
-											onClick: () => void link(entry.get()),
-										},
-										"Link",
-									),
+	return Div(
+		{ class: "flex flex-col gap-2 rounded-md border border-border p-3" },
+		If(available.bind((list) => list.length === 0))
+			.Then(
+				Span(
+					{ class: "text-[12px] text-muted-foreground" },
+					picking.bind((busy) =>
+						busy
+							? "Loading repositories…"
+							: "No repositories to add. Check which ones the app can see on GitHub.",
+					),
+				),
+			)
+			.Else(
+				Div(
+					{ class: "flex flex-col gap-2" },
+					Div(
+						{ class: "relative" },
+						Search({
+							class:
+								"pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground",
+						}),
+						Input({
+							value: query,
+							placeholder: "Filter repositories…",
+							class:
+								"h-8 w-full rounded-md border border-input bg-background pr-2 pl-7 text-[13px] outline-none placeholder:text-muted-foreground focus:border-ring",
+						}),
+					),
+					Div(
+						{ class: "flex max-h-64 flex-col gap-0.5 overflow-y-auto" },
+						ForEach(
+							matches,
+							(entry) => entry.externalId,
+							(entry) =>
+								Div(
+									{ class: "flex items-center gap-2 rounded px-1.5 py-1.5 hover:bg-accent/40" },
+									Span({ class: "min-w-0 flex-1 truncate text-[13px]" }, entry.bind("fullName")),
+									If(entry.bind((value) => value.linked))
+										.Then(Span({ class: "text-[11px] text-muted-foreground" }, "Linked"))
+										.Else(
+											Button(
+												{
+													size: "sm",
+													variant: "secondary",
+													class: "h-6 px-2 text-[11px]",
+													onClick: () => void link(entry.get()),
+												},
+												"Link",
+											),
+										),
 								),
 						),
+					),
 				),
 			),
-		),
 	);
 }
