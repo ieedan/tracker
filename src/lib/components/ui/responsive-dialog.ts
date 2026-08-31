@@ -197,40 +197,43 @@ export const ResponsiveDialogHeader = createComponent(function ResponsiveDialogH
 					{
 						"data-slot": "responsive-dialog-header",
 						class: cn(
-							// `1fr auto 1fr` rather than a flex row: grid sizes the two
-							// side columns equally, so the title sits at the middle of the
-							// bar rather than at the middle of what a wide action button
-							// left over.
-							"grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-border px-2 py-2",
+							// `1fr auto 1fr` rather than a flex row: equal side columns put
+							// the title at the middle of the bar rather than at the middle
+							// of what a wide action button left over.
+							"grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-x-2 gap-y-1 border-b border-border px-2 py-2",
+							// …but only while the middle column stays narrow enough for
+							// those side columns to reach the same width. A description is
+							// a sentence, and a sentence between the two corner buttons
+							// takes that room back and pulls the title off centre with it.
+							// So it drops to a row of its own, full width, where it has
+							// space to wrap and nothing left to push against. A header
+							// with no description simply has no second row.
+							"[&>[data-slot='dialog-description']]:col-span-3 [&>[data-slot='dialog-description']]:row-start-2 [&>[data-slot='dialog-description']]:text-center [&>[data-slot='dialog-description']]:text-[11px]",
+							"[&_[data-slot='dialog-title']]:min-w-0 [&_[data-slot='dialog-title']]:truncate [&_[data-slot='dialog-title']]:text-center [&_[data-slot='dialog-title']]:text-[15px] [&_[data-slot='dialog-title']]:leading-tight",
 							className,
 						),
 					},
 					DialogClose(
-						{ variant: "outline", size: "icon", class: "justify-self-start rounded-full" },
+						{
+							variant: "outline",
+							size: "icon",
+							class: "col-start-1 row-start-1 justify-self-start rounded-full",
+						},
 						XIcon({ class: "size-5", "aria-hidden": true }),
 						Span({ class: "sr-only" }, closeLabel),
 					),
-					Div(
-						{
-							// The description reads as a subtitle here rather than the
-							// paragraph it is in a dialog — smaller, centered under the
-							// title, and free to wrap. Cutting it off instead would hold
-							// the bar to one line at the price of the sentence that says
-							// what the panel is about to do.
-							class:
-								"flex min-w-0 flex-col items-center gap-0.5 text-center [&_[data-slot='dialog-description']]:text-[11px] [&_[data-slot='dialog-title']]:truncate [&_[data-slot='dialog-title']]:text-[15px] [&_[data-slot='dialog-title']]:leading-tight",
-						},
-						...children,
-					),
+					// The title lands in the middle cell on its own — the only child
+					// with no placement of its own, and the only cell left in row one.
+					...children,
 					// The third column holds the bar's symmetry even when there is no
 					// action to fill it. Round, and the same height as the close in the
 					// other corner, whatever size the caller built its button at.
 					action === undefined
-						? Div({ "aria-hidden": true })
+						? Div({ class: "col-start-3 row-start-1", "aria-hidden": true })
 						: Div(
 								{
 									class:
-										"justify-self-end [&>[data-slot='button']]:h-9 [&>[data-slot='button']]:rounded-full",
+										"col-start-3 row-start-1 justify-self-end [&>[data-slot='button']]:h-9 [&>[data-slot='button']]:rounded-full",
 								},
 								action(),
 							),
