@@ -274,6 +274,75 @@ function moved(shape: Shape, dx: number, dy: number): Shape {
 	};
 }
 
+function boxesOverlap(a: Box, b: Box): boolean {
+	return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
+}
+
+/** A box from two corners, in any order. */
+function boxBetween(a: Point, b: Point): Box {
+	return {
+		left: Math.min(a.x, b.x),
+		top: Math.min(a.y, b.y),
+		right: Math.max(a.x, b.x),
+		bottom: Math.max(a.y, b.y),
+	};
+}
+
+/** The four corners a box is resized by, clockwise from the top left. */
+const CORNERS = ["nw", "ne", "se", "sw"] as const;
+type Corner = (typeof CORNERS)[number];
+/** An arrow is resized by its ends instead — that is what an arrow is. */
+type Endpoint = "from" | "to";
+type Handle = Corner | Endpoint;
+
+function cornerOf(box: Box, corner: Corner): Point {
+	const left = corner === "nw" || corner === "sw";
+	const top = corner === "nw" || corner === "ne";
+	return { x: left ? box.left : box.right, y: top ? box.top : box.bottom };
+}
+
+/** Where the handles of a selected mark sit, and what each one is called. */
+function handlesOf(context: CanvasRenderingContext2D, shape: Shape): Array<[Handle, Point]> {
+	if (shape.kind === "arrow") {
+		return [
+			["from", shape.from],
+			["to", shape.to],
+		];
+	}
+	const box = boundsOf(context, shape);
+	return CORNERS.map((corner) => [corner, cornerOf(box, corner)]);
+}
+
+/**
+ * The same mark, mapped from one box onto another.
+ *
+ * Every kind resizes by having its geometry carried across: the ends of a
+ * rectangle, every point of a stroke. Text is the exception — scaling the box
+ * scales the type, since a text mark is its font size and nothing else.
+ */
+function resized(shape: Shape, from: Box, to: Box): Shape {
+	const spanX = from.right - from.left;
+	const spanY = from.bottom - from.top;
+	// A box with no extent has no scale to speak of; the mark is only moved.
+	const scaleX = spanX === 0 ? 1 : (to.right - to.left) / spanX;
+	const scaleY = spanY === 0 ? 1 : (to.bottom - to.top) / spanY;
+	const map = (point: Point): Point => ({
+		x: to.left + (point.x - from.left) * scaleX,
+		y: to.top + (point.y - from.top) * scaleY,
+	});
+
+	if (shape.kind === "text") {
+		return {
+			...shape,
+			at: map(shape.at),
+			// Type scales by its height; a font has no separate width to set.
+			size: Math.max(6, shape.size * Math.abs(scaleY)),
+		};
+	}
+	if (shape.kind === "stroke") return { ...shape, points: shape.points.map(map) };
+	return { ...shape, from: map(shape.from), to: map(shape.to) };
+}
+
 /** `shot.png` → `shot-annotated.png`, and marking up twice does not say it twice. */
 function annotatedFilename(filename: string): string {
 	const dot = filename.lastIndexOf(".");
@@ -315,10 +384,10 @@ export function ImageAnnotator(options: {
 	 */
 	const past = signal<Shape[][]>([]);
 	const future = signal<Shape[][]>([]);
-	/** The mark the pointer is holding, by id. */
-	const selected = signal<number | null>(null);
-	/** Whether the pointer is over a mark it could pick up, for the cursor. */
-	const overMark = signal(false);
+	/** The marks the pointer is holding, by id — several, after a marquee. */
+	const selected = signal<number[]>([]);
+	/** What the pointer would do here, as a Tailwind cursor class. */
+	const cursor = signal("cursor-crosshair");
 	const ready = signal(false);
 	const failed = signal(false);
 	const saving = signal(false);
@@ -335,8 +404,23 @@ export function ImageAnnotator(options: {
 	let ticket = 0;
 	/** Whether this instance is the one currently counted as open. */
 	let counted = false;
-	/** The mark being dragged: where the pointer was, and the list to undo to. */
-	let dragging: { id: number; at: Point; before: Shape[]; moved: boolean } | null = null;
+	/** The marks being dragged: where the pointer was, and the list to undo to. */
+	let dragging: { ids: number[]; at: Point; before: Shape[]; moved: boolean } | null = null;
+	/**
+	 * The handle being pulled. The shape is resized from the one it was when the
+	 * pull started rather than from the last frame, so a long drag cannot
+	 * accumulate rounding, and back to where it began is exactly where it began.
+	 */
+	let resizing: {
+		id: number;
+		handle: Handle;
+		origin: Shape;
+		originBox: Box;
+		before: Shape[];
+		moved: boolean;
+	} | null = null;
+	/** The rubber band, while one is being pulled out. */
+	let marquee: { from: Point; to: Point } | null = null;
 
 	const strokeWidth = () => WEIGHTS[weight.get()]!.stroke * unit;
 	const fontSize = () => WEIGHTS[weight.get()]!.font * unit;
@@ -434,20 +518,59 @@ export function ImageAnnotator(options: {
 		context.restore();
 	};
 
-	/** The dashed box around the mark the pointer is holding. */
-	const paintSelection = (context: CanvasRenderingContext2D, shape: Shape) => {
-		const box = boundsOf(context, shape);
-		const pad = 4 * unit;
+	const SELECTION_COLOR = "#60a5fa";
+
+	const dashedBox = (context: CanvasRenderingContext2D, box: Box, pad = 4 * unit) => {
 		context.save();
 		context.setLineDash([6 * unit, 4 * unit]);
 		context.lineWidth = Math.max(1, 1.5 * unit);
-		context.strokeStyle = "#60a5fa";
+		context.strokeStyle = SELECTION_COLOR;
 		context.strokeRect(
 			box.left - pad,
 			box.top - pad,
 			box.right - box.left + pad * 2,
 			box.bottom - box.top + pad * 2,
 		);
+		context.restore();
+	};
+
+	/** How wide a handle is drawn, and how near counts as grabbing it. */
+	const handleSize = () => 9 * unit;
+
+	/**
+	 * The dashed boxes, and the handles of a lone selection.
+	 *
+	 * Handles are only offered when one mark is selected: with several, the box
+	 * says what would move, and resizing a heap of marks at once is a different
+	 * gesture than this editor has room for.
+	 */
+	const paintSelection = (context: CanvasRenderingContext2D, list: Shape[]) => {
+		const ids = new Set(selected.get());
+		const held = list.filter((shape) => ids.has(shape.id));
+		if (held.length === 0) return;
+
+		for (const shape of held) dashedBox(context, boundsOf(context, shape));
+
+		const only = held.length === 1 ? held[0] : undefined;
+		if (only === undefined) return;
+
+		const size = handleSize();
+		context.save();
+		context.lineWidth = Math.max(1, 1.5 * unit);
+		context.strokeStyle = SELECTION_COLOR;
+		context.fillStyle = "#ffffff";
+		for (const [, point] of handlesOf(context, only)) {
+			// Round for an arrow's ends, square for a corner — the shape of the
+			// handle says which gesture it is.
+			context.beginPath();
+			if (only.kind === "arrow") {
+				context.arc(point.x, point.y, size / 2, 0, Math.PI * 2);
+			} else {
+				context.rect(point.x - size / 2, point.y - size / 2, size, size);
+			}
+			context.fill();
+			context.stroke();
+		}
 		context.restore();
 	};
 
@@ -465,9 +588,8 @@ export function ImageAnnotator(options: {
 		for (const shape of list) paint(context, shape);
 		if (drawing !== null) paint(context, drawing);
 		if (!withSelection) return;
-		const id = selected.get();
-		const held = id === null ? undefined : list.find((shape) => shape.id === id);
-		if (held !== undefined) paintSelection(context, held);
+		paintSelection(context, list);
+		if (marquee !== null) dashedBox(context, boxBetween(marquee.from, marquee.to), 0);
 	};
 
 	/** The topmost mark under a point, which is the one a click means. */
@@ -481,6 +603,75 @@ export function ImageAnnotator(options: {
 			if (hits(context, shape, at, slack)) return shape;
 		}
 		return null;
+	};
+
+	/** The lone selected mark, when there is exactly one — what handles belong to. */
+	const lone = (): Shape | null => {
+		const ids = selected.get();
+		if (ids.length !== 1) return null;
+		return shapes.get().find((shape) => shape.id === ids[0]) ?? null;
+	};
+
+	/** The handle under a point, if the pointer is on one. */
+	const handleAt = (at: Point): { shape: Shape; handle: Handle } | null => {
+		const context = canvasRef.get()?.getContext("2d") ?? null;
+		const shape = lone();
+		if (context === null || shape === null) return null;
+		const reach = handleSize();
+		for (const [handle, point] of handlesOf(context, shape)) {
+			if (Math.abs(at.x - point.x) <= reach && Math.abs(at.y - point.y) <= reach) {
+				return { shape, handle };
+			}
+		}
+		return null;
+	};
+
+	/** What each handle does, said in the shape of the pointer. */
+	const HANDLE_CURSOR: Record<Handle, string> = {
+		nw: "cursor-nwse-resize",
+		se: "cursor-nwse-resize",
+		ne: "cursor-nesw-resize",
+		sw: "cursor-nesw-resize",
+		from: "cursor-move",
+		to: "cursor-move",
+	};
+
+	const updateCursor = (at: Point | null) => {
+		const which = tool.get();
+		if (which === "text") {
+			cursor.set("cursor-text");
+			return;
+		}
+		if (which !== "select") {
+			cursor.set("cursor-crosshair");
+			return;
+		}
+		if (at === null) {
+			cursor.set("cursor-default");
+			return;
+		}
+		const handle = handleAt(at);
+		if (handle !== null) {
+			cursor.set(HANDLE_CURSOR[handle.handle]);
+			return;
+		}
+		cursor.set(markAt(at) === null ? "cursor-default" : "cursor-move");
+	};
+
+	/** The box a pull of `handle` makes, with the opposite corner staying put. */
+	const boxFromHandle = (origin: Box, handle: Corner, at: Point): Box => {
+		const opposite = cornerOf(origin, CORNERS[(CORNERS.indexOf(handle) + 2) % 4]!);
+		const floor = 4 * unit;
+		// Kept from collapsing to nothing, which a mark could not come back from.
+		const x =
+			Math.abs(at.x - opposite.x) < floor
+				? opposite.x + Math.sign(at.x - opposite.x || 1) * floor
+				: at.x;
+		const y =
+			Math.abs(at.y - opposite.y) < floor
+				? opposite.y + Math.sign(at.y - opposite.y || 1) * floor
+				: at.y;
+		return boxBetween(opposite, { x, y });
 	};
 
 	const load = (attachment: Attachment) => {
@@ -509,10 +700,13 @@ export function ImageAnnotator(options: {
 		element.src = attachment.url;
 	};
 
-	/** Drops a selection whose mark the list no longer holds. */
+	/** Drops from the selection any mark the list no longer holds. */
 	const reconcileSelection = (list: Shape[]) => {
-		const id = selected.get();
-		if (id !== null && !list.some((shape) => shape.id === id)) selected.set(null);
+		const ids = selected.get();
+		if (ids.length === 0) return;
+		const present = new Set(list.map((shape) => shape.id));
+		const kept = ids.filter((id) => present.has(id));
+		if (kept.length !== ids.length) selected.set(kept);
 	};
 
 	/** One edit: the list before it goes on the stack, and redo starts over. */
@@ -552,25 +746,28 @@ export function ImageAnnotator(options: {
 	};
 
 	const deleteSelected = () => {
-		const id = selected.get();
-		if (id === null) return;
-		apply(shapes.get().filter((shape) => shape.id !== id));
+		const ids = new Set(selected.get());
+		if (ids.size === 0) return;
+		apply(shapes.get().filter((shape) => !ids.has(shape.id)));
 	};
 
-	const commitText = () => {
+	/** Places the text being typed, and says which mark it became. */
+	const commitText = (): number | null => {
 		const pending = draft.get();
 		const text = draftText.get().trim();
 		draft.set(null);
 		draftText.set("");
-		if (pending === null || text === "") return;
+		if (pending === null || text === "") return null;
+		const id = (nextShapeId += 1);
 		commit({
 			kind: "text",
-			id: (nextShapeId += 1),
+			id,
 			color: color.get(),
 			size: pending.size,
 			at: pending.at,
 			text,
 		});
+		return id;
 	};
 
 	const startText = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
@@ -610,17 +807,53 @@ export function ImageAnnotator(options: {
 		commitText();
 
 		if (which === "select") {
-			const held = markAt(at);
-			selected.set(held?.id ?? null);
-			// Empty picture under the pointer: the click was a deselect.
-			if (held === null) {
+			// A handle first: it sits on top of the mark it belongs to, and
+			// pulling it is a different gesture from moving the mark.
+			const grabbed = handleAt(at);
+			if (grabbed !== null) {
+				canvas.setPointerCapture(event.pointerId);
+				const context = canvas.getContext("2d");
+				resizing = {
+					id: grabbed.shape.id,
+					handle: grabbed.handle,
+					origin: grabbed.shape,
+					originBox: context === null ? boxBetween(at, at) : boundsOf(context, grabbed.shape),
+					before: shapes.get(),
+					moved: false,
+				};
 				redraw();
 				return;
 			}
-			canvas.setPointerCapture(event.pointerId);
-			// The list as it stands is what an undo of this drag goes back to,
-			// kept aside until the drag turns out to have moved anything.
-			dragging = { id: held.id, at, before: shapes.get(), moved: false };
+
+			const held = markAt(at);
+
+			if (held === null) {
+				// Empty picture: pull a rubber band out and take whatever it covers.
+				canvas.setPointerCapture(event.pointerId);
+				marquee = { from: at, to: at };
+				if (!event.shiftKey) selected.set([]);
+				redraw();
+				return;
+			}
+
+			const ids = selected.get();
+			// Shift adds to the selection rather than replacing it; a plain click
+			// on something already held keeps the group, so a drag moves it whole.
+			const next = event.shiftKey
+				? ids.includes(held.id)
+					? ids.filter((id) => id !== held.id)
+					: [...ids, held.id]
+				: ids.includes(held.id)
+					? ids
+					: [held.id];
+			selected.set(next);
+
+			if (next.includes(held.id)) {
+				canvas.setPointerCapture(event.pointerId);
+				// The list as it stands is what an undo of this drag goes back to,
+				// kept aside until the drag turns out to have moved anything.
+				dragging = { ids: next, at, before: shapes.get(), moved: false };
+			}
 			redraw();
 			return;
 		}
@@ -650,24 +883,46 @@ export function ImageAnnotator(options: {
 	const extend = (canvas: HTMLCanvasElement, event: PointerEvent) => {
 		const at = toImage(canvas, event.clientX, event.clientY);
 
+		if (resizing !== null) {
+			const pull = resizing;
+			pull.moved = true;
+			const next =
+				pull.handle === "from" || pull.handle === "to"
+					? // An arrow is pulled by an end, which is simply put where the
+						// pointer is: no box, no scaling, just that end.
+						pull.origin.kind === "arrow"
+						? { ...pull.origin, [pull.handle]: at }
+						: pull.origin
+					: resized(pull.origin, pull.originBox, boxFromHandle(pull.originBox, pull.handle, at));
+			shapes.set(shapes.get().map((shape) => (shape.id === pull.id ? next : shape)));
+			redraw();
+			return;
+		}
+
+		if (marquee !== null) {
+			marquee.to = at;
+			redraw();
+			return;
+		}
+
 		if (dragging !== null) {
-			const dx = at.x - dragging.at.x;
-			const dy = at.y - dragging.at.y;
+			const drag = dragging;
+			const dx = at.x - drag.at.x;
+			const dy = at.y - drag.at.y;
 			if (dx === 0 && dy === 0) return;
-			dragging.at = at;
-			dragging.moved = true;
+			drag.at = at;
+			drag.moved = true;
+			const ids = new Set(drag.ids);
 			// Moved live, without touching history: the whole drag is one edit,
 			// pushed when it ends.
-			shapes.set(
-				shapes.get().map((shape) => (shape.id === dragging?.id ? moved(shape, dx, dy) : shape)),
-			);
+			shapes.set(shapes.get().map((shape) => (ids.has(shape.id) ? moved(shape, dx, dy) : shape)));
 			redraw();
 			return;
 		}
 
 		if (drawing === null) {
 			// Nothing in hand: the cursor still has to say what a press would do.
-			if (tool.get() === "select") overMark.set(markAt(at) !== null);
+			updateCursor(at);
 			return;
 		}
 
@@ -676,16 +931,42 @@ export function ImageAnnotator(options: {
 		redraw();
 	};
 
+	/** One edit, from a list kept aside before the gesture started. */
+	const commitGesture = (before: Shape[]) => {
+		past.update((stack) => [...stack, before]);
+		future.set([]);
+	};
+
 	const finish = () => {
+		if (resizing !== null) {
+			const pull = resizing;
+			resizing = null;
+			if (pull.moved) commitGesture(pull.before);
+			return;
+		}
+
+		if (marquee !== null) {
+			const band = boxBetween(marquee.from, marquee.to);
+			const context = canvasRef.get()?.getContext("2d") ?? null;
+			marquee = null;
+			// A band of no size is a click on the picture, which selects nothing.
+			if (context !== null && band.right - band.left > unit && band.bottom - band.top > unit) {
+				const caught = shapes
+					.get()
+					.filter((shape) => boxesOverlap(boundsOf(context, shape), band))
+					.map((shape) => shape.id);
+				selected.update((ids) => [...new Set([...ids, ...caught])]);
+			}
+			redraw();
+			return;
+		}
+
 		if (dragging !== null) {
 			const drag = dragging;
 			dragging = null;
 			// A press that picked a mark up and put it back down is a selection,
 			// not an edit, so it leaves nothing to undo.
-			if (drag.moved) {
-				past.update((stack) => [...stack, drag.before]);
-				future.set([]);
-			}
+			if (drag.moved) commitGesture(drag.before);
 			return;
 		}
 
@@ -702,6 +983,18 @@ export function ImageAnnotator(options: {
 			}
 		}
 		commit(shape);
+		// A shape you just drew is the one you are most likely to want to nudge,
+		// so the pointer takes over holding it — Excalidraw's habit. The pen and
+		// the highlighter stay put: those are used in strokes, not one at a time.
+		if (shape.kind !== "stroke") handOver(shape.id);
+	};
+
+	/** Back to the pointer, holding the mark that was just made. */
+	const handOver = (id: number) => {
+		tool.set("select");
+		selected.set([id]);
+		cursor.set("cursor-move");
+		redraw();
 	};
 
 	/** Switching tools puts down whatever the last one was holding. */
@@ -709,8 +1002,8 @@ export function ImageAnnotator(options: {
 		commitText();
 		tool.set(value);
 		// The dashed box belongs to the pointer; another tool has no use for it.
-		if (value !== "select") selected.set(null);
-		overMark.set(false);
+		if (value !== "select") selected.set([]);
+		updateCursor(null);
 		redraw();
 	};
 
@@ -755,8 +1048,10 @@ export function ImageAnnotator(options: {
 			shapes.set([]);
 			past.set([]);
 			future.set([]);
-			selected.set(null);
-			overMark.set(false);
+			selected.set([]);
+			resizing = null;
+			marquee = null;
+			updateCursor(null);
 			draft.set(null);
 			draftText.set("");
 			load(attachment);
@@ -807,7 +1102,7 @@ export function ImageAnnotator(options: {
 					if (event.altKey) return;
 
 					if (event.key === "Delete" || event.key === "Backspace") {
-						if (selected.get() === null) return;
+						if (selected.get().length === 0) return;
 						event.preventDefault();
 						deleteSelected();
 						return;
@@ -1017,13 +1312,9 @@ export function ImageAnnotator(options: {
 								// `touch-none` so a drag draws instead of panning the page.
 								class: cn(
 									"max-h-full max-w-full touch-none object-contain",
-									derived([tool, overMark], (current, over) => {
-										if (current === "text") return "cursor-text";
-										// The pointer says what a press would do: pick a mark up
-										// where there is one, and nothing where there is not.
-										if (current === "select") return over ? "cursor-move" : "cursor-default";
-										return "cursor-crosshair";
-									}),
+									// The pointer says what a press would do here: draw, pick a
+									// mark up, or pull the handle it is over.
+									cursor,
 								),
 								onPointerdown: (event) => begin(event.currentTarget, event),
 								onPointermove: (event) => extend(event.currentTarget, event),
@@ -1059,7 +1350,12 @@ export function ImageAnnotator(options: {
 											onKeydown: (event) => {
 												if (event.key === "Enter") {
 													event.preventDefault();
-													commitText();
+													// Finished deliberately, so the pointer takes it — the
+													// same hand-over a drawn shape gets. A commit that
+													// happens as a side effect of something else (picking
+													// another tool, saving) leaves the tool alone.
+													const id = commitText();
+													if (id !== null) handOver(id);
 													return;
 												}
 												if (event.key === "Escape") {
