@@ -46,7 +46,16 @@ export function imageChoice(existing: string | null = null): ImageChoice {
 	};
 }
 
-/** A square you click to choose a picture, showing the current one if there is one. */
+/**
+ * A square you click to choose a picture, showing the current one if there is
+ * one.
+ *
+ * The tile is the whole control: no labelled button beside it saying what a
+ * picture-shaped square with a dashed border already says. It answers on hover
+ * instead, and the one thing hovering cannot tell you — that a picture can be
+ * taken off again — sits on the tile as a corner button, and only once there is
+ * a picture to remove.
+ */
 export function ImagePicker(options: {
 	choice: ImageChoice;
 	/** Name behind the generated tile shown when there is no picture. */
@@ -65,7 +74,6 @@ export function ImagePicker(options: {
 	placeholder?: Child;
 	/** Tailwind for the tile itself — a person's picture is round, not a square. */
 	previewClass?: string;
-	label?: string;
 	/** Called after a successful upload or a clear, for forms that save eagerly. */
 	onChange?: (key: string | null) => void;
 	class?: string;
@@ -144,7 +152,7 @@ export function ImagePicker(options: {
 	};
 
 	return Div(
-		{ class: cn("flex items-center gap-3", options.class) },
+		{ class: cn("relative w-fit", options.class) },
 
 		Input({
 			this: input,
@@ -165,10 +173,11 @@ export function ImagePicker(options: {
 			{
 				variant: "ghost",
 				class: cn(
-					"relative size-14 shrink-0 overflow-hidden rounded-lg border border-dashed border-border p-0 hover:border-ring",
+					"group relative size-14 shrink-0 overflow-hidden rounded-lg border border-dashed border-border p-0 hover:border-ring",
 					options.previewClass,
 				),
 				title: "Choose a picture",
+				"aria-label": "Choose a picture",
 				onClick: () => input.get()?.click(),
 			},
 			If(choice.preview.bind((value) => value !== ""))
@@ -193,6 +202,16 @@ export function ImagePicker(options: {
 						),
 				),
 
+			// What the label used to say, said by the tile itself and only while
+			// the pointer is on it.
+			Div(
+				{
+					class:
+						"absolute inset-0 hidden items-center justify-center bg-background/70 group-hover:flex",
+				},
+				ImagePlus({ class: "size-4 text-muted-foreground" }),
+			),
+
 			If(
 				choice.uploading,
 				Div(
@@ -202,31 +221,33 @@ export function ImagePicker(options: {
 			),
 		),
 
-		Div(
-			{ class: "flex flex-col items-start gap-1" },
+		// Hover is a pointer's answer only, and this screen is mostly read on a
+		// phone — so an empty tile carries the same invitation permanently, in
+		// the corner where the remove button will be once there is a picture.
+		If(
+			choice.preview.bind((value) => value === ""),
+			Div(
+				{
+					class:
+						"pointer-events-none absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground",
+				},
+				ImagePlus({ class: "size-3" }),
+			),
+		),
+
+		// Outside the tile rather than inside it: a button cannot nest in a button.
+		If(
+			choice.preview.bind((value) => value !== ""),
 			Button(
 				{
-					variant: "ghost",
-					size: "sm",
-					class: "h-7 gap-1.5 text-[12px] text-muted-foreground",
-					disabled: choice.uploading,
-					onClick: () => input.get()?.click(),
+					variant: "outline",
+					size: "icon-xs",
+					class: "absolute -top-1.5 -right-1.5 size-5 rounded-full p-0",
+					title: "Remove the picture",
+					"aria-label": "Remove the picture",
+					onClick: clear,
 				},
-				ImagePlus({ class: "size-3.5" }),
-				options.label ?? "Upload a picture",
-			),
-			If(
-				choice.preview.bind((value) => value !== ""),
-				Button(
-					{
-						variant: "ghost",
-						size: "sm",
-						class: "h-6 gap-1.5 text-[11px] text-muted-foreground",
-						onClick: clear,
-					},
-					X({ class: "size-3" }),
-					"Remove",
-				),
+				X({ class: "size-3" }),
 			),
 		),
 	);

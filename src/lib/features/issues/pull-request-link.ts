@@ -181,6 +181,31 @@ export function PullRequestIcon(state: Readable<PullRequestState>, className?: s
 	});
 }
 
+/**
+ * The shortcut in the issue's back-nav header: icon and number, nothing else,
+ * because the header has a fixed height and the title is already on the page.
+ * Renders nothing when no pull request is linked.
+ */
+export function PullRequestHeaderLink(pull: Readable<Issue["pullRequest"]>) {
+	return If(
+		pull.bind((value) => value !== null),
+		A(
+			{
+				href: pull.bind((value) => value?.url ?? "#"),
+				target: "_blank",
+				rel: "noreferrer",
+				title: pull.bind((value) =>
+					value === null ? "" : `${value.title} · ${PULL_REQUEST_STATE_LABELS[value.state]}`,
+				),
+				class:
+					"flex shrink-0 items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground hover:underline",
+			},
+			PullRequestIcon(pull.bind((value) => value?.state ?? "open")),
+			pull.bind((value) => (value === null ? "" : `#${value.number}`)),
+		),
+	);
+}
+
 /** The compact marker on an issue row. */
 export function PullRequestBadge(pull: Readable<Issue["pullRequest"]>) {
 	return If(

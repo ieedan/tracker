@@ -24,9 +24,17 @@ import { Trash2 } from "@implementjs/lucide";
 import { toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import type { Issue } from "@/lib/domain/schemas";
 import { deleteIssues } from "./issue-store";
+import { cn } from "@/lib/utils";
 
 /** How many issues the confirmation names before it starts counting instead. */
 const NAMED_LIMIT = 8;
@@ -135,6 +143,25 @@ export function DeleteIssuesDialog({
 		onDeleted?.(done);
 	};
 
+	/**
+	 * The confirm, in whichever corner the panel has for it — the drawer's
+	 * top-right or the dialog's footer. Only one of the two is ever mounted. The
+	 * drawer's copy is the short label: a corner is not the place for "Delete 12
+	 * issues", and the list of exactly which ones is right below it either way.
+	 */
+	const DeleteButton = (options: { long: boolean } = { long: true }) =>
+		Button(
+			{
+				size: "sm",
+				variant: "destructive",
+				loading: deleting,
+				onClick: () => void confirm(),
+			},
+			options.long
+				? count.bind((n) => (n === 1 ? "Delete issue" : `Delete ${n} issues`))
+				: "Delete",
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
@@ -143,9 +170,9 @@ export function DeleteIssuesDialog({
 			deleting.set(false);
 		}),
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-md" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-md", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{ action: () => DeleteButton({ long: false }) },
 				DialogTitle(
 					{ class: "text-[15px] font-semibold" },
 					count.bind((n) => (n === 1 ? "Delete issue" : `Delete ${n} issues`)),
@@ -162,8 +189,8 @@ export function DeleteIssuesDialog({
 
 			// Which ones, by name. Deleting the wrong issue is unrecoverable, so
 			// the count alone is not enough to confirm against.
-			Div(
-				{ class: "flex max-h-56 flex-col gap-1 overflow-y-auto px-4 py-3" },
+			ResponsiveDialogBody(
+				{ class: "flex max-h-56 flex-col gap-1 px-4 py-3" },
 				ForEach(
 					named,
 					(issue) => issue.id,
@@ -186,8 +213,8 @@ export function DeleteIssuesDialog({
 				),
 			),
 
-			Div(
-				{ class: "flex justify-end gap-2 border-t border-border px-4 py-3" },
+			ResponsiveDialogFooter(
+				{ class: "py-3" },
 				Button(
 					{
 						size: "sm",
@@ -197,15 +224,7 @@ export function DeleteIssuesDialog({
 					},
 					"Cancel",
 				),
-				Button(
-					{
-						size: "sm",
-						variant: "destructive",
-						loading: deleting,
-						onClick: () => void confirm(),
-					},
-					count.bind((n) => (n === 1 ? "Delete issue" : `Delete ${n} issues`)),
-				),
+				DeleteButton(),
 			),
 		),
 	);

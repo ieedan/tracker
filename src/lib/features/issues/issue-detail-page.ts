@@ -48,7 +48,7 @@ import { IssueLabelPicker } from "./label-picker";
 import { IssueTimeline, type CommentActions } from "./activity-feed";
 import { patchIssue } from "./issue-store";
 import { RepositoryPicker } from "./repository-picker";
-import { PullRequestLink } from "./pull-request-link";
+import { PullRequestHeaderLink, PullRequestLink } from "./pull-request-link";
 import { BodyComposer } from "./body-composer";
 import { TransferIssueButton } from "./transfer-issue";
 import { DeleteIssueButton } from "./delete-issue";
@@ -402,6 +402,9 @@ export function IssueDetailPage({
 							{ class: "font-mono text-[12px] text-muted-foreground" },
 							issue.bind("identifier"),
 						),
+						// Pushed to the far right so a linked pull request is one tap
+						// away instead of a scroll down to the properties rail.
+						Div({ class: "ml-auto" }, PullRequestHeaderLink(linkedPull)),
 					),
 
 			Div(

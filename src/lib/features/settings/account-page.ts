@@ -50,7 +50,10 @@ function ProfileSection(data: Readable<PageData>) {
 			),
 		),
 		Div(
-			{ class: "flex flex-col gap-4 rounded-md border border-border p-3" },
+			// No box around it any more: with the label gone this section is one
+			// tile, and a bordered card holding a single 56px square is mostly
+			// empty space.
+			{ class: "flex flex-col gap-4" },
 			ImagePicker({
 				choice: picture,
 				fallback: data.bind((value) => value.user.name),
@@ -59,7 +62,6 @@ function ProfileSection(data: Readable<PageData>) {
 				// exactly the avatar the rest of the chrome will.
 				previewClass: "rounded-full",
 				placeholder: UserAvatar({ id: user.id, name: user.name }, "size-full text-lg"),
-				label: "Upload a picture",
 				// Saved on choose rather than behind a button: there is no other
 				// field on this control to batch it with.
 				onChange: (key) => void savePicture(key),

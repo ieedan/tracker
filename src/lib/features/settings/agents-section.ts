@@ -22,10 +22,18 @@ import { toastError } from "@/lib/client/toast";
 import { HarnessLogo, McpLogo } from "@/lib/components/harness-logo";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import { describeScopes } from "@/lib/domain/agents";
 import type { ConnectedAgent } from "@/lib/domain/schemas";
 import { relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export function AgentsSection(copy: (value: string) => Promise<void>) {
 	const agents = signal<ConnectedAgent[]>([]);
@@ -232,9 +240,9 @@ function ConnectDialog(open: Signal<boolean>, copy: (value: string) => Promise<v
 		// without it — an agent cannot guess where this app lives.
 		ImplementLifecycle({ onMount: () => origin.set(window.location.origin) }),
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-lg" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-lg", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{},
 				Div(
 					{ class: "flex items-center gap-2" },
 					McpLogo(),
@@ -246,7 +254,7 @@ function ConnectDialog(open: Signal<boolean>, copy: (value: string) => Promise<v
 				),
 			),
 
-			Div(
+			ResponsiveDialogBody(
 				{ class: "flex flex-col gap-4 px-4 py-4" },
 				Div(
 					{ class: "flex flex-col gap-1.5" },
@@ -289,8 +297,8 @@ function ConnectDialog(open: Signal<boolean>, copy: (value: string) => Promise<v
 				),
 			),
 
-			Div(
-				{ class: "flex justify-end border-t border-border px-4 py-2.5" },
+			// Nothing but a Done that the drawer's close button already is.
+			ResponsiveDialogFooter(
 				Button({ size: "sm", variant: "secondary", onClick: () => open.set(false) }, "Done"),
 			),
 		),
