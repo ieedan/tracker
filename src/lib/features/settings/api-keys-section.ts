@@ -28,7 +28,14 @@ import {
 } from "@/lib/components/ui/empty";
 import { Checkbox } from "@/lib/components/ui/checkbox";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogBody,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import { Label } from "@/lib/components/ui/label";
 import {
 	API_KEY_EXPIRATIONS,
@@ -236,15 +243,35 @@ function CreateApiKeyDialog(
 		open.set(false);
 	};
 
+	/**
+	 * Built twice — once into the drawer's top-right corner, once into the
+	 * dialog's footer — and mounted in whichever of those the panel turned out
+	 * to have. Both read the same signals, so the shape cannot change what the
+	 * button knows about itself.
+	 */
+	const CreateButton = () =>
+		Button(
+			{
+				size: "sm",
+				loading: creating,
+				disabled: derived(
+					[name, grantedCount],
+					(value, count) => value.trim() === "" || count === 0,
+				),
+				onClick: () => void submit(),
+			},
+			"Create key",
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ImplementEffect([open], (isOpen) => {
 			if (isOpen) reset();
 		}),
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-md" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-md", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{ action: CreateButton },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Create API key"),
 				DialogDescription(
 					{ class: "text-[12px]" },
@@ -252,7 +279,7 @@ function CreateApiKeyDialog(
 				),
 			),
 
-			Div(
+			ResponsiveDialogBody(
 				{ class: "flex flex-col gap-4 px-4 py-4" },
 				Div(
 					{ class: "flex flex-col gap-1.5" },
@@ -379,21 +406,9 @@ function CreateApiKeyDialog(
 				),
 			),
 
-			Div(
-				{ class: "flex items-center justify-end gap-2 border-t border-border px-4 py-2.5" },
+			ResponsiveDialogFooter(
 				Button({ variant: "ghost", size: "sm", onClick: () => open.set(false) }, "Cancel"),
-				Button(
-					{
-						size: "sm",
-						loading: creating,
-						disabled: derived(
-							[name, grantedCount],
-							(value, count) => value.trim() === "" || count === 0,
-						),
-						onClick: () => void submit(),
-					},
-					"Create key",
-				),
+				CreateButton(),
 			),
 		),
 	);

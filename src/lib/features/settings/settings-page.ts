@@ -18,7 +18,13 @@ import { api, messageOf } from "@/lib/client/api";
 import { toastError, toastSuccess } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
-import { ResponsiveDialog, ResponsiveDialogContent } from "@/lib/components/ui/responsive-dialog";
+import {
+	RESPONSIVE_DIALOG_PANEL,
+	ResponsiveDialog,
+	ResponsiveDialogContent,
+	ResponsiveDialogFooter,
+	ResponsiveDialogHeader,
+} from "@/lib/components/ui/responsive-dialog";
 import type { Label, Member, Workspace } from "@/lib/domain/schemas";
 import { LABEL_COLORS } from "@/lib/domain/issues";
 import { ImagePicker, imageChoice } from "@/lib/features/workspaces/image-picker";
@@ -28,6 +34,7 @@ import { ApiKeysSection } from "./api-keys-section";
 import { RepositoriesSection } from "./repositories-section";
 import { TeamsSection } from "./teams-section";
 import { WebhooksSection } from "./webhooks-section";
+import { cn } from "@/lib/utils";
 
 interface PageData {
 	workspace: Workspace;
@@ -322,12 +329,27 @@ function DeleteLabelDialog(
 ) {
 	const labelName = doomed.bind((value) => value?.name ?? "");
 
+	/**
+	 * The confirm, in whichever corner the panel has for it — the drawer's
+	 * top-right or the dialog's footer. Only one of the two is ever mounted.
+	 */
+	const DeleteButton = (options: { long: boolean } = { long: true }) =>
+		Button(
+			{
+				size: "sm",
+				variant: "destructive",
+				loading: deleting,
+				onClick: () => void confirm(),
+			},
+			options.long ? "Delete label" : "Delete",
+		);
+
 	return ResponsiveDialog(
 		{ open },
 		ResponsiveDialogContent(
-			{ class: "gap-0 p-0 md:max-w-md" },
-			Div(
-				{ class: "flex flex-col gap-1 border-b border-border px-4 py-3" },
+			{ class: cn("gap-0 p-0 md:max-w-md", RESPONSIVE_DIALOG_PANEL) },
+			ResponsiveDialogHeader(
+				{ action: () => DeleteButton({ long: false }) },
 				DialogTitle({ class: "text-[15px] font-semibold" }, "Delete label"),
 				DialogDescription(
 					{ class: "text-[12px]" },
@@ -338,8 +360,8 @@ function DeleteLabelDialog(
 				),
 			),
 
-			Div(
-				{ class: "flex justify-end gap-2 border-t border-border px-4 py-3" },
+			ResponsiveDialogFooter(
+				{ class: "py-3" },
 				Button(
 					{
 						size: "sm",
@@ -349,15 +371,7 @@ function DeleteLabelDialog(
 					},
 					"Cancel",
 				),
-				Button(
-					{
-						size: "sm",
-						variant: "destructive",
-						loading: deleting,
-						onClick: () => void confirm(),
-					},
-					"Delete label",
-				),
+				DeleteButton(),
 			),
 		),
 	);

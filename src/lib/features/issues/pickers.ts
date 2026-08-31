@@ -350,8 +350,13 @@ export function TeamPicker(
 
 /**
  * Which workspace the issue lands in — the crumb ahead of the team in the
- * composer (ENG-58). With only one workspace there is nothing to pick, so the
- * crumb is static text rather than a dropdown that opens onto a single row.
+ * composer (ENG-58), or a pill among the issue's other properties where a
+ * phone has no breadcrumb to put it in.
+ *
+ * With only one workspace there is nothing to pick. The crumb still says which
+ * one you are in, as static text rather than a dropdown onto a single row; the
+ * pill renders nothing at all, because a property row is a row of controls and
+ * one that cannot be operated only reads as broken.
  */
 export function WorkspacePicker(
 	current: Readable<Workspace | null>,
@@ -359,7 +364,7 @@ export function WorkspacePicker(
 	onPick: (slug: string) => void,
 	/** `open` is a read as much as a control: the composer warms what a switch
 	 * will need the moment the menu comes up (ENG-71). */
-	options: { class?: string; open?: Signal<boolean> } = {},
+	options: { class?: string; open?: Signal<boolean>; crumb?: boolean } = {},
 ) {
 	// Fresh nodes per call — the crumb face is rendered in both branches.
 	const face = () =>
@@ -393,7 +398,9 @@ export function WorkspacePicker(
 			onSelect: onPick,
 			trigger: {
 				class: cn(
-					"h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground",
+					options.crumb === true
+						? "h-auto min-h-0 gap-1.5 px-1 py-0 text-[13px] leading-none font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+						: triggerClass,
 					options.class,
 				),
 				title: "Workspace",
@@ -401,15 +408,17 @@ export function WorkspacePicker(
 			face,
 		}),
 	).Else(
-		Span(
-			{
-				class: cn(
-					"flex items-center gap-1.5 px-1 text-[13px] leading-none font-medium text-muted-foreground",
-					options.class,
-				),
-			},
-			face(),
-		),
+		options.crumb === true
+			? Span(
+					{
+						class: cn(
+							"flex items-center gap-1.5 px-1 text-[13px] leading-none font-medium text-muted-foreground",
+							options.class,
+						),
+					},
+					face(),
+				)
+			: null,
 	);
 }
 
