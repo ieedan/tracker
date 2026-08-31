@@ -23,7 +23,8 @@ import { Button } from "@/lib/components/ui/button";
 import { ALLOWED_TYPES } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
-import { rejectionReason, startUpload, type Upload as InFlight } from "./uploader";
+import { CONVERTIBLE_ACCEPT, needsTranscode, toStorableImage } from "./transcode";
+import { newUpload, rejectionReason, startUpload, type Upload as InFlight } from "./uploader";
 
 export function filesFromList(list: FileList | File[] | null | undefined): File[] {
 	if (list === null || list === undefined) return [];
@@ -66,30 +67,67 @@ export function beginUploads(options: {
 	uploads: Signal<InFlight[]>;
 	onUploaded: (attachment: Attachment) => void;
 }): void {
-	for (const file of options.files) {
-		const reason = rejectionReason(file);
-		if (reason !== null) {
-			toastError(`${file.name}: ${reason}`);
-			continue;
-		}
-
-		const upload = startUpload({
-			file,
-			slug: options.slug,
-			issueId: options.issueId,
-			commentId: options.commentId,
-		});
-		options.uploads.push(upload);
-
-		upload.attachment.onChange((value) => {
-			if (value === null) return;
-			options.onUploaded(value);
-			options.uploads.update((list) => list.filter((entry) => entry.localId !== upload.localId));
-		});
-	}
+	for (const file of options.files) void beginUpload(file, options);
 }
 
-const accept = ALLOWED_TYPES.join(",");
+/**
+ * One file, converted first if it has to be.
+ *
+ * The conversion is a step of its own on the list rather than a silent pause:
+ * a phone photo takes a moment, and a row that says nothing looks stuck.
+ */
+async function beginUpload(
+	file: File,
+	options: {
+		slug: string;
+		issueId?: string;
+		commentId?: string;
+		uploads: Signal<InFlight[]>;
+		onUploaded: (attachment: Attachment) => void;
+	},
+): Promise<void> {
+	let storable = file;
+
+	if (needsTranscode(file)) {
+		const converting = newUpload(file, "converting");
+		options.uploads.push(converting);
+		try {
+			storable = await toStorableImage(file);
+		} catch (cause) {
+			// The row stays, carrying why — the same way a failed upload does.
+			converting.error.set(
+				cause instanceof Error ? cause.message : "that photo could not be converted",
+			);
+			converting.status.set("error");
+			return;
+		}
+		options.uploads.update((list) => list.filter((entry) => entry.localId !== converting.localId));
+	}
+
+	const reason = rejectionReason(storable);
+	if (reason !== null) {
+		toastError(`${file.name}: ${reason}`);
+		return;
+	}
+
+	const upload = startUpload({
+		file: storable,
+		slug: options.slug,
+		issueId: options.issueId,
+		commentId: options.commentId,
+	});
+	options.uploads.push(upload);
+
+	upload.attachment.onChange((value) => {
+		if (value === null) return;
+		options.onUploaded(value);
+		options.uploads.update((list) => list.filter((entry) => entry.localId !== upload.localId));
+	});
+}
+
+// What the picker offers: everything storable, plus what the browser may be
+// able to convert into something storable on the way (ENG-84).
+const accept = [...ALLOWED_TYPES, ...CONVERTIBLE_ACCEPT].join(",");
 
 /** Hidden file input plus a paperclip that opens it. */
 export function AttachTrigger(options: {

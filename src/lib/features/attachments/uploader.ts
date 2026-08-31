@@ -14,6 +14,9 @@ import { api, messageOf } from "@/lib/client/api";
 import { MAX_ATTACHMENT_BYTES, formatBytes, isAllowedType } from "@/lib/domain/attachments";
 import type { Attachment } from "@/lib/domain/schemas";
 
+/** `converting` is before the bytes exist in a form the app can store. */
+export type UploadStatus = "converting" | "uploading" | "done" | "error";
+
 export interface Upload {
 	/** Local id, so a row can be tracked before the server has one. */
 	localId: string;
@@ -21,13 +24,27 @@ export interface Upload {
 	size: number;
 	/** 0–100. */
 	progress: Signal<number>;
-	status: Signal<"uploading" | "done" | "error">;
+	status: Signal<UploadStatus>;
 	error: Signal<string>;
 	/** Set once the server confirms it. */
 	attachment: Signal<Attachment | null>;
 }
 
 let counter = 0;
+
+/** A row for a file, in whatever state it is in before it goes up. */
+export function newUpload(file: File, status: UploadStatus): Upload {
+	counter += 1;
+	return {
+		localId: `upload-${counter}`,
+		filename: file.name,
+		size: file.size,
+		progress: signal(0),
+		status: signal<UploadStatus>(status),
+		error: signal(""),
+		attachment: signal<Attachment | null>(null),
+	};
+}
 
 /** Rejects a file locally, so an impossible upload never leaves the browser. */
 export function rejectionReason(file: File): string | null {
@@ -48,16 +65,7 @@ export function startUpload(options: {
 	issueId?: string;
 	commentId?: string;
 }): Upload {
-	counter += 1;
-	const upload: Upload = {
-		localId: `upload-${counter}`,
-		filename: options.file.name,
-		size: options.file.size,
-		progress: signal(0),
-		status: signal<"uploading" | "done" | "error">("uploading"),
-		error: signal(""),
-		attachment: signal<Attachment | null>(null),
-	};
+	const upload = newUpload(options.file, "uploading");
 
 	const fail = (message: string) => {
 		upload.error.set(message);

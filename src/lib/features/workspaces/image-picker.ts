@@ -23,6 +23,11 @@ import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { GeneratedWorkspaceAvatar } from "@/lib/components/workspace-avatar";
 import { ALLOWED_IMAGE_TYPES, imageRejectionReason } from "@/lib/domain/images";
+import {
+	CONVERTIBLE_ACCEPT,
+	needsTranscode,
+	toStorableImage,
+} from "@/lib/features/attachments/transcode";
 import { cn } from "@/lib/utils";
 
 export interface ImageChoice {
@@ -68,8 +73,25 @@ export function ImagePicker(options: {
 	const input = signal<HTMLInputElement | null>(null);
 	const { choice } = options;
 
-	const accept = async (file: File | null) => {
-		if (file === null) return;
+	const accept = async (chosen: File | null) => {
+		if (chosen === null) return;
+
+		// A picture straight off a phone is HEIC, which is stored nowhere here —
+		// the browser turns it into a JPEG first, where it can (ENG-84).
+		let file = chosen;
+		if (needsTranscode(chosen)) {
+			choice.uploading.set(true);
+			try {
+				file = await toStorableImage(chosen);
+			} catch (cause) {
+				toastError(
+					`${chosen.name}: ${cause instanceof Error ? cause.message : "could not be converted"}`,
+				);
+				return;
+			} finally {
+				choice.uploading.set(false);
+			}
+		}
 
 		const reason = imageRejectionReason(file);
 		if (reason !== null) {
@@ -128,8 +150,9 @@ export function ImagePicker(options: {
 			this: input,
 			type: "file",
 			// Straight from the allowlist the server enforces, so the picker cannot
-			// drift from it and offer a file that will be refused on reserve.
-			accept: ALLOWED_IMAGE_TYPES.join(","),
+			// drift from it and offer a file that will be refused on reserve —
+			// plus what the browser can convert into it on the way.
+			accept: [...ALLOWED_IMAGE_TYPES, ...CONVERTIBLE_ACCEPT].join(","),
 			class: "hidden",
 			onChange: (event) => {
 				void accept(event.target.files?.[0] ?? null);

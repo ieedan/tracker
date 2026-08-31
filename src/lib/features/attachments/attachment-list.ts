@@ -253,6 +253,12 @@ function UploadRow(upload: Readable<Upload>) {
 					}),
 				),
 			),
+			// A phone photo is converted before it goes anywhere; there is no
+			// progress to report for that, only that it is happening.
+			If(
+				current.status.bind((status) => status === "converting"),
+				Span({ class: "shrink-0 text-[11px] text-muted-foreground" }, "Converting…"),
+			),
 		),
 		If(
 			current.status.bind((status) => status === "error"),
