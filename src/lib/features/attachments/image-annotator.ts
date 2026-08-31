@@ -35,7 +35,9 @@ import {
 	ArrowUpRight,
 	Circle,
 	Highlighter,
+	MousePointer2,
 	Pen,
+	Redo2,
 	Square,
 	Trash2,
 	Type,
@@ -43,23 +45,37 @@ import {
 	X,
 	type IconComponent,
 } from "@implementjs/lucide";
+import { isTyping } from "@/lib/client/is-typing";
 import { toastError } from "@/lib/client/toast";
 import { Button } from "@/lib/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/lib/components/ui/dialog";
 import type { Attachment } from "@/lib/domain/schemas";
 import { cn } from "@/lib/utils";
 
-type AnnotationTool = "pen" | "highlighter" | "arrow" | "rect" | "ellipse" | "text";
+type AnnotationTool = "select" | "pen" | "highlighter" | "arrow" | "rect" | "ellipse" | "text";
 
 interface Point {
 	x: number;
 	y: number;
 }
 
-type Shape =
+type ShapeBody =
 	| { kind: "stroke"; highlight: boolean; color: string; width: number; points: Point[] }
 	| { kind: "arrow" | "rect" | "ellipse"; color: string; width: number; from: Point; to: Point }
 	| { kind: "text"; color: string; size: number; at: Point; text: string };
+
+/** A mark, with an identity of its own so the pointer can hold on to one. */
+type Shape = ShapeBody & { id: number };
+
+/** A box in image coordinates. */
+interface Box {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+let nextShapeId = 0;
 
 /** Where a text mark is being typed, in both spaces at once. */
 interface TextDraft {
@@ -73,13 +89,25 @@ interface TextDraft {
 	size: number;
 }
 
-const TOOLS: Array<{ value: AnnotationTool; label: string; icon: IconComponent }> = [
-	{ value: "pen", label: "Pen", icon: Pen },
-	{ value: "highlighter", label: "Highlighter", icon: Highlighter },
-	{ value: "arrow", label: "Arrow", icon: ArrowUpRight },
-	{ value: "rect", label: "Rectangle", icon: Square },
-	{ value: "ellipse", label: "Ellipse", icon: Circle },
-	{ value: "text", label: "Text", icon: Type },
+/**
+ * The tools, in the order their number keys run — Excalidraw's arrangement,
+ * where the digit a tool answers to is its place on the bar and the letter is
+ * the first letter of its name. Both are live; the bar shows the digit.
+ */
+const TOOLS: Array<{
+	value: AnnotationTool;
+	label: string;
+	icon: IconComponent;
+	/** Second way in, beside the digit. */
+	key: string;
+}> = [
+	{ value: "select", label: "Select", icon: MousePointer2, key: "v" },
+	{ value: "pen", label: "Pen", icon: Pen, key: "p" },
+	{ value: "highlighter", label: "Highlighter", icon: Highlighter, key: "h" },
+	{ value: "arrow", label: "Arrow", icon: ArrowUpRight, key: "a" },
+	{ value: "rect", label: "Rectangle", icon: Square, key: "r" },
+	{ value: "ellipse", label: "Ellipse", icon: Circle, key: "o" },
+	{ value: "text", label: "Text", icon: Type, key: "t" },
 ];
 
 /**
@@ -118,6 +146,134 @@ function toImage(canvas: HTMLCanvasElement, clientX: number, clientY: number): P
 	};
 }
 
+/** How wide a mark's own ink is, which is also how near counts as on it. */
+function inkWidth(shape: Shape): number {
+	if (shape.kind === "text") return shape.size;
+	return shape.kind === "stroke" && shape.highlight ? shape.width * 3 : shape.width;
+}
+
+/** Distance from a point to a segment — the whole of hit-testing a line. */
+function distanceToSegment(point: Point, from: Point, to: Point): number {
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const lengthSquared = dx * dx + dy * dy;
+	// A segment of no length is a point, and the distance to it is direct.
+	if (lengthSquared === 0) return Math.hypot(point.x - from.x, point.y - from.y);
+	const along = Math.max(
+		0,
+		Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared),
+	);
+	return Math.hypot(point.x - (from.x + along * dx), point.y - (from.y + along * dy));
+}
+
+/**
+ * What a mark occupies, ink included — the box the selection is drawn around.
+ *
+ * Text is the one kind whose extent the shape does not carry, so it is measured
+ * against the context that will draw it.
+ */
+function boundsOf(context: CanvasRenderingContext2D, shape: Shape): Box {
+	const pad = inkWidth(shape) / 2;
+
+	if (shape.kind === "text") {
+		context.save();
+		context.font = `600 ${shape.size}px ui-sans-serif, system-ui, sans-serif`;
+		const width = context.measureText(shape.text).width;
+		context.restore();
+		return {
+			left: shape.at.x,
+			top: shape.at.y,
+			right: shape.at.x + width,
+			// What `textBaseline: "top"` plus the font's own descent comes to.
+			bottom: shape.at.y + shape.size * 1.2,
+		};
+	}
+
+	const points = shape.kind === "stroke" ? shape.points : [shape.from, shape.to];
+	const xs = points.map((point) => point.x);
+	const ys = points.map((point) => point.y);
+	return {
+		left: Math.min(...xs) - pad,
+		top: Math.min(...ys) - pad,
+		right: Math.max(...xs) + pad,
+		bottom: Math.max(...ys) + pad,
+	};
+}
+
+/**
+ * Whether a point lands on a mark.
+ *
+ * On the ink itself rather than inside the box it occupies: these shapes are
+ * outlines, so the middle of a rectangle belongs to whatever is under it — the
+ * same rule Excalidraw uses for a shape with no fill. Text is the exception,
+ * being solid where it is drawn.
+ */
+function hits(context: CanvasRenderingContext2D, shape: Shape, at: Point, slack: number): boolean {
+	const reach = slack + inkWidth(shape) / 2;
+
+	if (shape.kind === "text") {
+		const box = boundsOf(context, shape);
+		return (
+			at.x >= box.left - slack &&
+			at.x <= box.right + slack &&
+			at.y >= box.top - slack &&
+			at.y <= box.bottom + slack
+		);
+	}
+
+	if (shape.kind === "stroke") {
+		const { points } = shape;
+		const first = points[0];
+		if (first === undefined) return false;
+		if (points.length === 1) return Math.hypot(at.x - first.x, at.y - first.y) <= reach;
+		for (let i = 1; i < points.length; i += 1) {
+			if (distanceToSegment(at, points[i - 1]!, points[i]!) <= reach) return true;
+		}
+		return false;
+	}
+
+	if (shape.kind === "arrow") return distanceToSegment(at, shape.from, shape.to) <= reach;
+
+	const left = Math.min(shape.from.x, shape.to.x);
+	const right = Math.max(shape.from.x, shape.to.x);
+	const top = Math.min(shape.from.y, shape.to.y);
+	const bottom = Math.max(shape.from.y, shape.to.y);
+
+	if (shape.kind === "rect") {
+		const outside =
+			at.x < left - reach || at.x > right + reach || at.y < top - reach || at.y > bottom + reach;
+		if (outside) return false;
+		// Inside the border by more than its reach is the hollow middle.
+		return !(
+			at.x > left + reach &&
+			at.x < right - reach &&
+			at.y > top + reach &&
+			at.y < bottom - reach
+		);
+	}
+
+	const radiusX = (right - left) / 2;
+	const radiusY = (bottom - top) / 2;
+	if (radiusX === 0 || radiusY === 0) return false;
+	const normalX = (at.x - (left + radiusX)) / radiusX;
+	const normalY = (at.y - (top + radiusY)) / radiusY;
+	// How far off the curve, scaled back into pixels by the tighter radius.
+	return Math.abs(Math.hypot(normalX, normalY) - 1) * Math.min(radiusX, radiusY) <= reach;
+}
+
+/** The same mark, moved. Shapes are replaced rather than mutated, for undo. */
+function moved(shape: Shape, dx: number, dy: number): Shape {
+	if (shape.kind === "text") return { ...shape, at: { x: shape.at.x + dx, y: shape.at.y + dy } };
+	if (shape.kind === "stroke") {
+		return { ...shape, points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+	}
+	return {
+		...shape,
+		from: { x: shape.from.x + dx, y: shape.from.y + dy },
+		to: { x: shape.to.x + dx, y: shape.to.y + dy },
+	};
+}
+
 /** `shot.png` → `shot-annotated.png`, and marking up twice does not say it twice. */
 function annotatedFilename(filename: string): string {
 	const dot = filename.lastIndexOf(".");
@@ -150,7 +306,19 @@ export function ImageAnnotator(options: {
 	const color = signal<string>(COLORS[0]);
 	const weight = signal(1);
 	const shapes = signal<Shape[]>([]);
-	const undone = signal<Shape[]>([]);
+	/**
+	 * History as whole lists rather than as added marks.
+	 *
+	 * A stack of what was added can only undo an addition, and a mark can now be
+	 * moved and deleted as well; a snapshot per edit undoes all three the same
+	 * way. A drawing holds a few dozen small objects, so the copies are cheap.
+	 */
+	const past = signal<Shape[][]>([]);
+	const future = signal<Shape[][]>([]);
+	/** The mark the pointer is holding, by id. */
+	const selected = signal<number | null>(null);
+	/** Whether the pointer is over a mark it could pick up, for the cursor. */
+	const overMark = signal(false);
 	const ready = signal(false);
 	const failed = signal(false);
 	const saving = signal(false);
@@ -167,6 +335,8 @@ export function ImageAnnotator(options: {
 	let ticket = 0;
 	/** Whether this instance is the one currently counted as open. */
 	let counted = false;
+	/** The mark being dragged: where the pointer was, and the list to undo to. */
+	let dragging: { id: number; at: Point; before: Shape[]; moved: boolean } | null = null;
 
 	const strokeWidth = () => WEIGHTS[weight.get()]!.stroke * unit;
 	const fontSize = () => WEIGHTS[weight.get()]!.font * unit;
@@ -264,14 +434,53 @@ export function ImageAnnotator(options: {
 		context.restore();
 	};
 
-	const redraw = () => {
+	/** The dashed box around the mark the pointer is holding. */
+	const paintSelection = (context: CanvasRenderingContext2D, shape: Shape) => {
+		const box = boundsOf(context, shape);
+		const pad = 4 * unit;
+		context.save();
+		context.setLineDash([6 * unit, 4 * unit]);
+		context.lineWidth = Math.max(1, 1.5 * unit);
+		context.strokeStyle = "#60a5fa";
+		context.strokeRect(
+			box.left - pad,
+			box.top - pad,
+			box.right - box.left + pad * 2,
+			box.bottom - box.top + pad * 2,
+		);
+		context.restore();
+	};
+
+	/**
+	 * `withSelection` is false for the one draw that becomes the PNG: the dashed
+	 * box is a handle on this screen, not part of the picture.
+	 */
+	const redraw = (withSelection = true) => {
 		const canvas = canvasRef.get();
 		const context = canvas?.getContext("2d") ?? null;
 		if (canvas === null || context === null || source === null) return;
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		context.drawImage(source, 0, 0, canvas.width, canvas.height);
-		for (const shape of shapes.get()) paint(context, shape);
+		const list = shapes.get();
+		for (const shape of list) paint(context, shape);
 		if (drawing !== null) paint(context, drawing);
+		if (!withSelection) return;
+		const id = selected.get();
+		const held = id === null ? undefined : list.find((shape) => shape.id === id);
+		if (held !== undefined) paintSelection(context, held);
+	};
+
+	/** The topmost mark under a point, which is the one a click means. */
+	const markAt = (at: Point): Shape | null => {
+		const context = canvasRef.get()?.getContext("2d") ?? null;
+		if (context === null) return null;
+		const slack = 6 * unit;
+		const list = shapes.get();
+		for (let i = list.length - 1; i >= 0; i -= 1) {
+			const shape = list[i]!;
+			if (hits(context, shape, at, slack)) return shape;
+		}
+		return null;
 	};
 
 	const load = (attachment: Attachment) => {
@@ -300,32 +509,52 @@ export function ImageAnnotator(options: {
 		element.src = attachment.url;
 	};
 
-	const commit = (shape: Shape) => {
-		shapes.push(shape);
-		// A new mark is the end of the line the redo stack was holding.
-		undone.set([]);
+	/** Drops a selection whose mark the list no longer holds. */
+	const reconcileSelection = (list: Shape[]) => {
+		const id = selected.get();
+		if (id !== null && !list.some((shape) => shape.id === id)) selected.set(null);
 	};
 
+	/** One edit: the list before it goes on the stack, and redo starts over. */
+	const apply = (next: Shape[]) => {
+		past.update((stack) => [...stack, shapes.get()]);
+		// An edit is the end of the line the redo stack was holding.
+		future.set([]);
+		shapes.set(next);
+		reconcileSelection(next);
+	};
+
+	const commit = (shape: Shape) => apply([...shapes.get(), shape]);
+
 	const undo = () => {
-		const list = shapes.get();
-		const last = list[list.length - 1];
-		if (last === undefined) return;
-		shapes.set(list.slice(0, -1));
-		undone.push(last);
+		const stack = past.get();
+		const previous = stack[stack.length - 1];
+		if (previous === undefined) return;
+		past.set(stack.slice(0, -1));
+		future.update((stack) => [...stack, shapes.get()]);
+		shapes.set(previous);
+		reconcileSelection(previous);
 	};
 
 	const redo = () => {
-		const list = undone.get();
-		const last = list[list.length - 1];
-		if (last === undefined) return;
-		undone.set(list.slice(0, -1));
-		shapes.push(last);
+		const stack = future.get();
+		const next = stack[stack.length - 1];
+		if (next === undefined) return;
+		future.set(stack.slice(0, -1));
+		past.update((stack) => [...stack, shapes.get()]);
+		shapes.set(next);
+		reconcileSelection(next);
 	};
 
 	const clear = () => {
 		if (shapes.get().length === 0) return;
-		undone.set([]);
-		shapes.set([]);
+		apply([]);
+	};
+
+	const deleteSelected = () => {
+		const id = selected.get();
+		if (id === null) return;
+		apply(shapes.get().filter((shape) => shape.id !== id));
 	};
 
 	const commitText = () => {
@@ -334,7 +563,14 @@ export function ImageAnnotator(options: {
 		draft.set(null);
 		draftText.set("");
 		if (pending === null || text === "") return;
-		commit({ kind: "text", color: color.get(), size: pending.size, at: pending.at, text });
+		commit({
+			kind: "text",
+			id: (nextShapeId += 1),
+			color: color.get(),
+			size: pending.size,
+			at: pending.at,
+			text,
+		});
 	};
 
 	const startText = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
@@ -373,42 +609,109 @@ export function ImageAnnotator(options: {
 		// A stroke started elsewhere on the picture ends the text being typed.
 		commitText();
 
+		if (which === "select") {
+			const held = markAt(at);
+			selected.set(held?.id ?? null);
+			// Empty picture under the pointer: the click was a deselect.
+			if (held === null) {
+				redraw();
+				return;
+			}
+			canvas.setPointerCapture(event.pointerId);
+			// The list as it stands is what an undo of this drag goes back to,
+			// kept aside until the drag turns out to have moved anything.
+			dragging = { id: held.id, at, before: shapes.get(), moved: false };
+			redraw();
+			return;
+		}
+
 		canvas.setPointerCapture(event.pointerId);
 		drawing =
 			which === "pen" || which === "highlighter"
 				? {
 						kind: "stroke",
+						id: (nextShapeId += 1),
 						highlight: which === "highlighter",
 						color: color.get(),
 						width: strokeWidth(),
 						points: [at],
 					}
-				: { kind: which, color: color.get(), width: strokeWidth(), from: at, to: at };
+				: {
+						kind: which,
+						id: (nextShapeId += 1),
+						color: color.get(),
+						width: strokeWidth(),
+						from: at,
+						to: at,
+					};
 		redraw();
 	};
 
 	const extend = (canvas: HTMLCanvasElement, event: PointerEvent) => {
-		if (drawing === null) return;
 		const at = toImage(canvas, event.clientX, event.clientY);
+
+		if (dragging !== null) {
+			const dx = at.x - dragging.at.x;
+			const dy = at.y - dragging.at.y;
+			if (dx === 0 && dy === 0) return;
+			dragging.at = at;
+			dragging.moved = true;
+			// Moved live, without touching history: the whole drag is one edit,
+			// pushed when it ends.
+			shapes.set(
+				shapes.get().map((shape) => (shape.id === dragging?.id ? moved(shape, dx, dy) : shape)),
+			);
+			redraw();
+			return;
+		}
+
+		if (drawing === null) {
+			// Nothing in hand: the cursor still has to say what a press would do.
+			if (tool.get() === "select") overMark.set(markAt(at) !== null);
+			return;
+		}
+
 		if (drawing.kind === "stroke") drawing.points.push(at);
 		else if (drawing.kind !== "text") drawing.to = at;
 		redraw();
 	};
 
 	const finish = () => {
+		if (dragging !== null) {
+			const drag = dragging;
+			dragging = null;
+			// A press that picked a mark up and put it back down is a selection,
+			// not an edit, so it leaves nothing to undo.
+			if (drag.moved) {
+				past.update((stack) => [...stack, drag.before]);
+				future.set([]);
+			}
+			return;
+		}
+
 		const shape = drawing;
 		drawing = null;
 		if (shape === null) return;
 		// A click that never moved is a stray click for everything but the pen,
 		// which draws its dot.
 		if (shape.kind !== "stroke" && shape.kind !== "text") {
-			const moved = Math.hypot(shape.to.x - shape.from.x, shape.to.y - shape.from.y);
-			if (moved < unit * 4) {
+			const travelled = Math.hypot(shape.to.x - shape.from.x, shape.to.y - shape.from.y);
+			if (travelled < unit * 4) {
 				redraw();
 				return;
 			}
 		}
 		commit(shape);
+	};
+
+	/** Switching tools puts down whatever the last one was holding. */
+	const pickTool = (value: AnnotationTool) => {
+		commitText();
+		tool.set(value);
+		// The dashed box belongs to the pointer; another tool has no use for it.
+		if (value !== "select") selected.set(null);
+		overMark.set(false);
+		redraw();
 	};
 
 	const save = () => {
@@ -419,8 +722,9 @@ export function ImageAnnotator(options: {
 		saving.set(true);
 		// The text just committed is drawn by the effect on `shapes`, which has
 		// already run by the time this frame is over — but `toBlob` reads the
-		// bitmap now, so paint it here rather than trusting the ordering.
-		redraw();
+		// bitmap now, so paint it here rather than trusting the ordering. Without
+		// the selection box: it is a handle, not part of the picture.
+		redraw(false);
 		canvas.toBlob((blob) => {
 			saving.set(false);
 			if (blob === null) {
@@ -445,10 +749,14 @@ export function ImageAnnotator(options: {
 				ticket += 1;
 				source = null;
 				drawing = null;
+				dragging = null;
 				return;
 			}
 			shapes.set([]);
-			undone.set([]);
+			past.set([]);
+			future.set([]);
+			selected.set(null);
+			overMark.set(false);
 			draft.set(null);
 			draftText.set("");
 			load(attachment);
@@ -485,10 +793,34 @@ export function ImageAnnotator(options: {
 			open,
 			ImplementDocument({
 				onKeydown: (event) => {
-					if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+					// A mark being typed owns the keyboard, ⌘Z included — that undo
+					// belongs to the text box.
+					if (isTyping(event)) return;
+
+					if (event.metaKey || event.ctrlKey) {
+						if (event.key.toLowerCase() !== "z") return;
+						event.preventDefault();
+						if (event.shiftKey) redo();
+						else undo();
+						return;
+					}
+					if (event.altKey) return;
+
+					if (event.key === "Delete" || event.key === "Backspace") {
+						if (selected.get() === null) return;
+						event.preventDefault();
+						deleteSelected();
+						return;
+					}
+
+					// A tool by its place on the bar, or by its own letter.
+					const key = event.key.toLowerCase();
+					const digit = Number.parseInt(key, 10);
+					const picked =
+						TOOLS[digit - 1] ?? TOOLS.find((entry) => entry.key === key && key.length === 1);
+					if (picked === undefined) return;
 					event.preventDefault();
-					if (event.shiftKey) redo();
-					else undo();
+					pickTool(picked.value);
 				},
 			}),
 		),
@@ -537,23 +869,33 @@ export function ImageAnnotator(options: {
 
 				Div(
 					{ class: "flex items-center gap-0.5 rounded-md border border-border p-0.5" },
-					...TOOLS.map((entry) =>
+					...TOOLS.map((entry, index) =>
 						Button(
 							{
 								variant: "ghost",
 								size: "icon-sm",
 								class: tool.bind((current) =>
-									cn("size-7", current === entry.value && "bg-accent text-accent-foreground"),
+									cn(
+										"relative size-7",
+										current === entry.value && "bg-accent text-accent-foreground",
+									),
 								),
-								title: entry.label,
+								title: `${entry.label} — ${index + 1} or ${entry.key.toUpperCase()}`,
 								"aria-label": entry.label,
+								"aria-keyshortcuts": `${index + 1} ${entry.key}`,
 								"aria-pressed": tool.bind((current) => current === entry.value),
-								onClick: () => {
-									commitText();
-									tool.set(entry.value);
-								},
+								onClick: () => pickTool(entry.value),
 							},
 							entry.icon({ class: "size-3.5" }),
+							// The number that presses this button, the way Excalidraw
+							// wears it. Only where there is a keyboard to press it with.
+							Span(
+								{
+									class:
+										"pointer-events-none absolute right-0.5 bottom-0 hidden text-[8px] leading-none opacity-60 md:block",
+								},
+								`${index + 1}`,
+							),
 						),
 					),
 				),
@@ -613,10 +955,24 @@ export function ImageAnnotator(options: {
 						class: "size-7",
 						title: "Undo (⌘Z)",
 						"aria-label": "Undo",
-						disabled: shapes.bind((list) => list.length === 0),
+						"aria-keyshortcuts": "Meta+Z",
+						disabled: past.bind((stack) => stack.length === 0),
 						onClick: undo,
 					},
 					Undo2({ class: "size-3.5" }),
+				),
+				Button(
+					{
+						variant: "ghost",
+						size: "icon-sm",
+						class: "size-7",
+						title: "Redo (⇧⌘Z)",
+						"aria-label": "Redo",
+						"aria-keyshortcuts": "Shift+Meta+Z",
+						disabled: future.bind((stack) => stack.length === 0),
+						onClick: redo,
+					},
+					Redo2({ class: "size-3.5" }),
 				),
 				Button(
 					{
@@ -661,7 +1017,13 @@ export function ImageAnnotator(options: {
 								// `touch-none` so a drag draws instead of panning the page.
 								class: cn(
 									"max-h-full max-w-full touch-none object-contain",
-									tool.bind((current) => (current === "text" ? "cursor-text" : "cursor-crosshair")),
+									derived([tool, overMark], (current, over) => {
+										if (current === "text") return "cursor-text";
+										// The pointer says what a press would do: pick a mark up
+										// where there is one, and nothing where there is not.
+										if (current === "select") return over ? "cursor-move" : "cursor-default";
+										return "cursor-crosshair";
+									}),
 								),
 								onPointerdown: (event) => begin(event.currentTarget, event),
 								onPointermove: (event) => extend(event.currentTarget, event),
